@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>they consulting – Motion Graphic</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Logo-Bildmarke als Vorlage; wird per JS in die Szenen geklont -->
+  <template id="mark-tpl">
+    <svg class="mark" viewBox="0 0 278 330" overflow="visible">
+      <path class="m-orange" fill="#ea5837" d="M1 194V65.5A63.5 63.5 0 0 1 128 65.5V194Z"/>
+      <path class="m-yellow" fill="#f7b85a" d="M128 65A65 65 0 0 1 128 195Z"/>
+      <path class="m-dark"   fill="#164656" d="M128 194H1.5A126.5 126.5 0 0 1 128 67.5Z"/>
+      <path class="m-mint"   fill="#7ec7be" d="M128 194H0A128 128 0 0 0 128 322Z"/>
+      <circle class="m-dot"  fill="#164656" cx="213" cy="264.5" r="63.5"/>
+    </svg>
+  </template>
+
+  <div id="stage">
+    <!-- durchgehender Hintergrund im Stil des Website-Heros -->
+    <div class="bg">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="orb orb-3"></div>
+      <div class="dots"></div>
+    </div>
+
+    <!-- heller Grund für die Logo-Szene, damit das Logo in Originalfarben steht -->
+    <div class="paper"><div class="dots dots-dark"></div></div>
+
+    <!-- 1 · Hook -->
+    <section class="scene" id="s-hook">
+      <div class="hook-text">
+        <h1 class="h-l split question">Noch ein<br>KI-Prototyp<br><span class="c-mint">für die <span class="strike">Schublade?<i class="strike-line"></i></span></span></h1>
+        <div class="answer">
+          <h1 class="h-xl split">Nicht bei uns.</h1>
+          <p class="h-m split c-mint">Wir entwickeln KI, die<br>im Tagesgeschäft wirkt.</p>
+        </div>
+      </div>
+      <div class="drawer-scene">
+        <div class="cabinet">
+          <div class="cabinet-body"></div>
+          <div class="slot"></div>
+        </div>
+        <div class="proto-card">
+          <div class="pc-proto">
+            <div class="pc-dash"></div>
+            <div class="pc-row"><b>KI-Prototyp</b><span class="pc-tag">v0.1</span></div>
+            <i class="pc-line" style="width:82%"></i><i class="pc-line" style="width:58%"></i><i class="pc-line" style="width:70%"></i>
+          </div>
+          <div class="pc-live">
+            <div class="pc-row"><b>KI im Einsatz</b><span class="pc-pill"><i class="live-dot"><i class="live-ring"></i></i>LIVE</span></div>
+            <div class="pc-bars"><i style="--h:34%"></i><i style="--h:48%"></i><i style="--h:44%"></i><i style="--h:63%"></i><i style="--h:72%"></i><i style="--h:94%"></i></div>
+          </div>
+        </div>
+        <div class="drawer-front"><span class="drawer-label">Prototypen</span><i class="handle"></i></div>
+      </div>
+    </section>
+
+    <!-- 2 · Claim -->
+    <section class="scene center" id="s-claim">
+      <div class="mark-slot"></div>
+      <div class="chip">KI-Integration mit Substanz</div>
+      <h1 class="h-xl split">they make<br>AI <span class="ul">work.<i class="ul-line"></i></span></h1>
+      <p class="lead split">Von der Idee zur produktiven KI-Lösung.</p>
+    </section>
+
+    <!-- 3 · Vorgehen -->
+    <section class="scene" id="s-process">
+      <div class="chip">Unser Vorgehen</div>
+      <h2 class="h-l split">Schritt für Schritt<br>zur wirkungsvollen<br><span class="c-mint">KI-Lösung.</span></h2>
+      <div class="badge-12"><b>12</b><span>Wochen</span></div>
+      <div class="timeline">
+        <div class="tl-track"><div class="tl-fill"></div></div>
+        <div class="step" style="--c:#ea5837"><div class="dot">1</div><div><div class="name">KI Kompass</div><div class="wk">Woche 1</div></div></div>
+        <div class="step" style="--c:#f7b85a"><div class="dot">2</div><div><div class="name">Discovery Workshop</div><div class="wk">Woche 2</div></div></div>
+        <div class="step" style="--c:#7ec7be"><div class="dot">3</div><div><div class="name">Opportunity Sprint</div><div class="wk">Woche 3–5</div></div></div>
+        <div class="step" style="--c:#7ec7be"><div class="dot">4</div><div><div class="name">Implementierung</div><div class="wk">Woche 4–10</div></div></div>
+        <div class="step" style="--c:#ffffff"><div class="dot">5</div><div><div class="name">Rollout &amp; Enablement</div><div class="wk">Woche 8–12</div></div></div>
+      </div>
+    </section>
+
+    <!-- 4 · Budgetgarantie -->
+    <section class="scene" id="s-budget">
+      <div class="quote-mark">“</div>
+      <div class="chip">Unsere Budgetgarantie</div>
+      <div class="quote">
+        <p class="q split">Was wir sagen,<br><span class="c-orange">gilt.</span></p>
+        <p class="q split">Was wir kalkulieren,<br><span class="c-yellow">bleibt.</span></p>
+        <p class="q split">Was wir starten, bringen<br><span class="c-mint">wir zu Ende.</span></p>
+      </div>
+      <div class="author">
+        <img src="assets/img/lars-avatar.jpg" alt="">
+        <div><b>Lars Quell</b><span>CEO, they consulting</span></div>
+      </div>
+    </section>
+
+    <!-- 5 · Digitale Souveränität -->
+    <section class="scene center" id="s-sovereign">
+      <div class="eu">
+        <svg class="eu-ring" viewBox="-160 -160 320 320"></svg>
+        <svg class="eu-shield" viewBox="0 0 100 100">
+          <path class="shield" d="M50 8 86 22V48C86 70 70 86 50 93 30 86 14 70 14 48V22Z"/>
+          <path class="tick" d="M33 51 45 63 68 38"/>
+        </svg>
+      </div>
+      <h2 class="h-l split">Digitale Souveränität.<br><span class="c-mint">Keine Kompromisse.</span></h2>
+      <div class="cards">
+        <div class="card"><svg viewBox="0 0 24 24"><path d="M5 12.5 10 17.5 19 7"/></svg>TISAX-konform</div>
+        <div class="card"><svg viewBox="0 0 24 24"><path d="M5 12.5 10 17.5 19 7"/></svg>Hosting in Europa</div>
+        <div class="card"><svg viewBox="0 0 24 24"><path d="M5 12.5 10 17.5 19 7"/></svg>DSGVO-ready</div>
+        <div class="card"><svg viewBox="0 0 24 24"><path d="M5 12.5 10 17.5 19 7"/></svg>KI ohne Datenweitergabe</div>
+      </div>
+    </section>
+
+
+    <!-- 6 · Kunden -->
+    <section class="scene center" id="s-clients">
+      <div class="chip">Projekte, Kunden &amp; Partner</div>
+      <h2 class="h-l split">Vom Mittelstand<br><span class="c-mint">bis zum Konzern.</span></h2>
+      <div class="logos">
+        <div><img src="assets/logos/volkswagen.svg" alt="Volkswagen"></div>
+        <div><img src="assets/logos/db-white.svg" alt="Deutsche Bahn"></div>
+        <div><img src="assets/logos/bentley.png" alt="Bentley"></div>
+        <div><img src="assets/logos/cariad.svg" alt="Cariad"></div>
+        <div><img src="assets/logos/lhind.svg" alt="Lufthansa Industry Solutions"></div>
+        <div><img src="assets/logos/cp.svg" alt="Contipark"></div>
+        <div><img src="assets/logos/ejf.svg" alt="EJF"></div>
+        <div><img src="assets/logos/vku.png" alt="VKU"></div>
+        <div><img src="assets/logos/bdb.svg" alt="BDB"></div>
+      </div>
+    </section>
+
+    <!-- 7 · Outro -->
+    <div class="wipe">
+      <div class="wipe-layer" style="background:#ea5837"></div>
+      <div class="wipe-layer" style="background:#f7b85a"></div>
+      <div class="wipe-layer" style="background:#7ec7be"></div>
+      <div class="wipe-layer" style="background:#f9f7f6"></div>
+    </div>
+    <section class="scene center" id="s-outro">
+      <div class="logo">
+        <div class="mark-slot"></div>
+        <div class="wordmark"><img src="assets/img/wordmark.png" alt="they consulting"></div>
+      </div>
+      <h2 class="h-m split">they make AI work.</h2>
+      <div class="cta"><span>Erstgespräch vereinbaren</span><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+      <div class="url">they-consulting.de</div>
+    </section>
+  </div>
+
+  <div id="controls" hidden>
+    <button id="play">▶︎</button>
+    <input id="scrub" type="range" min="0" max="1" step="0.0001" value="0">
+    <span id="time">0.00 s</span>
+    <a href="?format=feed">4:5</a> <a href="?format=story">9:16</a>
+  </div>
+
+  <script src="node_modules/gsap/dist/gsap.min.js"></script>
+  <script src="plan.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
