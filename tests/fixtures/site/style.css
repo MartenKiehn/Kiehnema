@@ -1,0 +1,11 @@
+@font-face { font-family: 'TestSans'; src: url(fonts/TestSans.ttf) format('truetype'); font-weight: 400; }
+:root { --brand-primary: #0a7d5a; --brand-dark: #10243e; }
+body { margin: 0; font-family: 'TestSans', sans-serif; color: #10243e; background: #ffffff; }
+header { display: flex; justify-content: space-between; padding: 16px 40px; background: #ffffff; }
+nav a { margin-left: 20px; color: #0a7d5a; }
+.hero { background: #10243e; color: #fff; padding: 120px 40px; min-height: 400px; }
+.hero h1 { font-family: 'TestSans', sans-serif; font-size: 64px; font-weight: 400; color: #ffffff; }
+.btn { display: inline-block; padding: 14px 28px; background: #f2994a; color: #10243e; border-radius: 8px; text-decoration: none; }
+h2 { color: #10243e; }
+.clients { display: flex; gap: 24px; padding: 40px; }
+.clients img { height: 48px; }
