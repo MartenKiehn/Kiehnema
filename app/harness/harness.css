@@ -1,0 +1,32 @@
+/* Harness base styles – compositions add their own composition.css on top. */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #0b1f27; overflow: hidden; }
+body { font-family: var(--font-body, sans-serif); -webkit-font-smoothing: antialiased; }
+
+#stage {
+  position: relative;
+  width: var(--w, 1080px);
+  height: var(--h, 1350px);
+  overflow: hidden;
+  transform-origin: 0 0;
+}
+.mg-scene { visibility: hidden; }
+
+/* word masks created by split() */
+.w  { display: inline-block; overflow: hidden; vertical-align: top; padding: 0 .02em .14em; margin: 0 -.02em -.14em; }
+.wi { display: inline-block; will-change: transform; }
+
+/* rendering must be driven by the GSAP timeline only */
+.mg-render *, .mg-render *::before, .mg-render *::after { animation: none !important; transition: none !important; caret-color: transparent !important; }
+/* consistent rasterisation regardless of seek history (layer promotion changes subpixel positioning) */
+.mg-render * { will-change: auto !important; }
+
+#mg-controls {
+  position: fixed; left: 0; right: 0; bottom: 0; height: 56px; padding: 0 16px;
+  display: flex; align-items: center; gap: 14px;
+  background: #0b1f27; border-top: 1px solid #234; font: 14px system-ui; color: #cde;
+}
+#mg-controls[hidden] { display: none; }
+#mg-controls input { flex: 1; }
+#mg-controls button { width: 40px; height: 32px; border: 0; border-radius: 6px; background: #7ec7be; color: #164656; font-size: 16px; cursor: pointer; }
+#mg-time { width: 64px; font-variant-numeric: tabular-nums; }

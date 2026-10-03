@@ -1,0 +1,54 @@
+{
+  "title": "they consulting – they make AI work.",
+  "language": "de",
+  "duration": 30,
+  "music": {
+    "bpm": 120,
+    "progression": [
+      "Am",
+      "F",
+      "C",
+      "G"
+    ],
+    "outro_progression": [
+      "F",
+      "C"
+    ],
+    "energy": "medium"
+  },
+  "scenes": {
+    "hook": [
+      0,
+      5.5
+    ],
+    "claim": [
+      5.5,
+      3.5
+    ],
+    "process": [
+      9,
+      5.5
+    ],
+    "budget": [
+      14.5,
+      4.5
+    ],
+    "sovereign": [
+      19,
+      3.5
+    ],
+    "clients": [
+      22.5,
+      3.0
+    ],
+    "outro": [
+      25.5,
+      4.5
+    ]
+  },
+  "marks": {
+    "drawerOpen": 0.9,
+    "slam": 2.0,
+    "answer": 2.5
+  }
+}

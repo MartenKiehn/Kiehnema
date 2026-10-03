@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8">
+<style>html,body{margin:0;background:#164656}#box{position:absolute;width:200px;height:200px;background:#ea5837}</style>
+</head>
+<body>
+<div id="box"></div>
+<!-- external resources the sandbox must block -->
+<img id="ext" src="https://example.com/pixel.png" alt="">
+<script>
+  // Minimal harness-contract page: deterministic, 1 second long.
+  const box = document.getElementById('box');
+  window.__duration = 1;
+  window.__seek = (t) => { box.style.left = `${Math.round(t * 600)}px`; box.style.top = '100px'; };
+  window.__leaked = null;
+  fetch('https://example.com/').then(() => { window.__leaked = true; }).catch(() => { window.__leaked = false; });
+  window.__seek(0);
+  window.__ready = true;
+</script>
+</body>
+</html>

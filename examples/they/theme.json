@@ -1,0 +1,22 @@
+{
+  "colors": {
+    "petrol": "#164656",
+    "petrol-deep": "#10323e",
+    "mint": "#7ec7be",
+    "yellow": "#f7b85a",
+    "orange": "#ea5837",
+    "paper": "#f9f7f6"
+  },
+  "fonts": [
+    {
+      "family": "Chivo Black",
+      "src": "assets/fonts/Chivo-Black.ttf",
+      "role": "display"
+    },
+    {
+      "family": "Chivo",
+      "src": "assets/fonts/Chivo-Regular.ttf",
+      "role": "body"
+    }
+  ]
+}
