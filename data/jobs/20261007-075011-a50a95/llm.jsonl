@@ -1,0 +1,6 @@
+{"step": "distill", "seconds": 29.5, "usage": {"input": 39509, "output": 3076, "cache_read": 0, "cache_write": 0}, "schema": "CompanyProfile"}
+{"step": "concept", "seconds": 49.3, "usage": {"input": 6278, "output": 4313, "cache_read": 0, "cache_write": 0}, "schema": "Concept"}
+{"step": "compose", "seconds": 566.2, "usage": {"input": 22850, "output": 45816, "cache_read": 0, "cache_write": 22846}, "chars": 31555}
+{"step": "fix", "seconds": 15.9, "usage": {"input": 38974, "output": 809, "cache_read": 18905, "cache_write": 20065}, "chars": 637}
+{"step": "qa", "seconds": 28.3, "usage": {"input": 11489, "output": 1734, "cache_read": 0, "cache_write": 0}, "schema": "QAReport"}
+{"step": "fix", "seconds": 36.7, "usage": {"input": 78575, "output": 3626, "cache_read": 37810, "cache_write": 40757}, "chars": 3408}

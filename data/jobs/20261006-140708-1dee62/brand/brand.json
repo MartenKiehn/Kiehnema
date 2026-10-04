@@ -1,0 +1,124 @@
+{
+ "site_name": "Atlas - Der sichere Weg zur KI im Unternehmen",
+ "language": "de",
+ "start_url": "https://talktoatlas.com/",
+ "colors": [
+  {
+   "hex": "#164555",
+   "score": 28.14,
+   "sources": [
+    "heading:h1",
+    "heading:h2",
+    "heading:h3",
+    "text:body",
+    "background:area",
+    "text:area",
+    "logo"
+   ],
+   "neutral": false
+  },
+  {
+   "hex": "#e65c3d",
+   "score": 11.72,
+   "sources": [
+    "cta",
+    "background:area",
+    "text:area",
+    "logo"
+   ],
+   "neutral": false
+  },
+  {
+   "hex": "#ffffff",
+   "score": 11.2,
+   "sources": [
+    "link:a",
+    "cta",
+    "background:area",
+    "text:area"
+   ],
+   "neutral": true
+  },
+  {
+   "hex": "#737373",
+   "score": 1.45,
+   "sources": [
+    "text:area"
+   ],
+   "neutral": true
+  },
+  {
+   "hex": "#f7b85a",
+   "score": 1.09,
+   "sources": [
+    "logo"
+   ],
+   "neutral": false
+  }
+ ],
+ "theme": {
+  "colors": {
+   "dark": "#164555",
+   "light": "#ffffff",
+   "paper": "#f7f7f5",
+   "primary": "#e65c3d",
+   "accent": "#f7b85a",
+   "accent-2": "#f7b85a",
+   "text": "#164555"
+  },
+  "fonts": [
+   {
+    "family": "Instrument Serif",
+    "src": "fonts/instrument-serif-400.woff2",
+    "role": "display",
+    "weight": 400,
+    "style": "normal"
+   },
+   {
+    "family": "Inter",
+    "src": "fonts/inter-400.woff2",
+    "role": "body",
+    "weight": 400,
+    "style": "normal"
+   }
+  ]
+ },
+ "fonts": [
+  {
+   "role": "display",
+   "site_family": "Instrument Serif",
+   "family": "Instrument Serif",
+   "file": "fonts/instrument-serif-400.woff2",
+   "source": "google",
+   "weight": 400
+  },
+  {
+   "role": "body",
+   "site_family": "Inter",
+   "family": "Inter",
+   "file": "fonts/inter-400.woff2",
+   "source": "google",
+   "weight": 400
+  }
+ ],
+ "logo": {
+  "file": "logo.svg",
+  "kind": "svg",
+  "width": 600,
+  "height": 173,
+  "source_url": null,
+  "colors": [
+   "#164656",
+   "#ea5837",
+   "#f7b85a"
+  ],
+  "on_dark_ok": false,
+  "on_light_ok": true,
+  "shapes": 8
+ },
+ "images": [],
+ "notes": [
+  "logo has low contrast on the dark brand colour – place it on a light background"
+ ],
+ "wordmark": null
+}

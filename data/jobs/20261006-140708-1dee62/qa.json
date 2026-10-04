@@ -1,0 +1,48 @@
+{
+ "approved": true,
+ "summary": "The frames are ready to render. All text is readable on a phone in both formats, the building and wall motif carries through the whole film, the palette is used consistently, and the dark and light scenes alternate as the storyboard says. Nothing is cut off and no text overlaps. The issues below are all minor: a ring that cuts through the CTA wordmark, empty space in a few story frames, and slightly low contrast on the CTA button.",
+ "issues": [
+  {
+   "severity": "minor",
+   "scene_id": "s-cta",
+   "format": "both",
+   "problem": "The thin beige circle behind the 'Atlas' wordmark is about as wide as the word, so its line cuts through the 'A' and the 's'. The bottom of the ring also nearly touches the tagline. The lockup looks unfinished.",
+   "fix": "Make the ring clearly bigger than the wordmark (e.g. width/height = wordmark width + 80px), or make it smaller and put it behind the word at opacity 0.35. Add margin-top: 24px to the tagline so it sits clearly below the ring."
+  },
+  {
+   "severity": "minor",
+   "scene_id": "s-cta",
+   "format": "both",
+   "problem": "The button text is white Inter at a small size on #e65c3d. That is about 3.4:1 contrast, which is borderline for small text on a phone.",
+   "fix": "Set the button text to font-weight 600 and at least 20px (feed) / 22px (story). Alternatively, darken the button background slightly to #d4512f."
+  },
+  {
+   "severity": "minor",
+   "scene_id": "s-infra",
+   "format": "feed",
+   "problem": "There is a large empty gap between the illustration (ends at ~y=415) and the chips (~y=505). The chips feel cut off from the visual.",
+   "fix": "Shrink the gap to ~40px, e.g. move the chip row up (top -= 50px), or move the illustration down a little so the content block is vertically centred."
+  },
+  {
+   "severity": "minor",
+   "scene_id": "s-payoff",
+   "format": "story",
+   "problem": "Below the building (from ~y=710) the frame is empty, about 25% of its height. The composition feels top-heavy.",
+   "fix": "In the story layout, scale the building up by about 1.25 and/or move the whole group down so it is vertically centred (e.g. justify-content: center on the stack)."
+  },
+  {
+   "severity": "minor",
+   "scene_id": "s-data",
+   "format": "story",
+   "problem": "The content sits in the upper two-thirds and the bottom ~200px is empty.",
+   "fix": "In the story format, move the whole stack down by ~80px, or give the chart card a larger height (e.g. 340px) so the space is used evenly."
+  },
+  {
+   "severity": "minor",
+   "scene_id": "s-hook",
+   "format": "both",
+   "problem": "The dotted line from the cloud starts inside the cloud shape, so the dots overlap its outline.",
+   "fix": "Start the dotted line at the cloud's lower left edge (outside the outline), or draw the cloud on top of the line (z-index above it)."
+  }
+ ]
+}

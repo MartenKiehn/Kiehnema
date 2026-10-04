@@ -1,0 +1,34 @@
+{
+ "approved": true,
+ "summary": "The video is ready to render. No major problems: every frame is readable in both formats, colors and type match across scenes, and the logo shows cleanly. I found four small fixes: the closing quote mark in s-proof, the weak dashboard in s-hook, a timing check on the last process chip and the gear in s-process, and empty space in the story version of s-brand.",
+ "issues": [
+  {
+   "severity": "minor",
+   "scene_id": "s-proof",
+   "format": "both",
+   "problem": "The closing quote mark shows as a straight \" instead of the German “. Together with the big gold quote mark plus the „ at the start, the line has too many quote marks and looks sloppy.",
+   "fix": "Use U+201C (“) for the closing mark in the quote string and check that the font has that character. Then either remove the „ at the start, because the large gold mark already opens the quote, or hide the gold mark."
+  },
+  {
+   "severity": "minor",
+   "scene_id": "s-hook",
+   "format": "both",
+   "problem": "The dashboard doesn't read as live metrics. Only two bars are tall, the other four are almost flat, and the large right-hand panel is mostly empty apart from a tiny red line. So the reveal after the drawer reopens feels weak.",
+   "fix": "By t≈2.4s, animate the bar heights to visible values of about 40–90% of the chart height, rising from left to right. Draw the line chart across the whole right panel with a stroke of at least 4px, and add a large KPI number (e.g. '+38%' in Chivo Black, primary color) to the empty panel."
+  },
+  {
+   "severity": "minor",
+   "scene_id": "s-process",
+   "format": "both",
+   "problem": "At t=15.1s the 'Rollout & Enablement' chip is still faded in. The gear the storyboard calls for at the end of the path isn't visible; the path just runs out as a dotted tail off the frame.",
+   "fix": "Have the chip opacity reach 1 by about 15.2s. At the end of the path, place a petrol gear icon about 48px in size that spins continuously (rotate keyframes, 3s linear infinite) and appears on the 15.5s cue. Remove the dotted tail."
+  },
+  {
+   "severity": "minor",
+   "scene_id": "s-brand",
+   "format": "story",
+   "problem": "The logo and tagline sit high in the story frame, leaving about 30% empty white space at the bottom, so the composition feels top-heavy.",
+   "fix": "In the story layout, center the logo + tagline group vertically (justify-content:center), or scale the logo to about 1.15× so the group fills more of the frame height."
+  }
+ ]
+}

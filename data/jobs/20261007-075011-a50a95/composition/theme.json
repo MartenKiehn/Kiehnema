@@ -1,0 +1,25 @@
+{
+  "colors": {
+    "dark": "#000000",
+    "light": "#ffffff",
+    "paper": "#f7f7f5",
+    "primary": "#388adc",
+    "muted": "#4c4c4c"
+  },
+  "fonts": [
+    {
+      "family": "Inter",
+      "src": "assets/brand/fonts/inter-700.woff2",
+      "role": "display",
+      "weight": 700,
+      "style": "normal"
+    },
+    {
+      "family": "Inter",
+      "src": "assets/brand/fonts/inter-400.woff2",
+      "role": "body",
+      "weight": 400,
+      "style": "normal"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+@font-face { font-family: 'Instrument Serif'; src: url(assets/brand/fonts/instrument-serif-400.woff2) format('woff2'); font-weight: 400; font-style: normal; font-display: block; }
+@font-face { font-family: 'Inter'; src: url(assets/brand/fonts/inter-400.woff2) format('woff2'); font-weight: 400; font-style: normal; font-display: block; }
+:root {
+  --brand-dark: #164555;
+  --brand-light: #ffffff;
+  --brand-paper: #f7f7f5;
+  --brand-primary: #e65c3d;
+  --brand-accent: #f7b85a;
+  --font-display: 'Instrument Serif', sans-serif;
+  --font-body: 'Inter', sans-serif;
+}

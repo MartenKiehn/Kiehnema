@@ -1,0 +1,210 @@
+{
+ "company_name": "Atlas",
+ "language": "de",
+ "one_liner": "Atlas ist eine modulare KI-Plattform von they consulting, mit der Mittelstand und Enterprise KI sicher und datenschutzkonform auf ihren eigenen Unternehmensdaten einsetzen.",
+ "audience": "Führungskräfte und Fachbereiche in Mittelstand und Enterprise",
+ "tone": "seriös, sicherheitsorientiert, pragmatisch, souverän",
+ "primary_cta": "Jetzt Beratungsgespräch vereinbaren",
+ "facts": [
+  {
+   "id": "f1",
+   "kind": "tagline",
+   "text": "Der sichere Weg zur KI im Unternehmen",
+   "quote": "Der sichere Weg zur KI im Unternehmen",
+   "source_url": "https://talktoatlas.com/",
+   "attribution": null
+  },
+  {
+   "id": "f2",
+   "kind": "claim",
+   "text": "Für Mittelstand und Enterprise mit voller Datenkontrolle und Compliance",
+   "quote": "Entwickelt für Mittelstand und Enterprise – bringen Sie KI in Ihre Organisation mit voller Datenkontrolle und Compliance.",
+   "source_url": "https://talktoatlas.com/",
+   "attribution": null
+  },
+  {
+   "id": "f3",
+   "kind": "other",
+   "text": "Problem: ChatGPT & Co. kennen das Unternehmen nicht",
+   "quote": "ChatGPT & Co. kennen Ihr Unternehmen nicht – und dürfen Ihre Daten nicht sehen",
+   "source_url": "https://talktoatlas.com/",
+   "attribution": null
+  },
+  {
+   "id": "f4",
+   "kind": "other",
+   "text": "Problem: KI-Projekte scheitern ohne Einbettung in Prozesse",
+   "quote": "KI-Projekte scheitern, weil sie nicht in echte Arbeitsprozesse eingebettet sind",
+   "source_url": "https://talktoatlas.com/",
+   "attribution": null
+  },
+  {
+   "id": "f5",
+   "kind": "differentiator",
+   "text": "Läuft in eigener Infrastruktur oder EU-Cloud, keine Datenübertragung an externe KI-Anbieter",
+   "quote": "Atlas läuft in Ihrer Infrastruktur oder in europäischen Cloud-Regionen. Keine Datenübertragung an externe KI-Anbieter.",
+   "source_url": "https://talktoatlas.com/",
+   "attribution": null
+  },
+  {
+   "id": "f6",
+   "kind": "differentiator",
+   "text": "Versteht eigene Daten, Dokumente und Prozesse",
+   "quote": "Atlas versteht Ihre Daten, Ihre Dokumente und Ihre Prozesse – nicht nur allgemeines Wissen.",
+   "source_url": "https://talktoatlas.com/",
+   "attribution": null
+  },
+  {
+   "id": "f7",
+   "kind": "differentiator",
+   "text": "Schnell startklar mit fertigen Modulen",
+   "quote": "Beginnen Sie mit fertigen Modulen und erweitern Sie Atlas flexibel, sobald neue Anforderungen entstehen.",
+   "source_url": "https://talktoatlas.com/",
+   "attribution": null
+  },
+  {
+   "id": "f8",
+   "kind": "service",
+   "text": "Datenchat: Fragen an Unternehmensdaten, automatische SQL-Abfragen, Antworten in Sekunden",
+   "quote": "Stellen Sie Fragen an Ihre Unternehmensdaten – Atlas erstellt automatisch die passenden Datenabfragen (z. B. SQL) und liefert Antworten in Sekunden.",
+   "source_url": "https://talktoatlas.com/",
+   "attribution": null
+  },
+  {
+   "id": "f9",
+   "kind": "claim",
+   "text": "Kein Warten mehr auf Analysten",
+   "quote": "Kein Warten mehr auf Analysten: Fachbereiche erhalten Antworten direkt im Chat.",
+   "source_url": "https://talktoatlas.com/",
+   "attribution": null
+  },
+  {
+   "id": "f10",
+   "kind": "service",
+   "text": "Dokumente: interne Wissensbasis, nachvollziehbare Antworten",
+   "quote": "Erstellen Sie eine interne Wissensbasis aus Ihren Dokumenten. Atlas beantwortet Fragen auf Basis Ihrer Unterlagen – nachvollziehbar und transparent.",
+   "source_url": "https://talktoatlas.com/",
+   "attribution": null
+  },
+  {
+   "id": "f11",
+   "kind": "service",
+   "text": "Daten-Agenten erstellen selbstständig Reports",
+   "quote": "Selbstständig arbeitende KI-Agenten kombinieren Datenquellen, stellen Rückfragen und erstellen Reports.",
+   "source_url": "https://talktoatlas.com/",
+   "attribution": null
+  },
+  {
+   "id": "f12",
+   "kind": "service",
+   "text": "Workflows: Unternehmensprozesse mit KI abbilden",
+   "quote": "Bilden Sie echte Unternehmensprozesse mit KI ab – von Dateneingaben bis zu automatisierten Entscheidungen.",
+   "source_url": "https://talktoatlas.com/",
+   "attribution": null
+  },
+  {
+   "id": "f13",
+   "kind": "claim",
+   "text": "Nutzt GPT-4, GPT-5 oder Claude Sonnet in der eigenen Cloud",
+   "quote": "Atlas nutzt modernste Large Language Models wie GPT-4, GPT-5 oder Claude Sonnet – sicher betrieben in Ihrer Cloud-Infrastruktur.",
+   "source_url": "https://talktoatlas.com/",
+   "attribution": null
+  },
+  {
+   "id": "f14",
+   "kind": "differentiator",
+   "text": "Keine Speicherung, kein Training, keine Weitergabe",
+   "quote": "Keine Daten verlassen Ihren Account. Keine Speicherung, kein Training, keine Übertragung an Dritte.",
+   "source_url": "https://talktoatlas.com/",
+   "attribution": null
+  },
+  {
+   "id": "f15",
+   "kind": "tagline",
+   "text": "KI und Datenschutz – kein Widerspruch",
+   "quote": "KI und Datenschutz – kein Widerspruch",
+   "source_url": "https://talktoatlas.com/",
+   "attribution": null
+  },
+  {
+   "id": "f16",
+   "kind": "claim",
+   "text": "Controlling: Ad-hoc-Analysen ohne SQL-Kenntnisse",
+   "quote": "Ad-hoc-Datenanalysen im Chat, ohne SQL-Kenntnisse.",
+   "source_url": "https://talktoatlas.com/",
+   "attribution": null
+  },
+  {
+   "id": "f17",
+   "kind": "claim",
+   "text": "Vertrieb: Umsatztrends als interaktive Karten",
+   "quote": "Regionale Umsatztrends als interaktive Karten – direkt aus Ihren CRM-Daten.",
+   "source_url": "https://talktoatlas.com/",
+   "attribution": null
+  },
+  {
+   "id": "f18",
+   "kind": "claim",
+   "text": "Management: Reports in Sekunden statt Tagen",
+   "quote": "Reports und Kennzahlen in Sekunden statt Tagen.",
+   "source_url": "https://talktoatlas.com/",
+   "attribution": null
+  },
+  {
+   "id": "f19",
+   "kind": "differentiator",
+   "text": "Made in Europe, entwickelt in Deutschland",
+   "quote": "Atlas wird in Deutschland entwickelt und übertrifft die höchsten europäischen Datenschutz- und Sicherheitsstandards.",
+   "source_url": "https://talktoatlas.com/",
+   "attribution": null
+  },
+  {
+   "id": "f20",
+   "kind": "claim",
+   "text": "Kompatibel mit PostgreSQL, MS SQL, NoSQL, MCP; n8n für Workflows",
+   "quote": "Atlas unterstützt relationale Datenbanken (PostgreSQL, MS SQL), NoSQL-Systeme, Dokumentenspeicher und Datenquellen mit MCP-Schnittstelle (Model Context Protocol).",
+   "source_url": "https://talktoatlas.com/",
+   "attribution": null
+  },
+  {
+   "id": "f21",
+   "kind": "team",
+   "text": "Lars Quell, Geschäftsführer",
+   "quote": "Lars Quell",
+   "source_url": "https://talktoatlas.com/",
+   "attribution": null
+  },
+  {
+   "id": "f22",
+   "kind": "team",
+   "text": "Florian Dietrichkeit, Leitung Softwareentwicklung",
+   "quote": "Florian Dietrichkeit",
+   "source_url": "https://talktoatlas.com/",
+   "attribution": null
+  },
+  {
+   "id": "f23",
+   "kind": "other",
+   "text": "Produkt von they consulting",
+   "quote": "Atlas ist ein Produkt von they consulting – einem deutschen Cloud- und KI-Beratungsunternehmen mit Fokus auf sichere, datenschutzkonforme KI-Architekturen.",
+   "source_url": "https://talktoatlas.com/",
+   "attribution": null
+  },
+  {
+   "id": "f24",
+   "kind": "cta",
+   "text": "Unverbindliches Gespräch, Atlas in Aktion erleben",
+   "quote": "Starten Sie mit einem unverbindlichen Gespräch – und erleben Sie Atlas in Aktion.",
+   "source_url": "https://talktoatlas.com/",
+   "attribution": null
+  },
+  {
+   "id": "f25",
+   "kind": "cta",
+   "text": "Beratungsgespräch vereinbaren",
+   "quote": "Jetzt Beratungsgespräch vereinbaren",
+   "source_url": "https://talktoatlas.com/",
+   "attribution": null
+  }
+ ]
+}

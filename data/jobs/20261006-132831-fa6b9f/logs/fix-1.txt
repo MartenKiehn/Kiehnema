@@ -1,0 +1,199 @@
+<file name="composition.html">
+<div class="bg">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+  <div class="dots"></div>
+</div>
+
+<!-- light grounds -->
+<div class="paper paper-white"><div class="dots dots-dark"></div></div>
+<div class="paper paper-grey"><div class="dots dots-dark"></div></div>
+
+<!-- 1 · Hook: drawer -->
+<section class="scene center" id="s-hook">
+  <h1 class="h-l split hook-headline" data-text-id="hook-headline">Keine Prototypen<br>für die <span class="c-accent2">Schublade.</span></h1>
+  <div class="drawer-scene">
+    <div class="drawer-rig">
+      <div class="cabinet"><i class="cab-top"></i></div>
+      <div class="lower"><i class="lower-handle"></i></div>
+      <div class="slot"></div>
+      <div class="well">
+        <div class="proto-card">
+          <i class="pc-title"></i>
+          <i class="pc-line" style="width:84%"></i>
+          <i class="pc-line" style="width:62%"></i>
+          <i class="pc-line" style="width:48%"></i>
+          <div class="stamp"><i></i></div>
+        </div>
+        <div class="dash">
+          <div class="dash-inner">
+            <div class="dash-head">
+              <i class="live-dot"><i class="live-ring"></i></i>
+              <i class="dh-line"></i>
+              <i class="dh-pill"></i>
+            </div>
+            <div class="dash-body">
+              <div class="dash-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="spark-box">
+                <svg class="spark" viewBox="0 0 200 180" preserveAspectRatio="none">
+                  <path class="spark-grid" d="M0 45H200M0 90H200M0 135H200"/>
+                  <path class="spark-area" d="M10 160 L45 128 L78 138 L112 92 L146 98 L190 30 L190 180 L10 180Z"/>
+                  <path class="spark-line" d="M10 160 L45 128 L78 138 L112 92 L146 98 L190 30"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+          <i class="dash-cover"></i>
+        </div>
+      </div>
+      <div class="drawer-front"><i class="plate"></i><i class="handle"></i></div>
+    </div>
+  </div>
+  <p class="h-m split c-accent hook-payoff" data-text-id="hook-payoff">Messbare Ergebnisse<br>im Tagesgeschäft.</p>
+</section>
+
+<!-- 2 · Brand -->
+<section class="scene center" id="s-brand">
+  <div class="brand-logo"><img src="assets/brand/logo.png" alt="they consulting"></div>
+  <h1 class="h-xl split" data-text-id="brand-tagline">they make<br>AI <span class="mk">work.<i class="mk-line deco"></i></span></h1>
+</section>
+
+<!-- 3 · Sprint -->
+<section class="scene" id="s-sprint">
+  <div class="chip chip-gold" data-text-id="sprint-label">Impact-Sprint</div>
+  <h2 class="h-l split" data-text-id="sprint-headline">In vier Wochen<br>vom <span class="c-accent">Use-Case</span><br>zum <span class="c-primary">MVP.</span></h2>
+  <div class="sprint-row">
+    <div class="note"><i class="pin"></i><i class="nl" style="width:80%"></i><i class="nl" style="width:62%"></i><i class="nl" style="width:72%"></i></div>
+    <div class="weeks">
+      <div class="wk"><i class="wk-fill"></i><span class="pips"><b></b></span></div>
+      <div class="wk"><i class="wk-fill"></i><span class="pips"><b></b><b></b></span></div>
+      <div class="wk"><i class="wk-fill"></i><span class="pips"><b></b><b></b><b></b></span></div>
+      <div class="wk"><i class="wk-fill"></i><span class="pips"><b></b><b></b><b></b><b></b></span></div>
+    </div>
+    <div class="mvp">
+      <div class="mvp-tile">
+        <svg viewBox="0 0 120 90"><path class="cloud" d="M30 74h58a18 18 0 0 0 2-36 26 26 0 0 0-50-6 20 20 0 0 0-10 42Z"/><path class="cloud-tick" d="M47 55l10 10 18-20"/></svg>
+        <i class="live-dot"><i class="live-ring"></i></i>
+      </div>
+    </div>
+  </div>
+  <p class="lead split" data-text-id="sprint-subline">Live in Ihrer Cloud-Umgebung.</p>
+</section>
+
+<!-- 4 · Process -->
+<section class="scene" id="s-process">
+  <h2 class="h-l split" data-text-id="process-headline">Von der Idee zur<br>produktiven<br><span class="c-accent2">KI-Lösung.</span></h2>
+  <div class="path-area">
+    <svg class="path-svg"></svg>
+    <div class="wp-chip" data-text-id="step-1">KI Kompass</div>
+    <div class="wp-chip" data-text-id="step-2">Discovery Workshop</div>
+    <div class="wp-chip" data-text-id="step-3">Opportunity Sprint</div>
+    <div class="wp-chip" data-text-id="step-4">Implementierung</div>
+    <div class="wp-chip" data-text-id="step-5">Rollout &amp; Enablement</div>
+    <div class="gear"><svg viewBox="-60 -60 120 120"><path class="gear-body"/><circle class="gear-hub" r="17"/></svg></div>
+  </div>
+</section>
+
+<!-- 5 · Proof -->
+<section class="scene" id="s-proof">
+  <div class="photo"><img src="assets/brand/img/photo-08.jpg" alt=""><div class="photo-tint"></div></div>
+  <div class="proof-content">
+    <svg class="qmark" viewBox="0 0 200 160">
+      <path d="M10 150V96C10 50 34 20 78 8l8 18C60 38 48 56 46 80h34v70Z"/>
+      <path d="M110 150V96c0-46 24-76 68-88l8 18c-26 12-38 30-40 54h34v70Z"/>
+    </svg>
+    <p class="q split" data-text-id="proof-quote"><span class="ln1">&#8222;Sie bleiben,</span><br><span class="ln2">bis alles</span><br><span class="ln3">stabil läuft.&#8220;</span></p>
+    <div class="attrib"><i class="attrib-line"></i><span data-text-id="proof-attribution">Kundenstimme</span></div>
+  </div>
+</section>
+
+<!-- 6 · Trust -->
+<section class="scene center" id="s-trust">
+  <div class="seals">
+    <div class="seal seal-1"><i class="seal-ring"></i>
+      <svg viewBox="0 0 120 120">
+        <path class="ico" d="M98 36H56L30 60l26 24h42Z"/>
+        <circle class="ico" cx="47" cy="60" r="5"/>
+        <path class="ico" d="M68 58v-6a8 8 0 0 1 16 0v6"/>
+        <rect class="ico-fill" x="63" y="57" width="26" height="20" rx="3"/>
+      </svg>
+    </div>
+    <div class="seal seal-2"><i class="seal-ring"></i>
+      <svg viewBox="0 0 120 120">
+        <g class="eu-stars"></g>
+        <path class="ico-fill" d="M41 76h38a13 13 0 0 0 1-26 17 17 0 0 0-32-5 13 13 0 0 0-7 31Z"/>
+      </svg>
+    </div>
+    <div class="seal seal-3"><i class="seal-ring"></i>
+      <svg viewBox="0 0 120 120">
+        <path class="ico-fill" d="M60 16 92 29V57C92 80 78 96 60 103 42 96 28 80 28 57V29Z"/>
+        <path class="shield-tick" d="M45 60 56 71 77 48"/>
+      </svg>
+    </div>
+  </div>
+  <h2 class="h-l split trust-head" data-text-id="trust-headline"><span class="tw1 c-primary">Festpreis.</span><br><span class="tw2 c-accent">EU-Server.</span><br><span class="tw3">TISAX-geprüft.</span></h2>
+  <p class="lead split" data-text-id="trust-subline">Was wir kalkulieren, bleibt.</p>
+</section>
+
+<!-- 7 · CTA -->
+<div class="cta-bg"><div class="dots dots-dark"></div></div>
+<section class="scene center" id="s-cta">
+  <div class="mini-drawer">
+    <div class="md-body"></div>
+    <div class="md-slot"></div>
+    <div class="md-front"><i></i></div>
+  </div>
+  <img class="logo" src="assets/brand/logo.png" alt="they consulting">
+  <p class="h-m split" data-text-id="cta-subline">Klar, unverbindlich<br>und auf Augenhöhe.</p>
+  <div class="cta-btn"><span data-text-id="cta-button">Erstgespräch vereinbaren</span><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+  <div class="url" data-text-id="cta-url">they-consulting.de</div>
+</section>
+</file>
+
+<edit file="composition.css"><search>.dash-body { display: flex; gap: 24px; margin-top: 26px; height: 208px; }
+.dash-bars {
+  flex: 1.3; display: flex; align-items: flex-end; gap: 13px;</search><replace>.dash-body { display: flex; gap: 20px; margin-top: 26px; height: 208px; }
+.dash-bars {
+  flex: 1.7; display: flex; align-items: flex-end; gap: 10px;</replace></edit>
+
+<edit file="composition.css"><search>.spark-line { fill: none;</search><replace>.spark-grid { fill: none; stroke: color-mix(in srgb, var(--dark) 12%, transparent); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.spark-area { fill: color-mix(in srgb, var(--accent2) 22%, transparent); }
+.spark-line { fill: none;</replace></edit>
+
+<edit file="composition.css"><search>.fmt-story .brand-logo { width: 720px; margin-bottom: 110px; }
+.fmt-story .h-xl { font-size: 136px; }</search><replace>.fmt-story #s-brand, .fmt-story #s-cta { justify-content: center; padding-top: 0; padding-bottom: 0; }
+.fmt-story .brand-logo { width: 820px; margin-bottom: 140px; }
+.fmt-story .h-xl { font-size: 150px; }</replace></edit>
+
+<edit file="composition.css"><search>.fmt-story .mini-drawer { margin-bottom: 90px; }
+.fmt-story .logo { width: 640px; margin-bottom: 90px; }
+.fmt-story .cta-btn { margin-top: 90px; }
+.fmt-story .url { margin-top: 56px; }</search><replace>.fmt-story .mini-drawer { margin-bottom: 110px; transform-origin: 50% 50%; width: 280px; height: 190px; }
+.fmt-story .logo { width: 760px; margin-bottom: 110px; }
+.fmt-story #s-cta .h-m { font-size: 68px; }
+.fmt-story .cta-btn { margin-top: 110px; font-size: 44px; padding: 34px 58px; }
+.fmt-story .url { margin-top: 64px; font-size: 40px; }</replace></edit>
+
+<edit file="composition.js"><search>    const V = [
+      [0.34, 0.48, 0.42, 0.6, 0.68, 0.82],
+      [0.4, 0.52, 0.5, 0.66, 0.74, 0.88],
+      [0.44, 0.58, 0.55, 0.7, 0.8, 0.93],
+      [0.48, 0.62, 0.6, 0.76, 0.86, 0.97],
+    ];
+    tl.to(bars, { scaleY: (i) => V[0][i], duration: 0.45, ease: 'back.out(1.8)', stagger: 0.06 }, T + 2.35);
+    for (let k = 1; k < V.length; k++) {
+      tl.to(bars, { scaleY: (i) => V[k][i], duration: 0.22, ease: 'power2.out' }, T + 2.6 + k * 0.25);
+    }
+    tl.to(spark, { strokeDashoffset: 0, duration: 0.8, ease: 'power2.out' }, T + 2.4);</search><replace>    const V = [
+      [0.2, 0.34, 0.3, 0.5, 0.62, 0.74, 0.88],
+      [0.24, 0.38, 0.36, 0.55, 0.66, 0.8, 0.92],
+      [0.26, 0.42, 0.4, 0.6, 0.7, 0.84, 0.96],
+      [0.3, 0.46, 0.44, 0.64, 0.75, 0.88, 1],
+    ];
+    tl.to(bars, { scaleY: (i) => V[0][i], duration: 0.4, ease: 'back.out(1.8)', stagger: 0.04 }, T + 2.15);
+    for (let k = 1; k < V.length; k++) {
+      tl.to(bars, { scaleY: (i) => V[k][i], duration: 0.22, ease: 'power2.out' }, T + 2.55 + k * 0.25);
+    }
+    tl.fromTo(`${s} .spark-area`, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.5 }, T + 2.25);
+    tl.to(spark, { strokeDashoffset: 0, duration: 0.6, ease: 'power2.out' }, T + 2.2);</replace></edit>

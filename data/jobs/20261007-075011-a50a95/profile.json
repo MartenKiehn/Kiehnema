@@ -1,0 +1,178 @@
+{
+ "company_name": "HafenCity Universität Hamburg (HCU)",
+ "language": "de",
+ "one_liner": "Die HCU ist die Universität für Baukunst und Metropolenentwicklung in Hamburg und richtet Lehre und Forschung interdisziplinär auf die gebaute Umwelt und die Zukunft von Metropolen aus.",
+ "audience": "Studieninteressierte, Studierende, Forschende und Mitarbeitende im Bereich gebaute Umwelt",
+ "tone": "sachlich, akademisch, interdisziplinär, zukunftsorientiert",
+ "primary_cta": "STUDIENORIENTIERUNG",
+ "facts": [
+  {
+   "id": "f1",
+   "kind": "tagline",
+   "text": "Universität für Baukunst und Metropolenentwicklung",
+   "quote": "Die HafenCity Universität Hamburg — Universität für Baukunst und Metropolenentwicklung (HCU) — richtet Lehre und Forschung auf die Zukunft von Metropolen aus.",
+   "source_url": "https://www.hcu-hamburg.de/universitaet",
+   "attribution": null
+  },
+  {
+   "id": "f2",
+   "kind": "claim",
+   "text": "Alle Aspekte des Bauens unter einem Dach",
+   "quote": "Die HCU vereint unter einem Dach alle Aspekte des Bauens in Gestaltung und Entwurf, Ingenieur- und Naturwissenschaften sowie Geistes- und Sozialwissenschaften.",
+   "source_url": "https://www.hcu-hamburg.de/universitaet/das-profil-der-hcu",
+   "attribution": null
+  },
+  {
+   "id": "f3",
+   "kind": "number",
+   "text": "Rund 2.400 Studierende und ca. 350 Mitarbeitende",
+   "quote": "Rund 2.400 Studierenden und ca. 350 Mitarbeitenden",
+   "source_url": "https://www.hcu-hamburg.de/universitaet/das-profil-der-hcu",
+   "attribution": null
+  },
+  {
+   "id": "f4",
+   "kind": "differentiator",
+   "text": "Standort HafenCity – größtes innerstädtisches Stadtentwicklungsprojekt Europas als Stadtlabor",
+   "quote": "der Standort HafenCity als größtes innerstädtisches Stadtentwicklungsprojekt Europas den besonderen Reiz eines Stadtlabors vor der eigenen Haustür",
+   "source_url": "https://www.hcu-hamburg.de/universitaet/das-profil-der-hcu",
+   "attribution": null
+  },
+  {
+   "id": "f5",
+   "kind": "other",
+   "text": "Gegründet 2006 durch Zusammenführung von vier Fachbereichen aus drei Hamburger Hochschulen",
+   "quote": "durch die Zusammenführung von vier Fachbereichen aus drei Hamburger Hochschulen gegründet",
+   "source_url": "https://www.hcu-hamburg.de/universitaet/das-profil-der-hcu",
+   "attribution": null
+  },
+  {
+   "id": "f6",
+   "kind": "claim",
+   "text": "Forschungsschwerpunkte: Klima/Nachhaltigkeit, soziale Gerechtigkeit, Digitalisierung",
+   "quote": "Die übergeordneten Forschungsschwerpunkte der HCU sind Klima/Nachhaltigkeit, soziale Gerechtigkeit und Digitalisierung.",
+   "source_url": "https://www.hcu-hamburg.de/universitaet/das-profil-der-hcu",
+   "attribution": null
+  },
+  {
+   "id": "f7",
+   "kind": "service",
+   "text": "Bachelor und Master in Architektur, Bauingenieurwesen, Geodäsie und Geoinformatik, Stadtplanung",
+   "quote": "Architektur, Bauingenieurwesen, Geodäsie und Geoinformatik, Stadtplanung – jeweils als Bachelor- mit konsekutivem Masterangebot",
+   "source_url": "https://www.hcu-hamburg.de/universitaet",
+   "attribution": null
+  },
+  {
+   "id": "f8",
+   "kind": "service",
+   "text": "Masterprogramme Urban Design und REAP",
+   "quote": "Urban Design und Resource Efficiency in Architecture and Planning (REAP) – als übergreifende Masterprogramme",
+   "source_url": "https://www.hcu-hamburg.de/universitaet",
+   "attribution": null
+  },
+  {
+   "id": "f9",
+   "kind": "service",
+   "text": "Bachelor TGA mit Digitaler Infrastruktur: intelligente, vernetzte Gebäude",
+   "quote": "Nachhaltige Gebäudetechnik verbindet Energie, Wasser, Luft und digitale Systeme.",
+   "source_url": "https://www.hcu-hamburg.de/bachelor",
+   "attribution": null
+  },
+  {
+   "id": "f10",
+   "kind": "service",
+   "text": "Bachelor Kultur – Digitalisierung – Metropole",
+   "quote": "Städte werden als kulturelle, digitale und soziale Räume erforscht.",
+   "source_url": "https://www.hcu-hamburg.de/bachelor",
+   "attribution": null
+  },
+  {
+   "id": "f11",
+   "kind": "differentiator",
+   "text": "Fachübergreifende Studienangebote als Alleinstellungsmerkmal mit rund 70 Veranstaltungen",
+   "quote": "Die FaSt sind ein Alleinstellungsmerkmal der HCU",
+   "source_url": "https://www.hcu-hamburg.de/bachelor",
+   "attribution": null
+  },
+  {
+   "id": "f12",
+   "kind": "number",
+   "text": "Rund 70 Veranstaltungen im Querschnittprogramm",
+   "quote": "Die HCU bietet in dem Querschnittprogramm rund 70 Veranstaltungen an",
+   "source_url": "https://www.hcu-hamburg.de/bachelor",
+   "attribution": null
+  },
+  {
+   "id": "f13",
+   "kind": "differentiator",
+   "text": "Konsequent interdisziplinär organisiert",
+   "quote": "Die HCU ist konsequent interdisziplinär organisiert.",
+   "source_url": "https://www.hcu-hamburg.de/universitaet/stellenausschreibungen",
+   "attribution": null
+  },
+  {
+   "id": "f14",
+   "kind": "claim",
+   "text": "Charakteristika der Ausbildung",
+   "quote": "Anwendungsbezug, technisches Wissen, multiperspektivische Reflexionen und gestalterische Kreativität sind die Charakteristika der Ausbildung an der HCU.",
+   "source_url": "https://www.hcu-hamburg.de/universitaet/stellenausschreibungen",
+   "attribution": null
+  },
+  {
+   "id": "f15",
+   "kind": "proof",
+   "text": "CityScienceLab in Kooperation mit dem MIT Media Lab",
+   "quote": "das CityScienceLab in cooperation with the MIT Media Lab (CSL), sowie der Energieforschungsverbund Hamburg (EFH)",
+   "source_url": "https://www.hcu-hamburg.de/research",
+   "attribution": null
+  },
+  {
+   "id": "f16",
+   "kind": "proof",
+   "text": "Forschung gefördert durch DFG, Bundesministerien, EU und Stiftungen",
+   "quote": "Die durch die DFG, Bundesministerien, EU und Stiftungen geförderten Forschungsprojekte zeigen die aktuellen Forschungsstärken der HCU auf.",
+   "source_url": "https://www.hcu-hamburg.de/research",
+   "attribution": null
+  },
+  {
+   "id": "f17",
+   "kind": "proof",
+   "text": "1000 Teilnehmende beim ExtremWetterKongress an der HCU",
+   "quote": "Mittlerweile 1000 Teilnehmende kommen bei der 16. ExtremWetterKongress und die 3. KlimaManagementTagung vom 23. bis 25. September an unserer HafenCity Universität zusammen.",
+   "source_url": "https://www.hcu-hamburg.de/",
+   "attribution": null
+  },
+  {
+   "id": "f18",
+   "kind": "other",
+   "text": "Teil der Erasmus+ Programmgeneration mit vielen Kooperationen",
+   "quote": "Die HCU ist Teil der aktuellen Erasmus+ Programm Generation und unterhält viele Kooperationen",
+   "source_url": "https://www.hcu-hamburg.de/internationales",
+   "attribution": null
+  },
+  {
+   "id": "f19",
+   "kind": "service",
+   "text": "Bibliothek Mo–Fr 9 bis 21 Uhr geöffnet",
+   "quote": "Montag bis Freitag 9 bis 21 Uhr",
+   "source_url": "https://www.hcu-hamburg.de/bibliothek",
+   "attribution": null
+  },
+  {
+   "id": "f20",
+   "kind": "cta",
+   "text": "Online-Studienorientierung",
+   "quote": "Entscheiden Sie selbst, ob Sie sich ein Studium an unserer Universität vorstellen können.",
+   "source_url": "https://www.hcu-hamburg.de/bachelor",
+   "attribution": null
+  },
+  {
+   "id": "f21",
+   "kind": "cta",
+   "text": "Bewerbung als Mitarbeitende",
+   "quote": "Interesse, Teil der HafenCity Universität zu werden und an der Zukunft der gebauten Umwelt mitzugestalten?",
+   "source_url": "https://www.hcu-hamburg.de/",
+   "attribution": null
+  }
+ ]
+}

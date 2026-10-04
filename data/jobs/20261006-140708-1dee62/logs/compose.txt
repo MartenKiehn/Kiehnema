@@ -1,0 +1,625 @@
+<file name="composition.html">
+<div class="bg">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+  <div class="grid"></div>
+</div>
+
+<!-- light ground for the two "everyday use" scenes -->
+<div class="paper"><div class="paper-dots"></div></div>
+
+<!-- Recurring visual: the company wall with its data core -->
+<div class="world">
+  <div class="world-inner">
+    <svg class="world-svg" viewBox="0 0 1080 640" overflow="visible">
+      <!-- second frame: EU cloud (infra scene) -->
+      <g class="eu">
+        <path class="eu-frame" d="M684 300H916Q940 300 940 324V576Q940 600 916 600H684Q660 600 660 576V324Q660 300 684 300Z"/>
+        <g class="eu-stars"></g>
+        <path class="eu-cloud" d="M772 458C758 458 758 438 773 436C772 420 793 414 802 425C810 410 834 414 834 432C848 432 850 458 834 458Z"/>
+      </g>
+      <path class="link" d="M500 470H660"/>
+      <circle class="packet" cx="500" cy="470" r="8"/>
+      <circle class="packet" cx="500" cy="470" r="8"/>
+
+      <!-- building -->
+      <g class="bld">
+        <path class="b-in" d="M378 582V268H468V168H612V268H702V582Z"/>
+        <path class="b-out" d="M360 600V250H450V150H630V250H720V600Z"/>
+        <path class="b-win" d="M482 188H520"/>
+        <path class="b-win" d="M560 188H598"/>
+        <path class="b-win" d="M482 218H520"/>
+        <path class="b-win" d="M560 218H598"/>
+        <path class="b-win" d="M396 290H426"/>
+        <path class="b-win" d="M654 290H684"/>
+        <path class="b-win" d="M516 600V562H564V600"/>
+        <circle class="core-glow g2" cx="540" cy="420" r="88"/>
+        <circle class="core-glow g1" cx="540" cy="420" r="56"/>
+        <path class="ring-wave" d="M430 420a110 110 0 1 0 220 0a110 110 0 1 0 -220 0"/>
+        <path class="ring" d="M430 420a110 110 0 1 0 220 0a110 110 0 1 0 -220 0"/>
+        <g class="bits"></g>
+        <circle class="core" cx="540" cy="420" r="28"/>
+        <path class="wall-hit" d="M720 345V475"/>
+      </g>
+
+      <!-- anonymous external AI -->
+      <g class="cloud">
+        <path class="cloud-body" d="M820 300C788 300 788 254 822 250C820 214 866 200 886 222C902 188 956 192 963 232C996 228 1006 264 986 280C1002 300 982 314 966 300Z"/>
+        <path class="cloud-alert" d="M820 300C788 300 788 254 822 250C820 214 866 200 886 222C902 188 956 192 963 232C996 228 1006 264 986 280C1002 300 982 314 966 300Z"/>
+      </g>
+      <g class="probes"></g>
+    </svg>
+  </div>
+</div>
+
+<!-- 1 · Hook -->
+<section class="scene top" id="s-hook">
+  <h1 class="h-l split" data-text-id="hook-problem">ChatGPT kennt<br>Ihr Unternehmen<br>nicht.</h1>
+  <p class="sub split" data-text-id="hook-problem-2">Und darf Ihre Daten nicht sehen.</p>
+</section>
+
+<!-- 2 · Payoff -->
+<section class="scene top center" id="s-payoff">
+  <div class="brand split" data-text-id="payoff-brand">Atlas</div>
+  <i class="brand-rule deco"></i>
+  <h2 class="h-m split" data-text-id="payoff-claim">KI und Datenschutz –<br>kein Widerspruch.</h2>
+</section>
+
+<!-- 3 · Infrastruktur -->
+<section class="scene top" id="s-infra">
+  <h2 class="h-l split" data-text-id="infra-headline">Läuft in Ihrer<br>Infrastruktur oder<br>EU-Cloud.</h2>
+  <div class="chips">
+    <div class="chip"><svg viewBox="0 0 24 24"><path class="arr" d="M4 12H16M12 7.5 16.5 12 12 16.5"/><path class="no" d="M5 20 19 4"/></svg><span data-text-id="infra-chip-1">Keine Speicherung</span></div>
+    <div class="chip"><svg viewBox="0 0 24 24"><path class="arr" d="M4 12H16M12 7.5 16.5 12 12 16.5"/><path class="no" d="M5 20 19 4"/></svg><span data-text-id="infra-chip-2">Kein Training</span></div>
+    <div class="chip"><svg viewBox="0 0 24 24"><path class="arr" d="M4 12H16M12 7.5 16.5 12 12 16.5"/><path class="no" d="M5 20 19 4"/></svg><span data-text-id="infra-chip-3">Keine Weitergabe</span></div>
+  </div>
+</section>
+
+<!-- 4 · Datenchat -->
+<section class="scene" id="s-data">
+  <h2 class="h-m split" data-text-id="data-headline">Fragen an Ihre Daten.<br>Antworten in Sekunden.</h2>
+  <div class="bubble"><span class="split" data-text-id="data-example">Wie lief Q3 im Süden?</span><i class="caret"></i></div>
+  <div class="answer-zone">
+    <div class="typing"><i></i><i></i><i></i></div>
+    <div class="sql"><i class="k" style="--w:96px"></i><i style="--w:60px"></i><i class="k" style="--w:70px"></i><i style="--w:120px"></i><i class="v" style="--w:84px"></i><i style="--w:54px"></i></div>
+    <div class="card">
+      <div class="card-head"><i class="d"></i><i class="t"></i><i class="p"></i></div>
+      <div class="chart">
+        <i style="--h:38%"></i><i style="--h:52%"></i><i style="--h:46%"></i><i style="--h:64%"></i><i style="--h:72%"></i><i class="hi" style="--h:94%"></i>
+      </div>
+    </div>
+  </div>
+  <p class="sub split" data-text-id="data-subline">Kein Warten mehr auf Analysten.</p>
+</section>
+
+<!-- 5 · Module -->
+<section class="scene" id="s-modules">
+  <h2 class="h-m split" data-text-id="modules-headline">Fertige Module.<br>Flexibel erweiterbar.</h2>
+  <div class="frame">
+    <div class="frame-head"><i></i><i></i><i></i><b></b></div>
+    <div class="slots">
+      <div class="slot"><div class="mod"><svg viewBox="0 0 24 24"><path d="M4 6.5C4 5.1 5.1 4 6.5 4h11C18.9 4 20 5.1 20 6.5v7c0 1.4-1.1 2.5-2.5 2.5H10l-4 4v-4h0.5C5.1 16 4 14.9 4 13.5Z"/></svg><span data-text-id="modules-chip-1">Datenchat</span></div></div>
+      <div class="slot"><div class="mod"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6Z M14 3v4h4 M9 12h6 M9 16h6"/></svg><span data-text-id="modules-chip-2">Dokumente</span></div></div>
+      <div class="slot"><div class="mod"><svg viewBox="0 0 24 24"><path d="M12 3v3 M7 8h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2Z M9.5 13h0.01 M14.5 13h0.01 M3 13v3 M21 13v3"/></svg><span data-text-id="modules-chip-3">Daten-Agenten</span></div></div>
+      <div class="slot"><div class="mod"><svg viewBox="0 0 24 24"><path d="M3 5h5v5H3Z M16 14h5v5h-5Z M8 7.5h5a2 2 0 0 1 2 2v7h1"/></svg><span data-text-id="modules-chip-4">Workflows</span></div></div>
+      <div class="slot plus"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div>
+    </div>
+  </div>
+</section>
+
+<!-- 6 · Vertrauen -->
+<section class="scene center" id="s-trust">
+  <div class="seal">
+    <svg viewBox="0 0 300 300" overflow="visible">
+      <path class="seal-dash" d="M8 150a142 142 0 1 0 284 0a142 142 0 1 0 -284 0"/>
+      <path class="seal-ring" d="M22 150a128 128 0 1 0 256 0a128 128 0 1 0 -256 0"/>
+      <path class="seal-bld" d="M96 218V113H123V83H177V113H204V218Z"/>
+      <circle class="seal-core" cx="150" cy="164" r="11"/>
+    </svg>
+  </div>
+  <h2 class="h-l split" data-text-id="trust-headline">Made in Europe.<br>Entwickelt in<br>Deutschland.</h2>
+</section>
+
+<!-- 7 · CTA -->
+<section class="scene center" id="s-cta">
+  <div class="cta-mark">
+    <div class="cta-glow"></div>
+    <div class="cta-ring"></div>
+    <div class="cta-brand split" data-text-id="cta-brand">Atlas</div>
+  </div>
+  <p class="cta-tag split" data-text-id="cta-tagline">Der sichere Weg<br>zur KI im Unternehmen</p>
+  <div class="btn"><span data-text-id="cta-button">Jetzt Beratungsgespräch vereinbaren</span><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+  <div class="url" data-text-id="cta-url">talktoatlas.com</div>
+</section>
+</file>
+
+<file name="composition.css">
+:root { --pad: 96px; --top: 110px; }
+#stage.fmt-story { --top: 250px; }
+
+#stage { color: var(--brand-light); font-family: var(--font-body); background: var(--brand-dark); overflow: hidden; }
+
+/* ---------- background ---------- */
+.bg {
+  position: absolute; inset: 0;
+  background: linear-gradient(165deg,
+    color-mix(in srgb, var(--brand-dark) 86%, var(--brand-light)) 0%,
+    var(--brand-dark) 55%,
+    color-mix(in srgb, var(--brand-dark) 86%, var(--brand-accent)) 100%);
+}
+.orb { position: absolute; border-radius: 50%; filter: blur(80px); }
+.orb-1 { width: 900px; height: 900px; right: -320px; top: -280px; background: radial-gradient(circle, color-mix(in srgb, var(--brand-accent) 34%, transparent), transparent 70%); }
+.orb-2 { width: 720px; height: 720px; left: -280px; bottom: -260px; background: radial-gradient(circle, color-mix(in srgb, var(--brand-primary) 24%, transparent), transparent 70%); }
+.orb-3 { width: 520px; height: 520px; left: 40%; top: 48%; background: radial-gradient(circle, color-mix(in srgb, var(--brand-light) 10%, transparent), transparent 70%); }
+.grid {
+  position: absolute; inset: -100px;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--brand-light) 5%, transparent) 1.5px, transparent 1.5px),
+    linear-gradient(90deg, color-mix(in srgb, var(--brand-light) 5%, transparent) 1.5px, transparent 1.5px);
+  background-size: 90px 90px;
+}
+.paper { position: absolute; inset: 0; background: var(--brand-paper); visibility: hidden; overflow: hidden; }
+.paper-dots {
+  position: absolute; inset: -80px;
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--brand-dark) 15%, transparent) 1.6px, transparent 0);
+  background-size: 36px 36px;
+}
+
+/* ---------- world (building) ---------- */
+.world { position: absolute; left: 0; top: 640px; width: 1080px; height: 640px; pointer-events: none; }
+.fmt-story .world { top: 820px; }
+.world-inner, .world-svg { width: 100%; height: 100%; display: block; }
+.world-svg { overflow: visible; }
+.b-out { fill: none; stroke: var(--brand-light); stroke-width: 5; stroke-linejoin: round; }
+.b-in { fill: none; stroke: var(--brand-accent); stroke-width: 2.5; stroke-linejoin: round; }
+.b-win { fill: none; stroke: color-mix(in srgb, var(--brand-light) 45%, transparent); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.core { fill: var(--brand-accent); }
+.core-glow { fill: var(--brand-accent); opacity: .18; }
+.bit { fill: var(--brand-accent); opacity: .8; }
+.ring { fill: none; stroke: var(--brand-primary); stroke-width: 6; }
+.ring-wave { fill: none; stroke: var(--brand-primary); stroke-width: 3; opacity: 0; }
+.wall-hit { fill: none; stroke: var(--brand-primary); stroke-width: 12; stroke-linecap: round; }
+.cloud-body { fill: color-mix(in srgb, var(--brand-light) 16%, transparent); stroke: color-mix(in srgb, var(--brand-light) 45%, transparent); stroke-width: 3; }
+.cloud-alert { fill: none; stroke: var(--brand-primary); stroke-width: 5; opacity: 0; }
+.probe { fill: color-mix(in srgb, var(--brand-light) 72%, transparent); }
+.eu-frame { fill: none; stroke: var(--brand-light); stroke-width: 5; stroke-linejoin: round; }
+.eu-star { fill: none; stroke: var(--brand-accent); stroke-width: 2.5; stroke-linejoin: round; }
+.eu-cloud { fill: none; stroke: var(--brand-light); stroke-width: 4; stroke-linejoin: round; }
+.link { fill: none; stroke: var(--brand-accent); stroke-width: 5; stroke-linecap: round; }
+.packet { fill: var(--brand-primary); }
+
+/* ---------- scenes ---------- */
+.scene {
+  position: absolute; inset: 0;
+  padding: 0 var(--pad);
+  display: flex; flex-direction: column; justify-content: center; align-items: flex-start;
+  visibility: hidden;
+}
+.scene.top { justify-content: flex-start; padding-top: var(--top); }
+.scene.center { align-items: center; text-align: center; }
+
+.h-l, .h-m, .brand, .cta-brand { font-family: var(--font-display); font-weight: 400; }
+.h-l { font-size: 110px; line-height: 1.04; letter-spacing: -.015em; }
+.h-m { font-size: 84px; line-height: 1.07; letter-spacing: -.01em; }
+.sub { font-size: 44px; line-height: 1.3; margin-top: 36px; color: color-mix(in srgb, var(--brand-light) 82%, transparent); }
+
+/* 1 · hook */
+#s-hook .h-l { font-size: 112px; }
+
+/* 2 · payoff */
+.brand { font-size: 190px; line-height: 1.02; letter-spacing: -.02em; }
+.brand-rule { display: block; width: 120px; height: 5px; border-radius: 3px; background: var(--brand-primary); margin: 14px 0 30px; transform-origin: 50% 50%; }
+
+/* 3 · infra */
+#s-infra .h-l { font-size: 96px; }
+.chips { position: absolute; left: var(--pad); right: var(--pad); top: 1010px; display: flex; flex-wrap: wrap; gap: 18px; }
+.fmt-story .chips { top: 1200px; flex-direction: column; align-items: flex-start; gap: 22px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 14px;
+  padding: 18px 32px 18px 22px; border-radius: 999px;
+  background: color-mix(in srgb, var(--brand-light) 7%, transparent);
+  border: 2px solid color-mix(in srgb, var(--brand-accent) 70%, transparent);
+  font-size: 32px; font-weight: 600; line-height: 1.2;
+}
+.chip svg { width: 40px; height: 40px; flex: none; }
+.chip .arr { fill: none; stroke: var(--brand-light); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.chip .no { fill: none; stroke: var(--brand-primary); stroke-width: 2.8; stroke-linecap: round; }
+
+/* 4 · data (light) */
+#s-data, #s-modules { color: var(--brand-dark); }
+#s-data .sub { color: color-mix(in srgb, var(--brand-dark) 75%, transparent); margin-top: 44px; }
+.bubble {
+  align-self: flex-end; margin-top: 56px;
+  display: flex; align-items: center; gap: 8px;
+  padding: 26px 40px; border-radius: 40px 40px 10px 40px;
+  background: var(--brand-dark); color: var(--brand-light);
+  font-size: 42px; font-weight: 600; line-height: 1.2;
+  box-shadow: 0 18px 40px color-mix(in srgb, var(--brand-dark) 22%, transparent);
+}
+.caret { display: block; width: 4px; height: 46px; border-radius: 2px; background: var(--brand-primary); }
+.answer-zone { position: relative; width: 100%; height: 400px; margin-top: 40px; }
+.typing {
+  position: absolute; left: 0; top: 0; display: flex; gap: 12px; padding: 26px 32px; border-radius: 32px;
+  background: var(--brand-light); box-shadow: 0 14px 30px color-mix(in srgb, var(--brand-dark) 12%, transparent);
+}
+.typing i { display: block; width: 16px; height: 16px; border-radius: 50%; background: color-mix(in srgb, var(--brand-dark) 45%, transparent); }
+.sql {
+  position: absolute; left: 0; top: 0; width: 78%; height: 78px; border-radius: 18px;
+  background: var(--brand-dark); display: flex; align-items: center; gap: 14px; padding: 0 28px;
+}
+.sql i { display: block; height: 16px; border-radius: 8px; width: var(--w); background: color-mix(in srgb, var(--brand-light) 55%, transparent); }
+.sql i.k { background: var(--brand-primary); }
+.sql i.v { background: var(--brand-accent); }
+.card {
+  position: absolute; inset: 0; border-radius: 32px; padding: 40px 44px;
+  background: var(--brand-light); display: flex; flex-direction: column;
+  box-shadow: 0 30px 70px color-mix(in srgb, var(--brand-dark) 16%, transparent);
+}
+.card-head { display: flex; align-items: center; gap: 16px; }
+.card-head i { display: block; }
+.card-head .d { width: 20px; height: 20px; border-radius: 50%; background: var(--brand-primary); }
+.card-head .t { width: 240px; height: 18px; border-radius: 9px; background: color-mix(in srgb, var(--brand-dark) 22%, transparent); }
+.card-head .p { margin-left: auto; width: 110px; height: 36px; border-radius: 18px; background: color-mix(in srgb, var(--brand-accent) 35%, transparent); }
+.chart {
+  flex: 1; display: flex; align-items: flex-end; gap: 24px; margin-top: 34px; padding-bottom: 6px;
+  border-bottom: 3px solid color-mix(in srgb, var(--brand-dark) 15%, transparent);
+}
+.chart i { display: block; flex: 1; height: var(--h); border-radius: 12px 12px 4px 4px; background: var(--brand-dark); }
+.chart i.hi { background: var(--brand-primary); }
+
+/* 5 · modules (light) */
+.frame {
+  width: 100%; margin-top: 60px; padding: 28px; border-radius: 34px;
+  background: var(--brand-light); border: 3px solid var(--brand-dark);
+  box-shadow: 0 30px 70px color-mix(in srgb, var(--brand-dark) 14%, transparent);
+}
+.frame-head { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; }
+.frame-head i { display: block; width: 16px; height: 16px; border-radius: 50%; }
+.frame-head i:nth-child(1) { background: var(--brand-primary); }
+.frame-head i:nth-child(2) { background: var(--brand-accent); }
+.frame-head i:nth-child(3) { background: color-mix(in srgb, var(--brand-dark) 30%, transparent); }
+.frame-head b { display: block; margin-left: 14px; width: 180px; height: 14px; border-radius: 7px; background: color-mix(in srgb, var(--brand-dark) 15%, transparent); }
+.slots { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.slot { position: relative; height: 128px; border-radius: 22px; border: 2.5px dashed color-mix(in srgb, var(--brand-dark) 28%, transparent); }
+.slot.plus { grid-column: span 2; height: 100px; display: flex; align-items: center; justify-content: center; border-color: color-mix(in srgb, var(--brand-primary) 60%, transparent); }
+.slot.plus svg { width: 56px; height: 56px; }
+.slot.plus path { fill: none; stroke: var(--brand-primary); stroke-width: 2.6; stroke-linecap: round; }
+.mod {
+  position: absolute; inset: -2.5px; border-radius: 22px;
+  background: var(--brand-dark); border: 3px solid var(--brand-accent); color: var(--brand-light);
+  display: flex; align-items: center; gap: 20px; padding: 0 28px;
+  font-size: 36px; font-weight: 600; line-height: 1.2;
+}
+.mod svg { width: 48px; height: 48px; flex: none; }
+.mod path { fill: none; stroke: var(--brand-accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* 6 · trust */
+.seal { width: 300px; height: 300px; margin-bottom: 64px; }
+.seal svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.seal-dash { fill: none; stroke: var(--brand-accent); stroke-width: 2.5; stroke-dasharray: 2 14; stroke-linecap: round; opacity: .7; }
+.seal-ring { fill: none; stroke: var(--brand-accent); stroke-width: 4; }
+.seal-bld { fill: none; stroke: var(--brand-light); stroke-width: 4; stroke-linejoin: round; }
+.seal-core { fill: var(--brand-primary); }
+#s-trust .h-l { font-size: 100px; }
+
+/* 7 · cta */
+.cta-mark { position: relative; display: flex; align-items: center; justify-content: center; }
+.cta-glow {
+  position: absolute; left: 50%; top: 50%; width: 600px; height: 600px; margin: -300px 0 0 -300px; border-radius: 50%;
+  background: radial-gradient(circle,
+    color-mix(in srgb, var(--brand-primary) 42%, transparent) 0%,
+    color-mix(in srgb, var(--brand-accent) 18%, transparent) 42%,
+    transparent 70%);
+}
+.cta-ring {
+  position: absolute; left: 50%; top: 50%; width: 400px; height: 400px; margin: -200px 0 0 -200px; border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--brand-accent) 70%, transparent);
+}
+.cta-brand { position: relative; font-size: 230px; line-height: 1.02; letter-spacing: -.02em; }
+.cta-tag { margin-top: 28px; font-size: 46px; line-height: 1.3; color: color-mix(in srgb, var(--brand-light) 86%, transparent); }
+.btn {
+  display: inline-flex; align-items: center; gap: 18px;
+  margin-top: 64px; padding: 30px 46px; border-radius: 999px;
+  background: var(--brand-primary); color: var(--brand-light);
+  font-size: 32px; font-weight: 600; line-height: 1.2;
+  box-shadow: 0 18px 44px color-mix(in srgb, var(--brand-primary) 30%, transparent);
+}
+.btn svg { width: 36px; height: 36px; flex: none; }
+.btn path { fill: none; stroke: var(--brand-light); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.url { margin-top: 36px; font-size: 32px; letter-spacing: .04em; font-weight: 600; color: color-mix(in srgb, var(--brand-light) 75%, transparent); }
+
+/* ---------- 9:16 ---------- */
+.fmt-story .sub { margin-top: 48px; }
+.fmt-story .bubble { margin-top: 80px; }
+.fmt-story .answer-zone { height: 560px; margin-top: 56px; }
+.fmt-story #s-data .sub { margin-top: 64px; }
+.fmt-story .frame { margin-top: 90px; padding: 34px; }
+.fmt-story .slots { gap: 24px; }
+.fmt-story .slot { height: 170px; }
+.fmt-story .slot.plus { height: 130px; }
+.fmt-story .seal { width: 380px; height: 380px; margin-bottom: 90px; }
+.fmt-story #s-trust .h-l { font-size: 108px; }
+.fmt-story .cta-brand { font-size: 250px; }
+.fmt-story .cta-tag { margin-top: 40px; }
+.fmt-story .btn { margin-top: 90px; }
+.fmt-story .url { margin-top: 48px; }
+</file>
+
+<file name="composition.js">
+/* Atlas – KI, die im Haus bleibt (30 s). */
+MG.composition(({ tl, W, H, isStory, manifest, $, $$, scene, words, fadeUp, exitUp, EXIT, stroke, cue }) => {
+  const DURATION = manifest.duration || 30;
+  const FALLBACK = {
+    's-hook': [0, 4], 's-payoff': [4, 4], 's-infra': [8, 5], 's-data': [13, 5.5],
+    's-modules': [18.5, 4.5], 's-trust': [23, 3], 's-cta': [26, 4],
+  };
+  const SC = manifest.scenes || {};
+  const timing = (id) => {
+    let v = Array.isArray(SC) ? SC.find((x) => x && x.id === id) : (SC[id] !== undefined ? SC[id] : SC[id.replace(/^s-/, '')]);
+    if (Array.isArray(v)) return [Number(v[0]), Number(v[1])];
+    if (v && typeof v === 'object') {
+      const st = Number(v.start);
+      const du = v.duration !== undefined ? Number(v.duration) : Number(v.end) - st;
+      if (!isNaN(st) && !isNaN(du)) return [st, du];
+    }
+    return FALLBACK[id];
+  };
+
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => {
+    const el = document.createElementNS(NS, tag);
+    Object.keys(attrs).forEach((k) => el.setAttribute(k, attrs[k]));
+    parent.appendChild(el);
+    return el;
+  };
+
+  // ---------- setup: generated SVG parts ----------
+  const bits = $('.bits');
+  for (let i = 0; i < 6; i++) {
+    const a = (Math.PI / 3) * i;
+    mk('rect', { class: 'bit', x: (540 + Math.cos(a) * 66 - 6).toFixed(1), y: (420 + Math.sin(a) * 66 - 6).toFixed(1), width: 12, height: 12, rx: 3 }, bits);
+  }
+  const probes = $('.probes');
+  for (let i = 0; i < 9; i++) {
+    const k = i / 8;
+    mk('circle', { class: 'probe', cx: (812 - k * 246).toFixed(1), cy: (300 + k * 102).toFixed(1), r: 6 }, probes);
+  }
+  const starPts = Array.from({ length: 10 }, (_, i) => {
+    const r = i % 2 ? 4.6 : 11;
+    const a = (Math.PI / 5) * i - Math.PI / 2;
+    return `${(Math.cos(a) * r).toFixed(2)} ${(Math.sin(a) * r).toFixed(2)}`;
+  });
+  const stars = $('.eu-stars');
+  for (let i = 0; i < 12; i++) {
+    const a = (Math.PI / 6) * i - Math.PI / 2;
+    const g = mk('g', { transform: `translate(${(800 + Math.cos(a) * 94).toFixed(2)} ${(440 + Math.sin(a) * 94).toFixed(2)})` }, stars);
+    mk('path', { class: 'eu-star', d: `M${starPts.join('L')}Z` }, g);
+  }
+
+  // ---------- layout constants (positions only, timing identical) ----------
+  const WORLD_TOP = isStory ? 820 : 640;
+  const INF = isStory ? { s: 1, top: 640 } : { s: 0.85, top: 450 };
+  const infraY = INF.top - (WORLD_TOP + 320 + (150 - 320) * INF.s);
+  const R = Math.ceil(Math.hypot(W, H)) + 100;
+
+  // ---------- living background ----------
+  tl.fromTo('.orb-1', { x: 0, y: 0 }, { x: -240, y: 280, duration: DURATION / 2, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0);
+  tl.fromTo('.orb-2', { x: 0, y: 0 }, { x: 320, y: -240, duration: DURATION / 2, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0);
+  tl.fromTo('.orb-3', { x: 0, y: 0, scale: 1 }, { x: -260, y: -320, scale: 1.4, duration: DURATION / 3, ease: 'sine.inOut', yoyo: true, repeat: 2 }, 0);
+  tl.fromTo('.grid', { y: 0, x: 0 }, { y: -90, x: -45, duration: DURATION, ease: 'none' }, 0);
+  tl.fromTo('.paper-dots', { y: 0 }, { y: -72, duration: DURATION, ease: 'none' }, 0);
+
+  // ---------- world: building + data core ----------
+  tl.set('.world-inner', { transformOrigin: '50% 50%', y: 0, scale: 1, autoAlpha: 1 }, 0);
+  tl.set('.bld', { x: -170 }, 0);
+  tl.set('.wall-hit', { autoAlpha: 0 }, 0);
+  const bOut = $('.b-out');
+  stroke(bOut);
+  const bIn = $('.b-in');
+  stroke(bIn);
+  const wins = $$('.b-win');
+  wins.forEach((p) => stroke(p));
+  tl.fromTo(bOut, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.01 }, 0);
+  tl.to(bOut, { strokeDashoffset: 0, duration: 1.0, ease: 'power2.inOut' }, 0.02);
+  tl.fromTo(wins, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.01, stagger: 0.07 }, 0.6);
+  tl.to(wins, { strokeDashoffset: 0, duration: 0.4, ease: 'power2.out', stagger: 0.07 }, 0.6);
+  tl.fromTo('.core', { scale: 0, transformOrigin: '50% 50%' }, { scale: 1, duration: 0.6, ease: 'back.out(2.5)' }, 0.45);
+  tl.fromTo('.core-glow', { scale: 0.8, opacity: 0.45, transformOrigin: '50% 50%' },
+    { scale: 1.25, opacity: 0.12, duration: 1, ease: 'sine.inOut', yoyo: true, repeat: 11, stagger: 0.25 }, 0.6);
+  tl.fromTo('.bit', { autoAlpha: 0, scale: 0, transformOrigin: '50% 50%' }, { autoAlpha: 0.85, scale: 1, duration: 0.3, stagger: 0.05 }, 0.8);
+  tl.fromTo('.bits', { rotation: 0, svgOrigin: '540 420' }, { rotation: 300, svgOrigin: '540 420', duration: 13, ease: 'none' }, 0);
+  tl.set('.ring', { scale: 0, autoAlpha: 0, transformOrigin: '50% 50%' }, 0);
+
+  // 1 · Hook ------------------------------------------------------------------
+  {
+    const [T, D] = timing('s-hook');
+    const { sel: s } = scene('s-hook', T, D);
+    words(`${s} .h-l`, T + 0.15, 0.06);
+    words(`${s} .sub`, T + 1.4, 0.05);
+    cue(T, 'thud');
+
+    // external AI cloud approaches and reaches for the data
+    tl.fromTo('.cloud', { x: 220, autoAlpha: 0, scale: 1, transformOrigin: '50% 50%' },
+      { x: 0, autoAlpha: 1, duration: 0.9, ease: 'power3.out' }, T + 0.5);
+    tl.fromTo('.cloud', { y: 0 }, { y: -10, duration: 0.6, ease: 'sine.inOut', yoyo: true, repeat: 3 }, T + 1.4);
+    tl.fromTo('.probe', { autoAlpha: 0, scale: 0, transformOrigin: '50% 50%' },
+      { autoAlpha: 1, scale: 1, duration: 0.15, stagger: 0.065, ease: 'back.out(3)' }, T + 1.4);
+
+    // the wall holds – hard stop, red flicker
+    tl.fromTo('.wall-hit', { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.06, ease: 'none', yoyo: true, repeat: 5 }, T + 2.0);
+    tl.to('.wall-hit', { autoAlpha: 1, duration: 0.1 }, T + 2.4);
+    tl.to('.wall-hit', { autoAlpha: 0, duration: 0.5 }, T + 3.2);
+    tl.fromTo('.cloud-alert', { opacity: 0 }, { opacity: 1, duration: 0.06, ease: 'none', yoyo: true, repeat: 5 }, T + 2.0);
+    tl.to('.cloud', { x: 14, duration: 0.05, ease: 'none', yoyo: true, repeat: 5 }, T + 2.0);
+    tl.to('.probe', { x: 24, y: -10, autoAlpha: 0.35, duration: 0.4, ease: 'back.out(3)', stagger: { each: 0.02, from: 'end' } }, T + 2.02);
+    cue(T + 2.0, 'stop', { until: T + 2.5 });
+    cue(T + 2.05, 'thud', { gain: 0.6 });
+    cue(T + 2.5, 'arp');
+    cue(T + 4.0, 'riser', { length: 1.5, gain: 0.5 });
+
+    exitUp([`${s} .h-l`, `${s} .sub`], T + D - EXIT - 0.05);
+    tl.to('.probe', { autoAlpha: 0, duration: 0.3 }, T + D - 0.45);
+  }
+
+  // 2 · Payoff ------------------------------------------------------------------
+  {
+    const [T, D] = timing('s-payoff');
+    const { sel: s } = scene('s-payoff', T, D);
+    // cloud dissolves, intelligence grows inside
+    tl.to('.cloud', { scale: 1.45, autoAlpha: 0, duration: 0.6, ease: 'power2.out' }, T - 0.25);
+    tl.to('.bld', { x: 0, duration: 1.0, ease: 'power3.inOut' }, T - 0.2);
+    tl.to('.ring', { scale: 1, autoAlpha: 1, duration: 0.9, ease: 'expo.out' }, T + 0.05);
+    tl.fromTo('.ring-wave', { scale: 1, opacity: 0.7, transformOrigin: '50% 50%' },
+      { scale: 1.55, opacity: 0, duration: 1.0, ease: 'power1.out', repeat: 3 }, T + 0.4);
+    tl.to(bIn, { strokeDashoffset: 0, duration: 0.9, ease: 'power2.inOut' }, T + 0.3);
+
+    words(`${s} .brand`, T + 0.1, 0.06, 0.7);
+    tl.fromTo(`${s} .brand-rule`, { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: 'power3.out' }, T + 0.35);
+    words(`${s} .h-m`, T + 0.45, 0.06);
+    cue(T, 'drop');
+    cue(T, 'impact', { gain: 0.7 });
+    cue(T + 0.5, 'groove');
+    cue(T + 0.5, 'bells', { notes: [74, 77, 81, 84], step: 0.12, gain: 0.04 });
+
+    exitUp([`${s} .brand`, `${s} .brand-rule`, `${s} .h-m`], T + D - EXIT - 0.05);
+  }
+
+  // 3 · Infrastructure ------------------------------------------------------------
+  {
+    const [T, D] = timing('s-infra');
+    const { sel: s } = scene('s-infra', T, D);
+    tl.to('.world-inner', { y: infraY, scale: INF.s, duration: 0.9, ease: 'power3.inOut' }, T - 0.3);
+    tl.to('.bld', { x: -220, duration: 0.9, ease: 'power3.inOut' }, T - 0.3);
+
+    const euFrame = $('.eu-frame');
+    stroke(euFrame);
+    const euCloud = $('.eu-cloud');
+    stroke(euCloud);
+    const link = $('.link');
+    stroke(link);
+    tl.fromTo('.eu', { autoAlpha: 0, x: 60 }, { autoAlpha: 1, x: 0, duration: 0.7, ease: 'power3.out' }, T + 0.3);
+    tl.to(euFrame, { strokeDashoffset: 0, duration: 0.8, ease: 'power2.inOut' }, T + 0.3);
+    tl.fromTo('.eu-star', { scale: 0, rotation: -120, transformOrigin: '50% 50%' },
+      { scale: 1, rotation: 0, duration: 0.5, ease: 'back.out(2.2)', stagger: 0.04 }, T + 0.6);
+    tl.to(euCloud, { strokeDashoffset: 0, duration: 0.6, ease: 'power2.out' }, T + 0.9);
+    tl.fromTo(link, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.01 }, T + 1.1);
+    tl.to(link, { strokeDashoffset: 0, duration: 0.5, ease: 'power2.inOut' }, T + 1.1);
+    tl.set('.packet', { autoAlpha: 0 }, 0);
+    tl.set('.packet', { autoAlpha: 1 }, T + 1.6);
+    tl.fromTo('.packet', { x: 0 }, { x: 160, duration: 0.8, ease: 'power1.inOut', repeat: 3, stagger: 0.4 }, T + 1.6);
+    cue(T + 1.1, 'bell', { note: 81, gain: 0.04 });
+
+    words(`${s} .h-l`, T + 0.1, 0.05);
+    $$(`${s} .chip`).forEach((chip, i) => {
+      const at = T + 1.5 + i * 0.5;
+      tl.fromTo(chip, { autoAlpha: 0, y: 40, scale: 0.9 }, { autoAlpha: 1, y: 0, scale: 1, duration: 0.5, ease: 'back.out(1.8)' }, at - 0.12);
+      const no = $('.no', chip);
+      stroke(no);
+      tl.to(no, { strokeDashoffset: 0, duration: 0.3, ease: 'power2.out' }, at + 0.15);
+      cue(at, 'tick');
+    });
+
+    exitUp([`${s} .h-l`, ...$$(`${s} .chip`)], T + D - EXIT);
+    tl.to('.world-inner', { autoAlpha: 0, y: infraY - 60, duration: 0.45, ease: 'power3.in' }, T + D - 0.45);
+  }
+
+  // 4 · Data chat (light) -------------------------------------------------------
+  {
+    const [T, D] = timing('s-data');
+    const [TM, DM] = timing('s-modules');
+    const { sel: s } = scene('s-data', T, D);
+    tl.set('.paper', { visibility: 'visible' }, T - 0.35);
+    tl.fromTo('.paper', { clipPath: 'circle(0px at 50% 55%)' }, { clipPath: `circle(${R}px at 50% 55%)`, duration: 0.65, ease: 'power3.inOut' }, T - 0.35);
+    tl.to('.paper', { clipPath: 'circle(0px at 50% 50%)', duration: 0.45, ease: 'power3.in' }, TM + DM - 0.4);
+    tl.set('.paper', { visibility: 'hidden' }, TM + DM + 0.08);
+
+    words(`${s} .h-m`, T + 0.1, 0.05);
+    tl.fromTo(`${s} .bubble`, { autoAlpha: 0, y: 30, scale: 0.9, transformOrigin: '100% 100%' },
+      { autoAlpha: 1, y: 0, scale: 1, duration: 0.45, ease: 'back.out(1.8)' }, T + 0.3);
+    words(`${s} .bubble .split`, T + 0.5, 0.11, 0.3);
+    tl.fromTo(`${s} .caret`, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.01 }, T + 0.45);
+    tl.to(`${s} .caret`, { autoAlpha: 0, duration: 0.25, ease: 'steps(1)', yoyo: true, repeat: 2 }, T + 1.2);
+    cue(T + 0.5, 'tick', { until: T + 1.3 });
+
+    // thinking → SQL flickers → folds into the answer card
+    tl.fromTo(`${s} .typing`, { autoAlpha: 0, y: 20 }, { autoAlpha: 1, y: 0, duration: 0.25 }, T + 1.15);
+    tl.fromTo(`${s} .typing i`, { y: 0 }, { y: -10, duration: 0.14, ease: 'sine.inOut', yoyo: true, repeat: 1, stagger: 0.08 }, T + 1.25);
+    tl.to(`${s} .typing`, { autoAlpha: 0, duration: 0.15 }, T + 1.55);
+    tl.fromTo(`${s} .sql`, { autoAlpha: 0, scaleX: 0.6, scaleY: 1, transformOrigin: '0% 0%' },
+      { autoAlpha: 1, scaleX: 1, duration: 0.25, ease: 'power3.out' }, T + 1.55);
+    tl.to(`${s} .sql i`, { autoAlpha: 0.3, duration: 0.05, ease: 'none', yoyo: true, repeat: 3, stagger: 0.025 }, T + 1.7);
+    tl.to(`${s} .sql`, { scaleY: 0, autoAlpha: 0, duration: 0.2, ease: 'power2.in' }, T + 1.88);
+    tl.fromTo(`${s} .card`, { autoAlpha: 0, scale: 0.92, y: 30, transformOrigin: '50% 0%' },
+      { autoAlpha: 1, scale: 1, y: 0, duration: 0.6, ease: 'back.out(1.4)' }, T + 2.0);
+    tl.fromTo(`${s} .chart i`, { scaleY: 0, transformOrigin: '50% 100%' },
+      { scaleY: 1, duration: 0.5, ease: 'back.out(1.8)', stagger: 0.07 }, T + 2.2);
+    tl.to(`${s} .chart i.hi`, { scaleY: 1.05, duration: 0.5, ease: 'sine.inOut', yoyo: true, repeat: 3 }, T + 3.0);
+    cue(T + 2.0, 'chime');
+
+    words(`${s} .sub`, T + 2.4, 0.05);
+    exitUp([`${s} .h-m`, `${s} .bubble`, `${s} .answer-zone`, `${s} .sub`], T + D - EXIT);
+  }
+
+  // 5 · Modules (light) ----------------------------------------------------------
+  {
+    const [T, D] = timing('s-modules');
+    const { sel: s } = scene('s-modules', T, D);
+    words(`${s} .h-m`, T + 0.1, 0.05);
+    tl.fromTo(`${s} .frame`, { autoAlpha: 0, y: 40, scale: 0.97 }, { autoAlpha: 1, y: 0, scale: 1, duration: 0.55, ease: 'power3.out' }, T + 0.15);
+    $$(`${s} .slot:not(.plus)`).forEach((slot, i) => {
+      const at = T + 0.5 + i * 0.5;
+      tl.fromTo($('.mod', slot), { autoAlpha: 0, y: -90, scale: 1.06 },
+        { autoAlpha: 1, y: 0, scale: 1, duration: 0.4, ease: 'back.out(1.5)' }, at - 0.2);
+      tl.to(slot, { scale: 0.97, duration: 0.08, ease: 'power1.out', yoyo: true, repeat: 1 }, at + 0.18);
+      cue(at, 'slide');
+    });
+    const plus = `${s} .slot.plus`;
+    tl.fromTo(plus, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.3 }, T + 2.4);
+    tl.fromTo(`${plus} svg`, { scale: 0, rotation: -90 }, { scale: 1, rotation: 0, duration: 0.5, ease: 'back.out(2.4)' }, T + 2.5);
+    tl.to(`${plus} svg`, { scale: 1.15, duration: 0.35, ease: 'sine.inOut', yoyo: true, repeat: 3 }, T + 3.0);
+    cue(T + 2.5, 'bell', { note: 84, gain: 0.04 });
+
+    exitUp([`${s} .h-m`, `${s} .frame`], T + D - EXIT);
+  }
+
+  // 6 · Trust --------------------------------------------------------------------
+  {
+    const [T, D] = timing('s-trust');
+    const { sel: s } = scene('s-trust', T, D);
+    tl.fromTo(`${s} .seal`, { autoAlpha: 0, scale: 0.8 }, { autoAlpha: 1, scale: 1, duration: 0.7, ease: 'power3.out' }, T);
+    const ring = $(`${s} .seal-ring`);
+    stroke(ring);
+    const bld = $(`${s} .seal-bld`);
+    stroke(bld);
+    tl.to(ring, { strokeDashoffset: 0, duration: 0.9, ease: 'power2.inOut' }, T + 0.05);
+    tl.to(bld, { strokeDashoffset: 0, duration: 0.8, ease: 'power2.inOut' }, T + 0.15);
+    tl.fromTo(`${s} .seal-dash`, { rotation: 0, svgOrigin: '150 150' }, { rotation: 70, svgOrigin: '150 150', duration: D, ease: 'none' }, T);
+    tl.fromTo(`${s} .seal-core`, { scale: 0, transformOrigin: '50% 50%' }, { scale: 1, duration: 0.5, ease: 'back.out(3)' }, T + 0.5);
+    tl.to(`${s} .seal-core`, { scale: 1.3, duration: 0.45, ease: 'sine.inOut', yoyo: true, repeat: 3 }, T + 1.0);
+    cue(T + 0.5, 'bell', { note: 84, gain: 0.05 });
+    words(`${s} .h-l`, T + 0.25, 0.06);
+    exitUp([`${s} .seal`, `${s} .h-l`], T + D - EXIT);
+  }
+
+  // 7 · CTA ----------------------------------------------------------------------
+  {
+    const [T, D] = timing('s-cta');
+    const { sel: s } = scene('s-cta', T, D, { visibleUntil: DURATION + 1 });
+    tl.fromTo(`${s} .cta-glow`, { scale: 0.4, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 1.0, ease: 'expo.out' }, T + 0.05);
+    tl.to(`${s} .cta-glow`, { scale: 1.12, duration: 0.9, ease: 'sine.inOut', yoyo: true, repeat: 2 }, T + 1.1);
+    tl.fromTo(`${s} .cta-ring`, { scale: 0.6, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 1.0, ease: 'power3.out' }, T + 0.15);
+    tl.to(`${s} .cta-ring`, { scale: 1.06, rotation: 20, duration: D - 1.2, ease: 'sine.inOut' }, T + 1.15);
+    words(`${s} .cta-brand`, T + 0.2, 0.06, 0.7);
+    words(`${s} .cta-tag`, T + 0.55, 0.04);
+    fadeUp(`${s} .btn`, T + 1.0, { ease: 'back.out(1.8)' });
+    fadeUp(`${s} .url`, T + 1.3);
+    tl.to(`${s} .btn svg`, { x: 10, duration: 0.25, ease: 'power2.inOut', yoyo: true, repeat: 3 }, T + 2.0);
+    tl.fromTo(`${s} .btn`, { scale: 1 }, { scale: 1.04, duration: 0.25, ease: 'power2.inOut', yoyo: true, repeat: 1 }, T + 2.0);
+    cue(T, 'riser', { length: 1.5, gain: 0.45 });
+    cue(T, 'outro');
+    cue(T, 'impact', { gain: 0.5 });
+    cue(T + 1.0, 'chime');
+  }
+});
+</file>

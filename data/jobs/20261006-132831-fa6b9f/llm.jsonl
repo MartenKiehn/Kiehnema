@@ -1,0 +1,5 @@
+{"step": "distill", "seconds": 34.0, "usage": {"input": 42004, "output": 3588, "cache_read": 0, "cache_write": 0}, "schema": "CompanyProfile"}
+{"step": "concept", "seconds": 54.5, "usage": {"input": 7470, "output": 4930, "cache_read": 0, "cache_write": 0}, "schema": "Concept"}
+{"step": "compose", "seconds": 698.5, "usage": {"input": 24121, "output": 58521, "cache_read": 0, "cache_write": 24117}, "chars": 41039}
+{"step": "qa", "seconds": 26.4, "usage": {"input": 13313, "output": 1441, "cache_read": 0, "cache_write": 0}, "schema": "QAReport"}
+{"step": "fix", "seconds": 63.6, "usage": {"input": 45096, "output": 6199, "cache_read": 18905, "cache_write": 26187}, "chars": 10231}

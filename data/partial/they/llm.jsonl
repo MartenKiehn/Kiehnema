@@ -1,0 +1,2 @@
+{"step": "distill", "seconds": 31.0, "usage": {"input": 42004, "output": 3300, "cache_read": 0, "cache_write": 0}, "schema": "CompanyProfile"}
+{"step": "concept", "seconds": 57.0, "usage": {"input": 7806, "output": 5075, "cache_read": 0, "cache_write": 0}, "schema": "Concept"}

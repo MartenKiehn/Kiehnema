@@ -1,0 +1,325 @@
+{
+ "title": "Bau die Zukunft Hamburgs – HCU",
+ "language": "de",
+ "rationale": "Studieninteressierte kennen das Problem: Städte entstehen nur, wenn viele Disziplinen zusammenarbeiten, aber an den meisten Hochschulen sind diese Fächer getrennt. Die HCU löst das mit ihrem eigenen Versprechen „alle Aspekte des Bauens unter einem Dach“. Das zeigen wir gleich am Anfang als Bild: Ein Dach schließt sich über einzelnen Bauplänen. Danach folgen Belege, die man nachprüfen kann (Studienfächer, Stadtlabor HafenCity, Forschung mit dem MIT Media Lab, Zahlen). Am Ende stehen der Leitsatz aus dem Briefing, Logo und Studienorientierung. Den Hinweis auf „Admin Felix“ aus dem Briefing lassen wir weg, weil er in keinem geprüften Fakt belegt ist.",
+ "hook": "Eine schwarze Fläche, auf der vier dünne blaue Baupläne einzeln und unverbunden gezeichnet werden: ein Grundriss, ein Tragwerk, ein Vermessungsraster und ein Stadtplan. Dazu der Text: „Eine Stadt baut niemand allein.“ Schon nach 2 Sekunden kommt die Auflösung: Eine Dachlinie zieht sich über alle vier, die Linien verbinden sich zu einer Hamburger Silhouette, und es erscheint „Alle Aspekte des Bauens – unter einem Dach.“",
+ "palette": {
+  "dark": "#000000",
+  "light": "#ffffff",
+  "paper": "#f7f7f5",
+  "primary": "#388adc",
+  "muted": "#4c4c4c"
+ },
+ "music": {
+  "bpm": 120.0,
+  "progression": [
+   "Am",
+   "F",
+   "C",
+   "G"
+  ],
+  "outro_progression": [
+   "F",
+   "G",
+   "Cmaj7"
+  ],
+  "energy": "medium"
+ },
+ "scenes": [
+  {
+   "id": "s-hook",
+   "start": 0.0,
+   "duration": 4.0,
+   "purpose": "Spannung zeigen (Stadt bauen geht nur gemeinsam) und sofort im Sinne der HCU auflösen",
+   "visual": "Vier blaue Bauplan-Linien (Grundriss, Tragwerk, Raster, Stadtplan) werden nacheinander auf Schwarz gezeichnet, jede für sich. Ab 2 s schließt sich eine Dachlinie mit einem Slide über allen vier, die Linien verbinden sich zu einer Hamburger Skyline in Primärblau.",
+   "background": "dark",
+   "texts": [
+    {
+     "id": "hook-headline",
+     "role": "headline",
+     "text": "Eine Stadt baut niemand allein.",
+     "fact_ids": [
+      "f2",
+      "f13"
+     ]
+    },
+    {
+     "id": "hook-payoff",
+     "role": "subline",
+     "text": "Alle Aspekte des Bauens – unter einem Dach.",
+     "fact_ids": [
+      "f2"
+     ]
+    }
+   ],
+   "assets": [],
+   "cues": [
+    {
+     "t": 0.0,
+     "type": "tick",
+     "note": "Linien beginnen sich zu zeichnen"
+    },
+    {
+     "t": 2.0,
+     "type": "slide",
+     "note": "Dachlinie schließt sich"
+    },
+    {
+     "t": 2.5,
+     "type": "chime",
+     "note": "Auflösung"
+    }
+   ]
+  },
+  {
+   "id": "s-disciplines",
+   "start": 4.0,
+   "duration": 5.0,
+   "purpose": "Belegen, was „unter einem Dach“ konkret heißt: vier Fächer, jeweils Bachelor und Master",
+   "visual": "Die Skyline aus dem Hook wird zu einem Querschnitt durch ein Gebäude mit vier Etagen. In jeder Etage gleitet ein Fach-Chip ein, im Takt der Musik. Verbindungslinien zwischen den Etagen zeigen das interdisziplinäre Arbeiten.",
+   "background": "light",
+   "texts": [
+    {
+     "id": "disc-headline",
+     "role": "headline",
+     "text": "Konsequent interdisziplinär.",
+     "fact_ids": [
+      "f13"
+     ]
+    },
+    {
+     "id": "disc-chip-arch",
+     "role": "chip",
+     "text": "Architektur",
+     "fact_ids": []
+    },
+    {
+     "id": "disc-chip-bau",
+     "role": "chip",
+     "text": "Bauingenieurwesen",
+     "fact_ids": []
+    },
+    {
+     "id": "disc-chip-geo",
+     "role": "chip",
+     "text": "Geodäsie & Geoinformatik",
+     "fact_ids": []
+    },
+    {
+     "id": "disc-chip-stadt",
+     "role": "chip",
+     "text": "Stadtplanung",
+     "fact_ids": []
+    },
+    {
+     "id": "disc-sub",
+     "role": "subline",
+     "text": "Bachelor + Master",
+     "fact_ids": [
+      "f7"
+     ]
+    }
+   ],
+   "assets": [],
+   "cues": [
+    {
+     "t": 5.0,
+     "type": "tick",
+     "note": null
+    },
+    {
+     "t": 5.5,
+     "type": "tick",
+     "note": null
+    },
+    {
+     "t": 6.0,
+     "type": "tick",
+     "note": null
+    },
+    {
+     "t": 6.5,
+     "type": "tick",
+     "note": null
+    }
+   ]
+  },
+  {
+   "id": "s-lab",
+   "start": 9.0,
+   "duration": 5.0,
+   "purpose": "Den Standort als Alleinstellungsmerkmal zeigen: Die HafenCity ist das Labor",
+   "visual": "Langsamer Zoom in das Foto. Darüber legt sich ein blaues Bauplan-Raster, das sich wie ein Messfeld über die Stadt ausbreitet. Ein Pin markiert die Lage der HCU.",
+   "background": "photo",
+   "texts": [
+    {
+     "id": "lab-headline",
+     "role": "headline",
+     "text": "Dein Stadtlabor vor der Haustür.",
+     "fact_ids": [
+      "f4"
+     ]
+    },
+    {
+     "id": "lab-sub",
+     "role": "subline",
+     "text": "Europas größtes innerstädtisches Stadtentwicklungsprojekt",
+     "fact_ids": [
+      "f4"
+     ]
+    }
+   ],
+   "assets": [
+    "img/photo-00.jpg"
+   ],
+   "cues": [
+    {
+     "t": 10.0,
+     "type": "thud",
+     "note": "Pin setzt auf"
+    }
+   ]
+  },
+  {
+   "id": "s-research",
+   "start": 14.0,
+   "duration": 5.0,
+   "purpose": "Zeigen, dass die Forschung relevant und renommiert ist",
+   "visual": "Drei Begriffe erscheinen als Ebenen eines Stadtmodells übereinander (Klima, Gerechtigkeit, Digitalisierung). Danach verbindet ein Datenlinien-Netz die Ebenen, und darunter erscheint der Hinweis auf die Kooperation mit dem MIT Media Lab.",
+   "background": "dark",
+   "texts": [
+    {
+     "id": "res-headline",
+     "role": "headline",
+     "text": "Forschung für Klima, Gerechtigkeit, Digitalisierung.",
+     "fact_ids": [
+      "f6"
+     ]
+    },
+    {
+     "id": "res-sub",
+     "role": "subline",
+     "text": "CityScienceLab mit dem MIT Media Lab",
+     "fact_ids": [
+      "f15"
+     ]
+    }
+   ],
+   "assets": [],
+   "cues": [
+    {
+     "t": 14.5,
+     "type": "arp",
+     "note": "Datenlinien"
+    },
+    {
+     "t": 16.5,
+     "type": "bell",
+     "note": null
+    }
+   ]
+  },
+  {
+   "id": "s-numbers",
+   "start": 19.0,
+   "duration": 4.5,
+   "purpose": "Mit Zahlen zeigen, dass es eine echte Gemeinschaft gibt und man über das eigene Fach hinausschauen kann",
+   "visual": "Große weiße Zahlen zählen auf Primärblau hoch: zuerst 2.400, dann 70. Dahinter bauen sich Punkte zu einem Gebäudeumriss auf.",
+   "background": "brand-color",
+   "texts": [
+    {
+     "id": "num-students",
+     "role": "headline",
+     "text": "Rund 2.400 Studierende",
+     "fact_ids": [
+      "f3"
+     ]
+    },
+    {
+     "id": "num-courses",
+     "role": "subline",
+     "text": "rund 70 fachübergreifende Veranstaltungen",
+     "fact_ids": [
+      "f11",
+      "f12"
+     ]
+    }
+   ],
+   "assets": [],
+   "cues": [
+    {
+     "t": 19.0,
+     "type": "groove",
+     "note": null
+    },
+    {
+     "t": 22.5,
+     "type": "riser",
+     "note": "Aufbau zum Markenmoment"
+    }
+   ]
+  },
+  {
+   "id": "s-brand",
+   "start": 23.5,
+   "duration": 6.5,
+   "purpose": "Markenmoment mit Leitsatz, Logo, CTA und Website",
+   "visual": "Die Dachlinie aus dem Hook kommt wieder und rahmt das HCU-Logo auf Weiß. Darunter erscheint der Leitsatz, dann ein blauer CTA-Button und die URL.",
+   "background": "light",
+   "texts": [
+    {
+     "id": "brand-headline",
+     "role": "headline",
+     "text": "Bau die Zukunft Hamburgs.",
+     "fact_ids": [
+      "f1",
+      "f21"
+     ]
+    },
+    {
+     "id": "brand-tagline",
+     "role": "label",
+     "text": "Universität für Baukunst und Metropolenentwicklung",
+     "fact_ids": []
+    },
+    {
+     "id": "brand-cta",
+     "role": "cta",
+     "text": "Zur Studienorientierung",
+     "fact_ids": []
+    },
+    {
+     "id": "brand-url",
+     "role": "url",
+     "text": "hcu-hamburg.de",
+     "fact_ids": []
+    }
+   ],
+   "assets": [
+    "logo.svg"
+   ],
+   "cues": [
+    {
+     "t": 23.5,
+     "type": "drop",
+     "note": null
+    },
+    {
+     "t": 23.5,
+     "type": "impact",
+     "note": "Logo erscheint"
+    },
+    {
+     "t": 26.0,
+     "type": "chime",
+     "note": "CTA erscheint"
+    },
+    {
+     "t": 28.0,
+     "type": "outro",
+     "note": null
+    }
+   ]
+  }
+ ]
+}

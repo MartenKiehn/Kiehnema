@@ -1,0 +1,26 @@
+{
+  "colors": {
+    "dark": "#164656",
+    "light": "#ffffff",
+    "paper": "#eef2f2",
+    "primary": "#f7b85a",
+    "accent": "#7ec7be",
+    "accent-2": "#ea5837"
+  },
+  "fonts": [
+    {
+      "family": "chivo-black",
+      "src": "assets/brand/fonts/chivo-black-400.ttf",
+      "role": "display",
+      "weight": 400,
+      "style": "normal"
+    },
+    {
+      "family": "Chivo",
+      "src": "assets/brand/fonts/chivo-400.ttf",
+      "role": "body",
+      "weight": 400,
+      "style": "normal"
+    }
+  ]
+}

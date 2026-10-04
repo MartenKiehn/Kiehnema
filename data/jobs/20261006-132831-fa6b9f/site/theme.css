@@ -1,0 +1,12 @@
+@font-face { font-family: 'chivo-black'; src: url(assets/brand/fonts/chivo-black-400.ttf) format('truetype'); font-weight: 400; font-style: normal; font-display: block; }
+@font-face { font-family: 'Chivo'; src: url(assets/brand/fonts/chivo-400.ttf) format('truetype'); font-weight: 400; font-style: normal; font-display: block; }
+:root {
+  --brand-dark: #164656;
+  --brand-light: #ffffff;
+  --brand-paper: #eef2f2;
+  --brand-primary: #f7b85a;
+  --brand-accent: #7ec7be;
+  --brand-accent-2: #ea5837;
+  --font-display: 'chivo-black', sans-serif;
+  --font-body: 'Chivo', sans-serif;
+}

@@ -1,0 +1,34 @@
+{
+ "approved": false,
+ "summary": "The frames look clean and match the storyboard, but one major issue blocks approval: in s-lab, the photo (img/photo-00.jpg) is not visible. What shows instead is a flat grey gradient with drawn building outlines and a stray bright line across the frame. It reads as a placeholder or a failed image load. The other issues are minor: the hook blueprints are too faint, the 'building outline' in the numbers scene is just a dot grid, and some story frames have empty space at the bottom.",
+ "issues": [
+  {
+   "severity": "major",
+   "scene_id": "s-lab",
+   "format": "both",
+   "problem": "The photo of HafenCity (img/photo-00.jpg) does not appear. The background is a light grey gradient with procedural rectangle outlines, which looks like a placeholder. The storyboard calls for a real photo with a slow zoom. There is also a hard bright white horizontal line at pin height and a thin white vertical line through the pin, which look like rendering artifacts.",
+   "fix": "Check the asset path and preload: the image must load before capture (await img.decode()). Render it as a full-bleed <img> or background-image with object-fit: cover, and animate transform: scale(1)→scale(1.08) over 5 s. Keep the blue grid overlay at about 30–40% opacity on top. Remove the white horizontal and vertical lines, or turn them into thin primary-blue crosshairs at about 40% opacity. Keep the dark bottom gradient (black at about 85% → transparent) so the white text stays readable over the photo."
+  },
+  {
+   "severity": "minor",
+   "scene_id": "s-hook",
+   "format": "both",
+   "problem": "At the payoff moment the four blueprint drawings are very faint, dark blue on black, and hard to see on a phone. Only the first one has started turning into the bright blue skyline, so the idea of the drawings joining into one city is weak.",
+   "fix": "Raise the idle blueprint stroke to #388adc at about 55% opacity and a stroke-width of about 2px. Make sure all four drawings move into the full-blue skyline state by about 2.6 s, for example by staggering a stroke-dashoffset animation 0.1 s apart."
+  },
+  {
+   "severity": "minor",
+   "scene_id": "s-numbers",
+   "format": "both",
+   "problem": "The dot field is a plain rectangular grid, not the building outline described in the storyboard. The dots also run behind '2.400' and the labels, which makes the area around the numbers look busy.",
+   "fix": "Mask the dots to a building or roof silhouette with a clip-path polygon that includes a gable top, and keep them below the '2.400' block (start under 'Studierende'). You can also lower the dot opacity to about 25%."
+  },
+  {
+   "severity": "minor",
+   "scene_id": "s-research",
+   "format": "story",
+   "problem": "The content sits in the upper-middle of the frame, leaving about 300px of empty dark space at the bottom.",
+   "fix": "In the 9:16 layout, move the content block down about 60px and increase the vertical gap between the layers and the subline. Alternatively, extend the data-line network faintly into the lower third."
+  }
+ ]
+}

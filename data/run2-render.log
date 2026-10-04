@@ -1,0 +1,22 @@
+2026-10-06 14:26:30,600 INFO app.render.renderer rendered feed: 900 frames -> /Users/martenkiehn/Projekte/motion-graphics/data/jobs/20261006-140708-1dee62/renders/feed-1080x1350.mp4
+2026-10-06 14:29:19,496 INFO app.render.renderer rendered story: 900 frames -> /Users/martenkiehn/Projekte/motion-graphics/data/jobs/20261006-140708-1dee62/renders/story-1080x1920.mp4
+{
+ "job_id": "20261006-140708-1dee62",
+ "status": "done",
+ "error": null,
+ "check": {
+  "ok": true,
+  "errors": 0,
+  "warnings": 0
+ },
+ "qa": {
+  "approved": true,
+  "major": 0,
+  "minor": 6
+ },
+ "outputs": {
+  "feed": "renders/feed-1080x1350.mp4",
+  "story": "renders/story-1080x1920.mp4"
+ },
+ "cost_usd": 1.598
+}

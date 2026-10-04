@@ -1,0 +1,366 @@
+{
+ "ok": true,
+ "issues": [],
+ "texts": [
+  {
+   "format": "feed",
+   "text_id": "hook-headline",
+   "text": "Eine Stadt baut niemand allein.",
+   "words": 5,
+   "window": 3.4,
+   "full_hold": 3.1,
+   "required": 1.75,
+   "mid_t": 2.2
+  },
+  {
+   "format": "feed",
+   "text_id": "hook-payoff",
+   "text": "Alle Aspekte des Bauens – unter einem Dach.",
+   "words": 8,
+   "window": 2.5,
+   "full_hold": 2.2,
+   "required": 2.5,
+   "mid_t": 3.0
+  },
+  {
+   "format": "feed",
+   "text_id": "disc-headline",
+   "text": "Konsequent interdisziplinär.",
+   "words": 2,
+   "window": 4.4,
+   "full_hold": 4.4,
+   "required": 1.0,
+   "mid_t": 6.6
+  },
+  {
+   "format": "feed",
+   "text_id": "disc-chip-arch",
+   "text": "Architektur",
+   "words": 1,
+   "window": 3.7,
+   "full_hold": 3.6,
+   "required": 0.75,
+   "mid_t": 7.0
+  },
+  {
+   "format": "feed",
+   "text_id": "disc-chip-bau",
+   "text": "Bauingenieurwesen",
+   "words": 1,
+   "window": 3.2,
+   "full_hold": 3.1,
+   "required": 0.75,
+   "mid_t": 7.2
+  },
+  {
+   "format": "feed",
+   "text_id": "disc-chip-geo",
+   "text": "Geodäsie & Geoinformatik",
+   "words": 3,
+   "window": 2.7,
+   "full_hold": 2.6,
+   "required": 1.25,
+   "mid_t": 7.5
+  },
+  {
+   "format": "feed",
+   "text_id": "disc-chip-stadt",
+   "text": "Stadtplanung",
+   "words": 1,
+   "window": 2.2,
+   "full_hold": 2.1,
+   "required": 0.75,
+   "mid_t": 7.7
+  },
+  {
+   "format": "feed",
+   "text_id": "disc-sub",
+   "text": "Bachelor + Master",
+   "words": 3,
+   "window": 1.7,
+   "full_hold": 1.5,
+   "required": 1.25,
+   "mid_t": 8.0
+  },
+  {
+   "format": "feed",
+   "text_id": "lab-headline",
+   "text": "Dein Stadtlabor vor der Haustür.",
+   "words": 5,
+   "window": 4.1,
+   "full_hold": 3.9,
+   "required": 1.75,
+   "mid_t": 11.8
+  },
+  {
+   "format": "feed",
+   "text_id": "lab-sub",
+   "text": "Europas größtes innerstädtisches Stadtentwicklungsprojekt",
+   "words": 4,
+   "window": 3.6,
+   "full_hold": 3.5,
+   "required": 1.5,
+   "mid_t": 12.0
+  },
+  {
+   "format": "feed",
+   "text_id": "res-headline",
+   "text": "Forschung für Klima, Gerechtigkeit, Digitalisierung.",
+   "words": 5,
+   "window": 4.7,
+   "full_hold": 4.4,
+   "required": 1.75,
+   "mid_t": 16.9
+  },
+  {
+   "format": "feed",
+   "text_id": "res-sub",
+   "text": "CityScienceLab mit dem MIT Media Lab",
+   "words": 6,
+   "window": 2.3,
+   "full_hold": 2.0,
+   "required": 2.0,
+   "mid_t": 17.9
+  },
+  {
+   "format": "feed",
+   "text_id": "num-students",
+   "text": "Rund 0 Studierende",
+   "words": 3,
+   "window": 4.1,
+   "full_hold": 3.8,
+   "required": 1.25,
+   "mid_t": 21.4
+  },
+  {
+   "format": "feed",
+   "text_id": "num-courses",
+   "text": "rund 0 fachübergreifende Veranstaltungen",
+   "words": 4,
+   "window": 2.9,
+   "full_hold": 2.7,
+   "required": 1.5,
+   "mid_t": 21.9
+  },
+  {
+   "format": "feed",
+   "text_id": "brand-tagline",
+   "text": "Universität für Baukunst und Metropolenentwicklung",
+   "words": 5,
+   "window": 5.9,
+   "full_hold": 5.7,
+   "required": 1.75,
+   "mid_t": 27.2
+  },
+  {
+   "format": "feed",
+   "text_id": "brand-headline",
+   "text": "Bau die Zukunft Hamburgs.",
+   "words": 4,
+   "window": 5.5,
+   "full_hold": 5.3,
+   "required": 1.5,
+   "mid_t": 27.4
+  },
+  {
+   "format": "feed",
+   "text_id": "brand-cta",
+   "text": "Zur Studienorientierung",
+   "words": 2,
+   "window": 4.0,
+   "full_hold": 3.9,
+   "required": 1.0,
+   "mid_t": 28.1
+  },
+  {
+   "format": "feed",
+   "text_id": "brand-url",
+   "text": "hcu-hamburg.de",
+   "words": 1,
+   "window": 3.7,
+   "full_hold": 3.5,
+   "required": 0.75,
+   "mid_t": 28.3
+  },
+  {
+   "format": "story",
+   "text_id": "hook-headline",
+   "text": "Eine Stadt baut niemand allein.",
+   "words": 5,
+   "window": 3.4,
+   "full_hold": 3.1,
+   "required": 1.75,
+   "mid_t": 2.2
+  },
+  {
+   "format": "story",
+   "text_id": "hook-payoff",
+   "text": "Alle Aspekte des Bauens – unter einem Dach.",
+   "words": 8,
+   "window": 2.5,
+   "full_hold": 2.2,
+   "required": 2.5,
+   "mid_t": 3.0
+  },
+  {
+   "format": "story",
+   "text_id": "disc-headline",
+   "text": "Konsequent interdisziplinär.",
+   "words": 2,
+   "window": 4.4,
+   "full_hold": 4.4,
+   "required": 1.0,
+   "mid_t": 6.6
+  },
+  {
+   "format": "story",
+   "text_id": "disc-chip-arch",
+   "text": "Architektur",
+   "words": 1,
+   "window": 3.7,
+   "full_hold": 3.6,
+   "required": 0.75,
+   "mid_t": 7.0
+  },
+  {
+   "format": "story",
+   "text_id": "disc-chip-bau",
+   "text": "Bauingenieurwesen",
+   "words": 1,
+   "window": 3.2,
+   "full_hold": 3.1,
+   "required": 0.75,
+   "mid_t": 7.2
+  },
+  {
+   "format": "story",
+   "text_id": "disc-chip-geo",
+   "text": "Geodäsie & Geoinformatik",
+   "words": 3,
+   "window": 2.7,
+   "full_hold": 2.6,
+   "required": 1.25,
+   "mid_t": 7.5
+  },
+  {
+   "format": "story",
+   "text_id": "disc-chip-stadt",
+   "text": "Stadtplanung",
+   "words": 1,
+   "window": 2.2,
+   "full_hold": 2.1,
+   "required": 0.75,
+   "mid_t": 7.7
+  },
+  {
+   "format": "story",
+   "text_id": "disc-sub",
+   "text": "Bachelor + Master",
+   "words": 3,
+   "window": 1.7,
+   "full_hold": 1.5,
+   "required": 1.25,
+   "mid_t": 8.0
+  },
+  {
+   "format": "story",
+   "text_id": "lab-headline",
+   "text": "Dein Stadtlabor vor der Haustür.",
+   "words": 5,
+   "window": 4.1,
+   "full_hold": 3.9,
+   "required": 1.75,
+   "mid_t": 11.8
+  },
+  {
+   "format": "story",
+   "text_id": "lab-sub",
+   "text": "Europas größtes innerstädtisches Stadtentwicklungsprojekt",
+   "words": 4,
+   "window": 3.6,
+   "full_hold": 3.5,
+   "required": 1.5,
+   "mid_t": 12.0
+  },
+  {
+   "format": "story",
+   "text_id": "res-headline",
+   "text": "Forschung für Klima, Gerechtigkeit, Digitalisierung.",
+   "words": 5,
+   "window": 4.7,
+   "full_hold": 4.4,
+   "required": 1.75,
+   "mid_t": 16.9
+  },
+  {
+   "format": "story",
+   "text_id": "res-sub",
+   "text": "CityScienceLab mit dem MIT Media Lab",
+   "words": 6,
+   "window": 2.3,
+   "full_hold": 2.0,
+   "required": 2.0,
+   "mid_t": 17.9
+  },
+  {
+   "format": "story",
+   "text_id": "num-students",
+   "text": "Rund 0 Studierende",
+   "words": 3,
+   "window": 4.1,
+   "full_hold": 3.8,
+   "required": 1.25,
+   "mid_t": 21.4
+  },
+  {
+   "format": "story",
+   "text_id": "num-courses",
+   "text": "rund 0 fachübergreifende Veranstaltungen",
+   "words": 4,
+   "window": 2.9,
+   "full_hold": 2.7,
+   "required": 1.5,
+   "mid_t": 21.9
+  },
+  {
+   "format": "story",
+   "text_id": "brand-tagline",
+   "text": "Universität für Baukunst und Metropolenentwicklung",
+   "words": 5,
+   "window": 5.9,
+   "full_hold": 5.7,
+   "required": 1.75,
+   "mid_t": 27.2
+  },
+  {
+   "format": "story",
+   "text_id": "brand-headline",
+   "text": "Bau die Zukunft Hamburgs.",
+   "words": 4,
+   "window": 5.5,
+   "full_hold": 5.3,
+   "required": 1.5,
+   "mid_t": 27.4
+  },
+  {
+   "format": "story",
+   "text_id": "brand-cta",
+   "text": "Zur Studienorientierung",
+   "words": 2,
+   "window": 4.0,
+   "full_hold": 3.9,
+   "required": 1.0,
+   "mid_t": 28.1
+  },
+  {
+   "format": "story",
+   "text_id": "brand-url",
+   "text": "hcu-hamburg.de",
+   "words": 1,
+   "window": 3.7,
+   "full_hold": 3.5,
+   "required": 0.75,
+   "mid_t": 28.3
+  }
+ ]
+}

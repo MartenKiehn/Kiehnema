@@ -1,0 +1,367 @@
+{
+ "site_name": "HafenCity Universität Hamburg (HCU): Start",
+ "language": "en",
+ "start_url": "https://www.hcu-hamburg.de/",
+ "colors": [
+  {
+   "hex": "#000000",
+   "score": 35.78,
+   "sources": [
+    "link:a",
+    "text:body",
+    "text:area",
+    "heading:h3",
+    "heading:h2"
+   ],
+   "neutral": true
+  },
+  {
+   "hex": "#4c4c4c",
+   "score": 35.41,
+   "sources": [
+    "heading:h2",
+    "text:area",
+    "heading:h1",
+    "heading:h3"
+   ],
+   "neutral": true
+  },
+  {
+   "hex": "#ffffff",
+   "score": 32.91,
+   "sources": [
+    "background:area",
+    "text:area"
+   ],
+   "neutral": true
+  },
+  {
+   "hex": "#388adc",
+   "score": 27.52,
+   "sources": [
+    "text:area",
+    "cta",
+    "background:area",
+    "logo"
+   ],
+   "neutral": false
+  },
+  {
+   "hex": "#428bca",
+   "score": 2.55,
+   "sources": [
+    "cta",
+    "background:area"
+   ],
+   "neutral": false
+  },
+  {
+   "hex": "#d7dadb",
+   "score": 1.75,
+   "sources": [
+    "background:area"
+   ],
+   "neutral": true
+  },
+  {
+   "hex": "#a0a0a0",
+   "score": 0.78,
+   "sources": [
+    "heading:h1",
+    "text:area"
+   ],
+   "neutral": true
+  },
+  {
+   "hex": "#808281",
+   "score": 0.42,
+   "sources": [
+    "text:area"
+   ],
+   "neutral": true
+  },
+  {
+   "hex": "#e6e6e6",
+   "score": 0.1,
+   "sources": [
+    "background:area"
+   ],
+   "neutral": true
+  }
+ ],
+ "theme": {
+  "colors": {
+   "dark": "#000000",
+   "light": "#ffffff",
+   "paper": "#f7f7f5",
+   "primary": "#388adc",
+   "accent": "#388adc",
+   "accent-2": "#388adc",
+   "text": "#000000"
+  },
+  "fonts": [
+   {
+    "family": "Inter",
+    "src": "fonts/inter-700.woff2",
+    "role": "display",
+    "weight": 700,
+    "style": "normal"
+   },
+   {
+    "family": "Inter",
+    "src": "fonts/inter-400.woff2",
+    "role": "body",
+    "weight": 400,
+    "style": "normal"
+   }
+  ]
+ },
+ "fonts": [
+  {
+   "role": "display",
+   "site_family": "Lucida Grande",
+   "family": "Inter",
+   "file": "fonts/inter-700.woff2",
+   "source": "fallback",
+   "weight": 700
+  },
+  {
+   "role": "body",
+   "site_family": "Lucida Grande",
+   "family": "Inter",
+   "file": "fonts/inter-400.woff2",
+   "source": "fallback",
+   "weight": 400
+  }
+ ],
+ "logo": {
+  "file": "logo.svg",
+  "kind": "svg",
+  "width": 600,
+  "height": 150,
+  "source_url": "https://www.hcu-hamburg.de/fileadmin/images/HCU_Logo.svg",
+  "colors": [
+   "#378adc"
+  ],
+  "on_dark_ok": true,
+  "on_light_ok": true,
+  "shapes": 36
+ },
+ "images": [
+  {
+   "file": "img/photo-00.jpg",
+   "url": "https://www.hcu-hamburg.de/_assets/975bca32e4513aa47db8ebb0c462a69a/Images/hintergrund.jpg",
+   "kind": "photo",
+   "alt": "",
+   "page": "https://www.hcu-hamburg.de/sitemap",
+   "section": "Sitemap",
+   "width": 2400,
+   "height": 1532
+  },
+  {
+   "file": "img/photo-01.jpg",
+   "url": "https://www.hcu-hamburg.de/fileadmin/_processed_/f/6/csm_HafenCity_Universitaet_Hamburg_Foyer_c3021f41ee.jpg",
+   "kind": "photo",
+   "alt": "",
+   "page": "https://www.hcu-hamburg.de/universitaet",
+   "section": "Willkommen an der HafenCity Universität Hamburg",
+   "width": 690,
+   "height": 459
+  },
+  {
+   "file": "img/photo-02.jpg",
+   "url": "https://www.hcu-hamburg.de/fileadmin/documents/IO/Sprachkurse/German-Language-Course.jpg",
+   "kind": "photo",
+   "alt": "",
+   "page": "https://www.hcu-hamburg.de/",
+   "section": "01.10.2026 BIS 21.10.2026 12:00 UHR -",
+   "width": 680,
+   "height": 500
+  },
+  {
+   "file": "img/photo-03.jpg",
+   "url": "https://www.hcu-hamburg.de/fileadmin/documents/IMZ/Bibliothek/Veranstaltungen/Workshop_image_label_bw_4-3.png",
+   "kind": "photo",
+   "alt": "",
+   "page": "https://www.hcu-hamburg.de/",
+   "section": "08.10.2026 11:00 UHR -",
+   "width": 960,
+   "height": 720
+  },
+  {
+   "file": "img/photo-04.jpg",
+   "url": "https://www.hcu-hamburg.de/fileadmin/documents/IMZ/Bibliothek/Veranstaltungen/Coffee_Lecture_big_letters_01_1027x684.jpg",
+   "kind": "photo",
+   "alt": "",
+   "page": "https://www.hcu-hamburg.de/",
+   "section": "07.10.2026 13:00 UHR -",
+   "width": 1027,
+   "height": 684
+  },
+  {
+   "file": "clients/client-00.png",
+   "url": "https://www.hcu-hamburg.de/fileadmin/images/social/Social_Icons-13.png",
+   "kind": "client-logo",
+   "alt": "",
+   "page": "https://www.hcu-hamburg.de/",
+   "section": "Liebe Studierende, herzlich willkommen an der HafenCity Universität!",
+   "width": 160,
+   "height": 159
+  },
+  {
+   "file": "clients/client-01.png",
+   "url": "https://www.hcu-hamburg.de/fileadmin/images/social/Instagram_1_blau_01.png",
+   "kind": "client-logo",
+   "alt": "",
+   "page": "https://www.hcu-hamburg.de/",
+   "section": "Liebe Studierende, herzlich willkommen an der HafenCity Universität!",
+   "width": 128,
+   "height": 128
+  },
+  {
+   "file": "clients/client-02.png",
+   "url": "https://www.hcu-hamburg.de/fileadmin/images/social/Facebook_1_blau_01.png",
+   "kind": "client-logo",
+   "alt": "",
+   "page": "https://www.hcu-hamburg.de/",
+   "section": "Liebe Studierende, herzlich willkommen an der HafenCity Universität!",
+   "width": 128,
+   "height": 128
+  },
+  {
+   "file": "clients/client-03.png",
+   "url": "https://www.hcu-hamburg.de/fileadmin/images/social/YouTube.png",
+   "kind": "client-logo",
+   "alt": "",
+   "page": "https://www.hcu-hamburg.de/",
+   "section": "Liebe Studierende, herzlich willkommen an der HafenCity Universität!",
+   "width": 128,
+   "height": 128
+  },
+  {
+   "file": "clients/client-04.jpg",
+   "url": "https://www.hcu-hamburg.de/typo3temp/assets/images/_fe25caa9856bb022dc3da2af34272d89.png",
+   "kind": "client-logo",
+   "alt": "",
+   "page": "https://www.hcu-hamburg.de/sitemap",
+   "section": "Sitemap",
+   "width": 710,
+   "height": 25
+  },
+  {
+   "file": "clients/client-05.jpg",
+   "url": "https://www.hcu-hamburg.de/typo3temp/assets/images/_a6adb997539de9beedb1aa0d35ac0173.png",
+   "kind": "client-logo",
+   "alt": "",
+   "page": "https://www.hcu-hamburg.de/it-service",
+   "section": "Informationstechnologie",
+   "width": 480,
+   "height": 25
+  },
+  {
+   "file": "clients/client-06.jpg",
+   "url": "https://www.hcu-hamburg.de/typo3temp/assets/images/_ba274af401bc06e2c5b4482b9dd5817d.png",
+   "kind": "client-logo",
+   "alt": "",
+   "page": "https://www.hcu-hamburg.de/hcu-intern",
+   "section": "Interner Bereich der HCU Hamburg",
+   "width": 225,
+   "height": 30
+  },
+  {
+   "file": "clients/client-07.jpg",
+   "url": "https://www.hcu-hamburg.de/typo3temp/assets/images/_03ddb0f655988a7717cdc730eabf13f8.png",
+   "kind": "client-logo",
+   "alt": "",
+   "page": "https://www.hcu-hamburg.de/hcu-intern",
+   "section": "Interner Bereich der HCU Hamburg",
+   "width": 710,
+   "height": 25
+  },
+  {
+   "file": "clients/client-08.jpg",
+   "url": "https://www.hcu-hamburg.de/typo3temp/assets/images/_bab0c54b574e96200055ba363403f1f5.png",
+   "kind": "client-logo",
+   "alt": "",
+   "page": "https://www.hcu-hamburg.de/universitaet",
+   "section": "Willkommen an der HafenCity Universität Hamburg",
+   "width": 710,
+   "height": 25
+  },
+  {
+   "file": "clients/client-09.jpg",
+   "url": "https://www.hcu-hamburg.de/typo3temp/assets/images/_b91aa8743f6891d0cabc8178740608d5.png",
+   "kind": "client-logo",
+   "alt": "",
+   "page": "https://www.hcu-hamburg.de/bachelor",
+   "section": "Bachelor Studienprogramme an der HCU",
+   "width": 710,
+   "height": 25
+  },
+  {
+   "file": "clients/client-10.jpg",
+   "url": "https://www.hcu-hamburg.de/typo3temp/assets/images/_d256893a7e0939e31c551275bf5018df.png",
+   "kind": "client-logo",
+   "alt": "",
+   "page": "https://www.hcu-hamburg.de/master",
+   "section": "Master Studiengänge an der HCU",
+   "width": 710,
+   "height": 25
+  },
+  {
+   "file": "clients/client-11.jpg",
+   "url": "https://www.hcu-hamburg.de/typo3temp/assets/images/_fda018e73bccc6f89f999724b7ca5faa.png",
+   "kind": "client-logo",
+   "alt": "",
+   "page": "https://www.hcu-hamburg.de/research",
+   "section": "Referat für Forschung und Internationalisierung",
+   "width": 480,
+   "height": 25
+  },
+  {
+   "file": "clients/client-12.jpg",
+   "url": "https://www.hcu-hamburg.de/typo3temp/assets/images/_e171f4ed302c679757047da7158780ce.png",
+   "kind": "client-logo",
+   "alt": "",
+   "page": "https://www.hcu-hamburg.de/studierendenservices",
+   "section": "Herzlich willkommen auf den Seiten des Studierendenservices",
+   "width": 710,
+   "height": 25
+  },
+  {
+   "file": "clients/client-13.jpg",
+   "url": "https://www.hcu-hamburg.de/typo3temp/assets/images/_134bf0e8170512928b6b67d2fe5b4d3d.png",
+   "kind": "client-logo",
+   "alt": "",
+   "page": "https://www.hcu-hamburg.de/internationales",
+   "section": "Internationales",
+   "width": 710,
+   "height": 25
+  },
+  {
+   "file": "clients/client-14.jpg",
+   "url": "https://www.hcu-hamburg.de/typo3temp/assets/images/_2b1c1a27b5b7d45e23a36e0d3a51b802.png",
+   "kind": "client-logo",
+   "alt": "",
+   "page": "https://www.hcu-hamburg.de/bibliothek",
+   "section": "BIBLIOTHEK",
+   "width": 480,
+   "height": 25
+  },
+  {
+   "file": "clients/client-15.jpg",
+   "url": "https://www.hcu-hamburg.de/typo3temp/assets/images/_e69690a7f8d6d63d202651b4bd90c10b.png",
+   "kind": "client-logo",
+   "alt": "",
+   "page": "https://www.hcu-hamburg.de/studentische-angelegenheiten",
+   "section": "Studentische Angelegenheiten",
+   "width": 710,
+   "height": 25
+  }
+ ],
+ "notes": [
+  "font Lucida Grande not downloadable – using Inter 700 instead",
+  "font Lucida Grande not downloadable – using Inter 400 instead"
+ ],
+ "wordmark": null
+}
