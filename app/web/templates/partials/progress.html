@@ -1,0 +1,10 @@
+<section class="card progress-card" id="progress" {% if job.poll %}hx-get="/jobs/{{ job.id }}/progress" hx-trigger="every 2s" hx-target="#progress-status" hx-select="#progress-status" hx-select-oob="#activity-entries:innerHTML,#job-cost:innerHTML" hx-swap="outerHTML"{% endif %}>
+  <div id="progress-status">
+  <div class="section-heading"><h2>{% if job.status == 'queued' %}In the queue{% elif job.status == 'render' %}Making the final cut{% else %}Your story is taking shape{% endif %}</h2><span class="live-dot" aria-hidden="true"></span></div>
+  <p class="progress-message" role="status" aria-live="polite">{{ job.message }}</p>
+  <ol class="steps">{% for key, label in steps %}<li class="{% if key == job.status or key == 'compose' and job.status == 'fix' %}current{% elif key in seen %}complete{% endif %}"><span aria-hidden="true">{% if key in seen and key != job.status %}✓{% else %}{{ loop.index }}{% endif %}</span>{{ label }}</li>{% endfor %}</ol>
+  <div class="progress-footer"><p>Writing the animation can take around 11 minutes.<br>You can leave this page and return while the app stays running.</p><div><b>${{ '%.2f'|format(job.cost_usd|default(0)) }}</b><small>Estimated so far · updates after model calls</small></div></div>
+  </div>
+  <details class="activity"><summary>Activity log</summary><ol id="activity-entries">{% for item in job.history|default([])|reverse %}<li>{{ item.message }}</li>{% endfor %}</ol></details>
+</section>
+{% if poll_response %}<span id="job-cost">${{ '%.2f'|format(job.cost_usd|default(0)) }} <small>estimated</small></span>{% endif %}

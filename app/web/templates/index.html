@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="intro">
+  <p class="eyebrow">FROM WEBSITE TO THE FINAL CUT</p>
+  <h1>Your brand.<br>A little more <em>motion.</em></h1>
+  <p class="lede">Turn your website into a short, on-brand video.<br>Shape the story. Review the details. Make it yours.</p>
+</section>
+<div class="create-grid">
+  <section class="card new-job" aria-labelledby="new-title">
+    <div class="section-heading"><h2 id="new-title">New video</h2><span class="badge">01 / THE BRIEF</span></div>
+    {% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
+    <form action="/jobs" method="post">
+      <label for="website">Website URL</label>
+      <input id="website" name="url" type="url" required maxlength="2048" placeholder="https://your-company.com" value="{{ values.get('url', '') }}" aria-describedby="url-help">
+      <p id="url-help" class="help">We’ll find your colours, fonts, imagery and the story behind your brand.</p>
+      <div class="field-row">
+        <div><label for="duration">Duration <span class="optional">seconds</span></label>
+          <input id="duration" name="duration" type="number" min="15" max="60" step="1" required value="{{ values.get('duration', 30) }}" aria-describedby="duration-help">
+          <p id="duration-help" class="help">15–60 seconds. Both formats included.</p>
+        </div>
+        <div class="format-note"><span class="ratio feed" aria-hidden="true"></span><span class="ratio story" aria-hidden="true"></span><span>4:5 feed<br>9:16 story</span></div>
+      </div>
+      <label for="description">Creative direction <span class="optional">optional</span></label>
+      <textarea id="description" name="description" rows="4" maxlength="4000" placeholder="Who’s it for? What should they remember? A hook, a mood, a must-have message…">{{ values.get('description', '') }}</textarea>
+      <p class="help">The video follows your website’s language unless you ask for another.</p>
+      <label class="checkbox"><input name="allow_client_logos" type="checkbox" value="true" {% if values.get('allow_client_logos') %}checked{% endif %}><span>Show client logos found on the website</span></label>
+      <button class="button wide" type="submit">Create preview <span aria-hidden="true">↗</span></button>
+      <p class="help centered">You’ll review everything before the final render.</p>
+    </form>
+  </section>
+  <aside class="process-card">
+    <div class="format-art" aria-hidden="true">
+      <div class="film-caption"><span>KIEHNEMA / COLOR</span><span>01 — 02</span></div>
+      <div class="film-frames">
+        <div class="art-feed"><span>Your<br>brand.<br><em>In motion.</em></span><b>01 / 4:5 FEED</b></div>
+        <div class="art-story"><span>Make<br>your<br><em>move.</em></span><b>02 / 9:16 STORY</b></div>
+      </div>
+      <div class="film-caption"><span>A STORY IN EVERY FRAME</span><span>▶</span></div>
+    </div>
+    <p class="eyebrow">A SMALL BRIEF. A FULL STORY.</p>
+    <ol class="process-list"><li><span>01</span><div><b>Give us the starting point</b><p>Your website and a little direction.</p></div></li><li><span>02</span><div><b>Put your eye on it</b><p>Preview both formats, edit copy, leave feedback.</p></div></li><li><span>03</span><div><b>Ready for the feed</b><p>Two MP4s with original music, ready to share.</p></div></li></ol>
+    <p class="cost-note">Usually about 15 minutes to the first preview.<br>Previous 30-second videos: roughly $1.50–$2 in model costs. Estimates only; Billing may differ.</p>
+  </aside>
+</div>
+<section class="library" aria-labelledby="library-title"><div class="section-heading"><div><p class="eyebrow">YOUR WORKSPACE</p><h2 id="library-title">Your videos</h2></div><span class="muted">Pick up where you left off.</span></div>{% include "partials/jobs.html" %}</section>
+{% endblock %}

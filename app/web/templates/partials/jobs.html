@@ -1,0 +1,10 @@
+<div id="jobs" hx-get="/jobs" hx-trigger="every 4s" hx-swap="outerHTML">
+  {% for job in jobs %}
+  <article class="job-row">
+    <a class="job-link" href="/jobs/{{ job.id }}"><span class="job-symbol" aria-hidden="true">↗</span><span><strong>{{ job.url }}</strong><small>{{ job.duration }} seconds · Feed + story · {{ job.id[:8] }}</small></span></a>
+    <span class="badge status-{{ job.status }}">{{ {'review': 'Ready for review', 'done': 'Videos ready', 'failed': 'Needs attention', 'interrupted': 'Interrupted'}.get(job.status, job.status|replace('_', ' ')|title) }}</span>
+    <span class="job-cost">${{ '%.2f'|format(job.cost_usd|default(0)) }}</span>
+    {% if not job.poll and not job.active %}<a class="text-link muted" href="/jobs/{{ job.id }}/delete" aria-label="Delete video for {{ job.url }}">Delete</a>{% endif %}
+  </article>
+  {% else %}<div class="empty-state"><span aria-hidden="true">↗</span><h3>A blank canvas, for now.</h3><p>Your videos will live here. Start with a website above.</p></div>{% endfor %}
+</div>

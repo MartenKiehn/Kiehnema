@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" role="img" aria-labelledby="title">
+  <title id="title">Kiehnema – K and play in a film frame</title>
+  <rect width="80" height="80" rx="12" fill="#292b28"/>
+  <rect x="2" y="2" width="76" height="76" rx="10" fill="none" stroke="#65665e"/>
+  <g fill="#a7a598">
+    <rect x="12" y="10" width="8" height="4" rx="1"/>
+    <rect x="28" y="10" width="8" height="4" rx="1"/>
+    <rect x="44" y="10" width="8" height="4" rx="1"/>
+    <rect x="60" y="10" width="8" height="4" rx="1"/>
+    <rect x="12" y="66" width="8" height="4" rx="1"/>
+    <rect x="28" y="66" width="8" height="4" rx="1"/>
+    <rect x="44" y="66" width="8" height="4" rx="1"/>
+    <rect x="60" y="66" width="8" height="4" rx="1"/>
+  </g>
+  <polygon points="15,24 23,24 23,37 34,24 44,24 30,40 44,56 34,56 23,43 23,56 15,56" fill="#f4f0e7"/>
+  <polygon points="47,24 70,40 47,56" fill="#d5ad68"/>
+</svg>
