@@ -52,7 +52,9 @@ class CrawlResult:
 
     def save(self, out: Path) -> Path:
         path = out / "crawl.json"
-        path.write_text(json.dumps(asdict(self), ensure_ascii=False, indent=1))
+        temporary = path.with_suffix(".tmp")
+        temporary.write_text(json.dumps(asdict(self), ensure_ascii=False, indent=1))
+        temporary.replace(path)
         return path
 
     @classmethod
@@ -189,6 +191,7 @@ async def crawl(
                 if total > MAX_TEXT_CHARS:
                     data["blocks"] = data["blocks"][: max(1, int(len(data["blocks"]) * MAX_TEXT_CHARS / total))]
                 result.pages.append(PageData(url=normalize(final), depth=depth, data=data, screenshot=shot))
+                result.save(out)
                 seen.add(normalize(final))
 
                 if depth < max_depth:

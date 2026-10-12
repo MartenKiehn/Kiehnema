@@ -1,2 +1,30 @@
-data/jobs
-docs/erklaerung
+# Local jobs, crawls, renders and generated demo music
+/data/
+/out/
+/assets/audio/music.wav
+*.sqlite
+*.sqlite-*
+*.log
+
+# Installed dependencies and Python caches
+node_modules/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+playwright-report/
+test-results/
+
+# Local configuration and editor/OS files
+.env
+.env.*
+!.env.example
+.idea/
+.DS_Store
+.claude/settings.local.json
+
+/docs/erklaerung/

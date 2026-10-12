@@ -34,7 +34,7 @@ def review_job(workspace, monkeypatch):
     path = jobs.jobs_dir() / JOB
     (path / "concept.json").write_text(json.dumps(CONCEPT))
     (path / "check.json").write_text(json.dumps({"ok": True, "issues": []}))
-    (path / "profile.json").write_text(json.dumps({"facts": [{"id": "f1", "quote": "Robots that work.", "source_url": "https://example.com/about"}]}))
+    (path / "profile.json").write_text(json.dumps({"facts": [{"id": "f1", "text": "Robots that work.", "quote": "Robots that work.", "source_url": "https://example.com/about"}]}))
     build_site(Path("examples/they"), path / "site")
     frames = []
     for fmt in ("feed", "story"):
@@ -294,10 +294,13 @@ def test_restart_marks_unfinished_work_without_restarting_it(workspace):
 
 
 @pytest.mark.browser
-async def test_progress_motion_survives_polling_and_respects_reduced_motion(review_job, tmp_path):
+async def test_progress_insights_survive_polling_and_expand_as_results_arrive(review_job, tmp_path):
     from playwright.async_api import async_playwright
 
     async with app.router.lifespan_context(app), async_playwright() as pw:
+        (review_job / "profile.json").write_text(json.dumps({"facts": [
+            {"text": text, "source_url": "https://example.com/about"} for text in
+            ("Robots that work.", "Founded in 2019.", "Fixed-price projects.", "Built for small factories.")]}))
         write_status(review_job, "crawl", "Reading page 1 (limit 20): https://example.com/")
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
             browser = await pw.chromium.launch()
@@ -313,20 +316,24 @@ async def test_progress_motion_survives_polling_and_respects_reduced_motion(revi
                 await page.get_by_role("heading", name="Reading your website").wait_for()
                 await page.get_by_text("Activity log", exact=True).click()
                 activity = await page.locator("details.activity").element_handle()
-                motion = await page.locator(".progress-motion").element_handle()
-                assert await motion.evaluate("el => getComputedStyle(el, '::after').animationName") == "scan-motion"
-                await page.screenshot(path=str(tmp_path / "progress-desktop.png"), full_page=True)
+                assert await page.locator(".progress-motion").count() == 0
+                await page.get_by_text("Read 1 more", exact=True).click()
+                facts = await page.locator(".insight-card").first.element_handle()
+                (review_job / "brand").mkdir()
+                (review_job / "brand/brand.json").write_text(json.dumps({"colors": [{"hex": "#ffffff"}, {"hex": "#19285a"}]}))
                 write_status(review_job, "brand", "Brand assets found")
                 await page.get_by_role("heading", name="Finding your visual identity").wait_for(timeout=10000)
-                assert await motion.evaluate("el => el.isConnected")
+                assert await facts.evaluate("el => el.isConnected && el.querySelector('details').open")
                 assert await activity.evaluate("el => el.isConnected && el.open")
+                assert "White" in await page.locator(".insight-colours").inner_text()
+                assert "#ffffff" not in await page.locator(".discoveries").inner_text()
+                await page.screenshot(path=str(tmp_path / "progress-desktop.png"), full_page=True)
                 assert "Find the facts" in await page.locator(".progress-next").inner_text()
                 assert await page.locator('[aria-current="step"]').text_content() == "2Brand"
                 await page.set_viewport_size({"width": 390, "height": 844})
                 assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
                 await page.screenshot(path=str(tmp_path / "progress-mobile.png"), full_page=True)
                 await page.emulate_media(reduced_motion="reduce")
-                assert await motion.evaluate("el => getComputedStyle(el, '::after').animationName") == "none"
                 assert await page.locator(".live-dot").evaluate("el => getComputedStyle(el).animationName") == "none"
             finally:
                 await browser.close()

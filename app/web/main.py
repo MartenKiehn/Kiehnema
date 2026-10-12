@@ -21,6 +21,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from app.crawl.guard import UrlGuard
 from app.pipeline import jobs
 from app.pipeline.status import write_status
+from app.web.insights import job_insights
 
 HERE = Path(__file__).resolve().parent
 TERMINAL = {"review", "done", "failed", "interrupted"}
@@ -116,6 +117,7 @@ async def job_context(job_id: str) -> dict:
     path = job_path(job_id)
     job = job_summary(path)
     context = {"job": job, "steps": STEPS, "seen": {h["status"] for h in job.get("history", [])},
+               "insights": job_insights(path) if job["poll"] else [],
                "concept": {}, "frames": {}, "facts": {}, "check": {}, "qa": {}, "can_approve": False}
     if job["status"] in {"review", "done"}:
         state = await jobs.job_state(job_id)

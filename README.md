@@ -18,6 +18,7 @@ Social-Media-Spot für LinkedIn & Instagram, gebaut aus Inhalten, Farben, Schrif
 | `out/they-consulting-story-1080x1920.mp4` | 9:16 | Instagram Reels/Stories, LinkedIn mobil |
 
 30 fps, H.264 (BT.709, korrekt getaggt), AAC-Stereo mit eigens erzeugter Musik.
+Diese Ausgabedateien sind lokal und werden mit `npm run render` erzeugt; sie gehören nicht ins Git-Repo.
 
 ## Storyboard
 
@@ -78,8 +79,15 @@ uv sync
 uv run playwright install chromium
 uv run python -m app            # http://127.0.0.1:8000
 uv run pytest                   # MG_LIVE_BEDROCK=1 also runs a live Bedrock smoke test
+npm run music                   # generate the demo audio for the command below
 uv run python -m app.render.renderer --root . --format feed --audio assets/audio/music.wav --out out/py
 ```
+
+Git contains source code, tests, documentation, example assets and dependency lockfiles.
+Jobs, databases, crawled content and rendered videos in `data/` and `out/` stay local, as do
+generated demo music, installed dependencies, caches, `.env` files and personal editor settings.
+A fresh checkout starts without saved jobs; the app creates its data directory when needed.
+The `spikes/partial_concept.py` experiment requires the crawl and brand extraction commands below first.
 
 ```bash
 uv run python -m app.harness examples/they data/sites/they      # build a composition into a site

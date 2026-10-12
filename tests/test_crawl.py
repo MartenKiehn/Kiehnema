@@ -49,7 +49,16 @@ def test_normalize_drops_fragments_and_tracking():
 
 async def test_crawl_and_brand_fixture_site(site, tmp_path):
     guard = UrlGuard(allow_hosts={"127.0.0.1"})
-    result = await crawl(site, tmp_path / "crawl", guard, max_pages=10)
+    snapshots = []
+
+    def progress(message):
+        saved = tmp_path / "crawl/crawl.json"
+        if saved.exists():
+            snapshots.append(json.loads(saved.read_text()))
+
+    result = await crawl(site, tmp_path / "crawl", guard, max_pages=10, progress=progress)
+    assert snapshots and len(snapshots[0]["pages"]) == 1
+    assert not (tmp_path / "crawl/crawl.tmp").exists()
     urls = {p.url for p in result.pages}
     assert {site, site + "about.html", site + "services/"} <= urls
     assert not any("private" in u or "example.com" in u for u in urls)

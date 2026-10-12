@@ -1,0 +1,23 @@
+{% macro entries(items) %}
+<ul class="insight-items">{% for item in items %}<li>
+  {% if item.label %}<span class="eyebrow">{{ item.label }}</span>{% endif %}
+  <p>{{ item.text|truncate(400) }}</p>
+  {% if item.url and item.url|safe_url != '#' %}<a href="{{ item.url|safe_url }}" target="_blank" rel="noopener noreferrer">Read on your website ↗</a>{% endif %}
+</li>{% endfor %}</ul>
+{% endmacro %}
+<section class="discoveries" aria-label="Discoveries from your website">
+  {% for card in insights|default([]) %}
+  <article class="insight-card" id="{{ card.id }}" hx-preserve="true">
+    <p class="eyebrow">{{ card.label }}</p><h3>{{ card.title }}</h3>
+    {% if card.description %}<p class="insight-description">{{ card.description }}</p>{% endif %}
+    {% if card.colours %}<ul class="insight-colours">{% for colour in card.colours %}<li>
+      <svg viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="8" fill="{{ colour.value }}"/></svg>
+      <span>{{ colour.name }}</span>
+    </li>{% endfor %}</ul>{% endif %}
+    {{ entries(card['items'][:3]) }}
+    {% if card['items']|length > 3 %}<details><summary>Read {{ card['items']|length - 3 }} more</summary>{{ entries(card['items'][3:]) }}</details>{% endif %}
+  </article>
+  {% else %}
+  <p class="insights-empty">The first discoveries will appear here as we read your website.</p>
+  {% endfor %}
+</section>

@@ -30,11 +30,11 @@
 {% set current_index = step_keys.index(current_step) if current_step in step_keys else -1 %}
 <section class="card progress-card" id="progress" {% if job.poll %}hx-get="/jobs/{{ job.id }}/progress" hx-trigger="every 2s" hx-target="#progress-status" hx-select="#progress-status" hx-select-oob="#activity-entries:innerHTML,#job-cost:innerHTML" hx-swap="outerHTML"{% endif %}>
   <div class="progress-signal"><p class="eyebrow">WORK IN PROGRESS</p><span class="live-dot" aria-hidden="true"></span></div>
-  <div class="progress-motion" aria-hidden="true"></div>
   <div id="progress-status">
   <div class="section-heading"><h2>{{ progress_copy[0] }}</h2>{% if current_index >= 0 %}<span class="badge">STEP {{ current_index + 1 }} / {{ steps|length }}</span>{% endif %}</div>
   <p class="progress-description">{{ progress_copy[1] }}</p>
   <p class="progress-message" role="status" aria-live="polite">{{ job.message }}</p>
+  {% include "partials/insights.html" %}
   <div class="progress-next"><span class="eyebrow">UP NEXT <span aria-hidden="true">↗</span></span><p>{{ progress_copy[2] }}</p></div>
   <ol class="steps" aria-label="Video production steps">{% for key, label in steps %}{% set complete = key in seen and loop.index0 < current_index %}<li class="{% if key == current_step %}current{% elif complete %}complete{% endif %}" {% if key == current_step %}aria-current="step"{% endif %}><span aria-hidden="true">{% if complete %}✓{% else %}{{ loop.index }}{% endif %}</span>{{ label }}</li>{% endfor %}</ol>
   <div class="progress-footer"><p>Steps can take different amounts of time and may repeat during revisions.<br>You can leave this page and return while the app stays running.</p><div><b>${{ '%.2f'|format(job.cost_usd|default(0)) }}</b><small>Estimated so far · updates after model calls</small></div></div>
