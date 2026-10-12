@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 FactKind = Literal[
     "claim", "tagline", "service", "process-step", "differentiator", "proof", "client", "quote",
@@ -41,6 +41,13 @@ class ConceptText(BaseModel):
     role: TextRole
     text: str = Field(description="final on-screen copy in the video language; short")
     fact_ids: list[str] = Field(default_factory=list, description="facts that support this text (required for headline/subline/quote/body)")
+
+
+class SceneChange(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, allow_inf_nan=False, extra="forbid")
+    id: str
+    duration: float = Field(ge=0.5, le=60)
+    visual: str = Field(min_length=1, max_length=4000)
 
 
 class ConceptCue(BaseModel):

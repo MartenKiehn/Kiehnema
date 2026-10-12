@@ -31,7 +31,7 @@ from app.harness.build import Theme, build_site
 from app.pipeline import prompts
 from app.pipeline.files import COMPOSITION_FILES, apply_edits, parse_files, theme_for, write_composition
 from app.pipeline.llm import LLM, estimate_cost, image_block, messages
-from app.pipeline.schemas import CompanyProfile, Concept, QAReport
+from app.pipeline.schemas import CompanyProfile, Concept, QAReport, SceneChange
 from app.pipeline.status import write_status
 from app.pipeline.verify import lint_composition, validate_concept, verify_profile
 from app.render.job import render_site
@@ -59,6 +59,7 @@ class JobState(TypedDict, total=False):
     concept_errors: list[str]
     lint: list[str]
     check: dict
+    review_requirements: str  # retained while automatic checks replace the current problems
     problems: str  # input for the next fix round
     fix_instruction: str | None
     fix_round: int
@@ -160,7 +161,8 @@ def _save_files(state: JobState, files: dict[str, str]) -> list[str]:
     """Write the composition dir for these files and return lint errors."""
     brand = _brand(state)
     concept = _concept(state)
-    used = {a for s in concept.scenes for a in s.assets} | ({brand["logo"]["file"]} if brand.get("logo") else set())
+    # Image revisions can select any asset offered to the composer, not just the original storyboard.
+    used = {a["file"] for a in _asset_list(brand, state.get("allow_client_logos", False))}
     write_composition(_dir(state) / "composition", files, concept, state["duration"], _dir(state) / "brand",
                       Theme.model_validate(brand["theme"]), used)
     text_ids = {t.id for s in concept.scenes for t in s.texts}
@@ -281,8 +283,14 @@ async def n_fix(state: JobState, config: RunnableConfig) -> dict:
     ctx = _compose_context(state)
     files = _files(state)
     instruction = state.get("fix_instruction") or "The automated checks found these problems. Fix all errors; fix warnings where easy."
+    problems = state.get("problems", "")
+    requirements = state.get("review_requirements", "")
+    if requirements:
+        instruction += " Reviewer requests override earlier visual directions and asset choices. Fix technical errors without undoing these requests."
+        if requirements != problems:
+            problems += "\n\nReviewer requirements (still apply throughout this revision):\n" + requirements
     user = prompts.compose_user(**ctx).rsplit("\n\n", 1)[0] + "\n\n" + prompts.fix_user(
-        files=files, problems=state.get("problems", ""), instruction=instruction)
+        files=files, problems=problems, instruction=instruction)
     text = await _llm(config).text(
         "fix", messages(prompts.compose_system(), user), effort="low", max_tokens=48_000,
         on_progress=lambda n: _status(state, "fix", f"Revising the composition (round {rnd}) – {n:,} characters so far"))
@@ -354,22 +362,56 @@ async def n_review(state: JobState, config: RunnableConfig) -> dict:
     action = (decision or {}).get("action", "approve")
     if action == "approve":
         return {"review": {"action": "approve"}}
+    concept = _concept(state)
+    updates = {}
     if action == "edit":
         edits = decision.get("texts", {})
         problems = "\n".join(f'- text data-text-id="{k}": change the copy to “{v}” (keep its styling)' for k, v in edits.items())
-        concept = _concept(state)
         for scene in concept.scenes:  # keep the storyboard in sync with the edited copy
             for t in scene.texts:
                 if t.id in edits:
                     t.text = edits[t.id]
-        (_dir(state) / "concept.json").write_text(concept.model_dump_json(indent=1))
         instruction = "The reviewer changed these texts. Apply exactly these copy changes and adjust layout if needed."
         if decision.get("text"):
             problems += f"\n- Additional reviewer feedback: {decision['text']}"
     else:
         problems = f"- {decision.get('text', '')}"
         instruction = "The reviewer gave this feedback on the video. Apply it while keeping everything that works."
-    return {"review": {"action": action}, "problems": problems, "fix_instruction": instruction, "fix_round": 0, "qa_done": True}
+    if decision.get("scenes"):
+        changes = [SceneChange.model_validate(s) for s in decision["scenes"]]
+        original = {scene.id: scene for scene in concept.scenes}
+        if len(changes) != len(original) or {s.id for s in changes} != set(original):
+            raise ValueError("Scene changes must contain every scene exactly once")
+        if not 15 <= round(sum(s.duration for s in changes), 3) <= 60:
+            raise ValueError("The revised video must be between 15 and 60 seconds")
+        cursor = 0.0
+        concept.scenes = [original[change.id] for change in changes]
+        for scene, change in zip(concept.scenes, changes):
+            for cue in scene.cues:
+                cue.t = round(cursor + max(0, min(1, (cue.t - scene.start) / scene.duration)) * change.duration, 3)
+            scene.start, scene.duration, scene.visual = cursor, change.duration, change.visual
+            cursor = round(cursor + change.duration, 3)
+        updates["duration"] = cursor
+        request_path = _dir(state) / "request.json"
+        request = _read_json(request_path)
+        request["duration"] = cursor
+        temporary = request_path.with_suffix(".tmp")
+        temporary.write_text(json.dumps(request, ensure_ascii=False))
+        temporary.replace(request_path)
+        problems += f"\n- Apply the updated storyboard exactly: scene order, durations and visual directions. New total: {cursor:g} seconds. Update all animation timing and sound cues to match."
+        instruction += " The reviewer also edited the storyboard; follow its new order, timing and visual directions."
+    if decision.get("comments"):
+        problems += "\nTimeline comments refer to the ORIGINAL preview. Apply each to its scene ID even if that scene has moved or changed duration:"
+        for comment in decision["comments"]:
+            problems += (f"\n- At {comment['time']:.3f}s in original scene {comment['scene_id']} "
+                         f"({comment['format']} format): {comment['text']}")
+    if action == "edit" or decision.get("scenes"):
+        concept_path = _dir(state) / "concept.json"
+        temporary = concept_path.with_suffix(".tmp")
+        temporary.write_text(concept.model_dump_json(indent=1))
+        temporary.replace(concept_path)
+    return {"review": decision, "review_requirements": problems, "problems": problems, "fix_instruction": instruction,
+            "fix_round": 0, "qa_done": True, **updates}
 
 
 def after_review(state: JobState) -> str:

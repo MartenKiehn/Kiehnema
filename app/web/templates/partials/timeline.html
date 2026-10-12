@@ -1,0 +1,27 @@
+<section class="timeline-editor" aria-labelledby="timeline-title">
+  <div class="section-heading"><div><p class="eyebrow">CURRENT PREVIEW</p><h3 id="timeline-title">Choose a moment. Leave a direction.</h3></div><span class="badge">{{ comments|length }} confirmed comments</span></div>
+  <p class="help">Click a frame or move the playhead. Comments stay attached to this preview, even when you change the scene order below.</p>
+  <div class="timeline-transport"><button type="button" class="button secondary small" id="timeline-play">Play both previews</button><output id="timeline-time">0.0 s</output><button type="button" class="button secondary small" id="comment-here">Comment here</button></div>
+  <label for="timeline-position" class="sr-only">Video timeline position</label>
+  <input id="timeline-position" class="timeline-range" type="range" min="0" max="{{ preview_duration }}" step="0.1" value="0">
+  <div class="timeline-frames" aria-label="Scene frames">
+    {% for scene in concept.scenes %}{% set frame = frames.get(scene.id, {}).get('feed') or frames.get(scene.id, {}).get('story') %}
+    <button type="button" class="timeline-frame" data-scene="{{ scene.id }}" data-start="{{ scene.start }}" data-duration="{{ scene.duration }}" data-time="{{ frame.t if frame else scene.start + scene.duration / 2 }}" aria-label="Scene {{ loop.index }} at {{ '%.1f'|format(scene.start) }} seconds">
+      {% if frame %}<img src="/jobs/{{ job.id }}/files/{{ frame.file }}" alt="Scene {{ loop.index }} preview">{% else %}<span class="frame-missing">Scene {{ loop.index }}</span>{% endif %}
+      <span>{{ '%02d'|format(loop.index) }} <small>{{ '%g'|format(scene.start) }}<span class="timeline-end">–{{ '%g'|format(scene.start + scene.duration) }}</span> s</small></span>
+    </button>{% endfor %}
+  </div>
+  <div id="comment-markers" class="comment-markers" role="group" aria-label="Comments along the timeline"></div>
+  <div class="timeline-scale"><span>0 s</span><span>{{ '%.1f'|format(preview_duration) }} s · current preview</span></div>
+  <div class="comment-workspace">
+    <div class="comment-composer" id="comment-composer">
+      <h3 id="comment-editor-title">Add a comment</h3>
+      <div class="field-row"><div><label for="comment-time">At second</label><input id="comment-time" type="number" min="0" max="{{ preview_duration }}" step="0.001" required value="0"></div><div><label for="comment-format">Applies to</label><select id="comment-format"><option value="both">Both formats</option><option value="feed">4:5 · Feed</option><option value="story">9:16 · Story</option></select></div></div>
+      <label for="comment-text">What should change?</label><textarea id="comment-text" rows="4" maxlength="2000" placeholder="Replace this scene with a close-up of the product. Use a lighter background and a calmer entrance." aria-describedby="comment-help"></textarea>
+      <p id="comment-help" class="help">Confirm each comment to add it to the timeline. Nothing is sent to the model until you choose Revise preview.</p>
+      <div class="actions"><button type="button" class="button small" id="save-comment">Confirm comment</button><button type="button" class="button secondary small" id="cancel-comment">Clear draft</button></div>
+      <p id="comment-status" class="help" role="status" aria-live="polite"></p>
+    </div>
+    <div><h3>Confirmed comments <span id="comment-count">{{ comments|length }}</span></h3><p class="help" id="comments-empty">Your confirmed comments will appear here and on the timeline.</p><ol id="comment-list" class="comment-list"></ol></div>
+  </div>
+</section>

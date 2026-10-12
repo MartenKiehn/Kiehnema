@@ -235,11 +235,105 @@ async def test_saved_review_combines_edits_and_feedback_and_deletes_checkpoint(d
     monkeypatch.setattr(settings, "data_dir", moved)
     path = moved / "jobs" / job_id
     result = await resume_job(job_id, {"action": "edit", "texts": {"proof-title": "Fixed prices"},
-                                       "text": "Make the opening bolder"}, llm=FakeLLM({}))
+                                       "text": "Make the opening bolder",
+                                       "scenes": [{"id": s["id"], "duration": 5, "visual": s["visual"]} for s in CONCEPT["scenes"]],
+                                       "comments": [{"time": 2.5, "scene_id": "s-proof", "format": "feed", "text": "Show our robot"}]}, llm=FakeLLM({}))
     assert "Fixed prices" in result["problems"] and "Make the opening bolder" in result["problems"]
+    persisted = (await job_state(job_id))["values"]
+    assert persisted["duration"] == 15 and persisted["review"]["comments"][0]["text"] == "Show our robot"
+    assert "2.500s in original scene s-proof (feed format)" in persisted["problems"]
     assert json.loads((path / "concept.json").read_text())["scenes"][1]["texts"][0]["text"] == "Fixed prices"
     with pytest.raises(ValueError, match="not waiting for review"):
         await resume_job(job_id, {"action": "approve"}, llm=FakeLLM({}))
     await jobs.delete_job(job_id)
     assert not path.exists()
     assert not (await job_state(job_id))["values"]
+
+
+async def test_review_retimes_scenes_and_preserves_comment_targets(data_dir, monkeypatch):
+    from app.pipeline import jobs
+    from app.pipeline.graph import n_review
+
+    job_id = jobs.create_job("https://example.com", 6)
+    path = data_dir / "jobs" / job_id
+    concept = json.loads(json.dumps(CONCEPT))
+    concept['scenes'][1]['cues'][0]['t'] = 3.05
+    (path / 'concept.json').write_text(json.dumps(concept))
+    changes = [{'id': 's-proof', 'duration': 6, 'visual': 'Product photo'},
+               {'id': 's-hook', 'duration': 5, 'visual': 'New opening'},
+               {'id': 's-outro', 'duration': 4, 'visual': 'Logo'}]
+    decision = {'action': 'feedback', 'text': '', 'scenes': changes,
+                'comments': [{'time': 3.1, 'scene_id': 's-proof', 'format': 'story', 'text': 'Show the product close up'}]}
+    monkeypatch.setattr('app.pipeline.graph.interrupt', lambda value: decision)
+    result = await n_review({'job_id': job_id, 'duration': 6}, {'configurable': {'llm': FakeLLM({})}})
+    updated = json.loads((path / 'concept.json').read_text())
+    assert [(s['id'], s['start'], s['duration']) for s in updated['scenes']] == [('s-proof', 0, 6), ('s-hook', 6, 5), ('s-outro', 11, 4)]
+    assert [c['t'] for c in updated['scenes'][0]['cues']] == [3, 0]
+    assert updated['scenes'][2]['cues'][0]['t'] == 11
+    assert result['duration'] == json.loads((path / 'request.json').read_text())['duration'] == 15
+    assert '3.100s in original scene s-proof (story format): Show the product close up' in result['problems']
+    assert 'new order, timing and visual directions' in result['fix_instruction']
+    decision['scenes'] = changes[:2]
+    with pytest.raises(ValueError, match='every scene exactly once'):
+        await n_review({'job_id': job_id}, {'configurable': {'llm': FakeLLM({})}})
+    assert json.loads((path / 'concept.json').read_text()) == updated
+
+
+@pytest.mark.parametrize("allow_clients", [False, True])
+def test_composition_includes_all_offered_replacement_images(data_dir, allow_clients):
+    from app.harness.build import build_site
+    from PIL import Image
+    from app.pipeline import jobs
+    from app.pipeline.graph import _save_files
+
+    job_id = jobs.create_job("https://example.com", 6, allow_client_logos=allow_clients)
+    job = data_dir / 'jobs' / job_id
+    (job / 'concept.json').write_text(json.dumps(CONCEPT))
+    brand = job / 'brand'
+    brand.mkdir()
+    images = []
+    for file, kind, colour in [('img/old.png', 'photo', 'red'), ('img/replacement.png', 'photo', 'blue'),
+                               ('clients/client.png', 'client-logo', 'green')]:
+        target = brand / file
+        target.parent.mkdir(exist_ok=True)
+        Image.new('RGB', (20, 20), colour).save(target)
+        images.append({'file': file, 'kind': kind, 'alt': file, 'section': '', 'width': 20, 'height': 20})
+    (brand / 'brand.json').write_text(json.dumps({'theme': {'colors': CONCEPT['palette'], 'fonts': []}, 'images': images}))
+    files = {'composition.html': HTML.replace('assets/brand/logo.svg', 'assets/brand/img/replacement.png'),
+             'composition.css': CSS, 'composition.js': JS_GOOD}
+    state = {'job_id': job_id, 'duration': 6, 'allow_client_logos': allow_clients}
+    for _ in range(2):  # Rebuilding during a later repair must also keep replacement images.
+        assert not _save_files(state, files)
+        site = build_site(job / 'composition', job / 'site')
+        assert (site / 'assets/brand/img/replacement.png').read_bytes() == (brand / 'img/replacement.png').read_bytes()
+        assert (site / 'assets/brand/clients/client.png').exists() == allow_clients
+
+
+async def test_reviewer_image_request_survives_automatic_repair(data_dir, monkeypatch):
+    from app.pipeline import jobs
+    from app.pipeline.graph import n_review, n_fix
+
+    job_id = jobs.create_job('https://example.com', 6)
+    job = data_dir / 'jobs' / job_id
+    (job / 'concept.json').write_text(json.dumps(CONCEPT))
+    request = 'Replace the background photo with a different image'
+    decision = {'action': 'feedback', 'text': '', 'comments': [
+        {'time': 3, 'scene_id': 's-proof', 'format': 'both', 'text': request}]}
+    monkeypatch.setattr('app.pipeline.graph.interrupt', lambda value: decision)
+    llm = FakeLLM({'fix': [FIX_LINT]})
+    config = {'configurable': {'llm': llm}}
+    state = {'job_id': job_id, 'duration': 6}
+    state.update(await n_review(state, config))
+    monkeypatch.setattr('app.pipeline.graph._compose_context', lambda state: {'concept': CONCEPT, 'theme': {}, 'assets': []})
+    monkeypatch.setattr('app.pipeline.graph._files', lambda state: {'composition.js': JS_BAD})
+    monkeypatch.setattr('app.pipeline.graph._save_files', lambda state, files: [])
+    state.update(await n_fix(state, config))
+    state['problems'] = '- [error] page-error: image returned 404'
+    await n_fix(state, config)
+    prompt = llm.calls[-1][1][1].content
+    assert 'image returned 404' in prompt and request in prompt and 'original scene s-proof' in prompt
+    assert 'without undoing these requests' in prompt
+    decision['comments'][0]['text'] = 'Now change only the heading'
+    state.update(await n_review(state, config))
+    assert request not in state['review_requirements']
+    assert 'Now change only the heading' in state['review_requirements']

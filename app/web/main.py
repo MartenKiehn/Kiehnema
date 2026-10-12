@@ -10,6 +10,7 @@ import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlsplit
+from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
@@ -20,8 +21,10 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.crawl.guard import UrlGuard
 from app.pipeline import jobs
+from app.pipeline.schemas import SceneChange
 from app.pipeline.status import write_status
 from app.web.insights import job_insights
+from app.web.review import CommentRequest, saved_comments, save_comments
 
 HERE = Path(__file__).resolve().parent
 TERMINAL = {"review", "done", "failed", "interrupted"}
@@ -132,6 +135,8 @@ async def job_context(job_id: str) -> dict:
                        board=(path / "brand/board.png").is_file(), preview=(path / "site/index.html").is_file(),
                        can_approve=bool(values.get("check", {}).get("ok")),
                        revision=revision(path) if concept else "")
+        context["comments"] = saved_comments(path, context["revision"])
+        context["preview_duration"] = max((s["start"] + s["duration"] for s in concept.get("scenes", [])), default=job["duration"])
     return context
 
 
@@ -210,7 +215,8 @@ async def progress(request: Request, job_id: str):
 @app.post("/jobs/{job_id}/review")
 async def review(request: Request, job_id: str):
     path = job_path(job_id)
-    form = dict(await request.form())
+    submitted = await request.form()
+    form = dict(submitted)
     if job_id in app.state.tasks or job_summary(path)["status"] != "review":
         raise HTTPException(409, "This job is no longer waiting for review. Open it again to see the current state.")
     context = await job_context(job_id)
@@ -222,22 +228,77 @@ async def review(request: Request, job_id: str):
     edits = {k: v for k, v in draft.items() if texts.get(k) != v}
     error = None
     action = form.get("action")
+    comments = saved_comments(path, context["revision"])
+    scenes = context["concept"].get("scenes", [])
+    scene_changes = []
+    scene_draft = {}
+    order = submitted.getlist("scene-order")
+    if order or any(k.startswith(("scene-duration:", "scene-visual:")) for k in form):
+        try:
+            if len(order) != len(scenes) or set(order) != {s["id"] for s in scenes}:
+                raise ValueError("Keep every scene exactly once in the scene order.")
+            scene_changes = [SceneChange(id=sid, duration=form.get(f"scene-duration:{sid}"),
+                                         visual=form.get(f"scene-visual:{sid}")).model_dump() for sid in order]
+            if not 15 <= round(sum(s["duration"] for s in scene_changes), 3) <= 60:
+                raise ValueError("The total video length must be between 15 and 60 seconds.")
+            scene_draft = {s["id"]: s for s in scene_changes}
+            if scene_changes == [{k: s[k] for k in ("id", "duration", "visual")} for s in scenes]:
+                scene_changes = []
+        except (ValueError, ValidationError):
+            error = "Keep each scene once, its duration between 0.5 and 60 seconds, the total between 15 and 60 seconds, and each visual direction between 1 and 4,000 characters."
+            scene_draft = {s["id"]: {"duration": form.get(f"scene-duration:{s['id']}", s["duration"]),
+                                     "visual": form.get(f"scene-visual:{s['id']}", s["visual"])} for s in scenes}
     if draft.keys() != texts.keys() or any(not v or len(v) > 500 for v in draft.values()) or len(feedback) > 4000:
         error = "Keep every text between 1 and 500 characters and feedback under 4,000 characters."
-    elif action == "approve" and (edits or feedback):
+    elif action == "approve" and (edits or feedback or comments or scene_changes):
         error = "You have unapplied changes. Choose Revise preview, then review the updated version before approving."
     elif action == "approve" and not context["can_approve"]:
         error = "Automatic checks still report errors. Request a revision before rendering."
-    elif action == "revise" and not edits and not feedback:
-        error = "Edit a text or add feedback to request a revision."
+    elif action == "revise" and not edits and not feedback and not comments and not scene_changes:
+        error = error or "Edit a scene, confirm a timeline comment or add feedback to request a revision."
     elif action not in {"approve", "revise"}:
         error = "Choose Revise preview or Approve & render."
     if error:
-        return templates.TemplateResponse(request, "job.html", {**context, "error": error, "draft": draft, "feedback": feedback}, status_code=422)
+        return templates.TemplateResponse(request, "job.html", {**context, "error": error, "draft": draft, "feedback": feedback,
+                                          "scene_draft": scene_draft,
+                                          "edit_scenes": sorted(scenes, key=lambda s: order.index(s["id"]))
+                                          if len(order) == len(scenes) and set(order) == {s["id"] for s in scenes} else scenes}, status_code=422)
     decision = {"action": "approve"} if action == "approve" else (
         {"action": "edit", "texts": edits, "text": feedback} if edits else {"action": "feedback", "text": feedback})
+    if comments:
+        decision["comments"] = comments
+    if scene_changes:
+        decision["scenes"] = scene_changes
     enqueue(job_id, decision)
     return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+
+
+@app.post("/jobs/{job_id}/comments")
+async def review_comment(job_id: str, data: CommentRequest):
+    path = job_path(job_id)
+    if job_id in app.state.tasks or job_summary(path)["status"] != "review" or data.revision != revision(path):
+        raise HTTPException(409, "This preview has changed. Reload before editing comments.")
+    comments = saved_comments(path, data.revision)
+    if data.id and not any(c["id"] == data.id for c in comments):
+        raise HTTPException(404, "Comment not found.")
+    if data.action == "delete":
+        if not data.id:
+            raise HTTPException(422, "Choose a comment to delete.")
+        comments = [c for c in comments if c["id"] != data.id]
+    else:
+        scenes = read_json(path / "concept.json").get("scenes", [])
+        duration = max((s["start"] + s["duration"] for s in scenes), default=0)
+        scene = next((s for s in scenes if s["start"] <= data.time < s["start"] + s["duration"]), None)
+        if data.time == duration and scenes:
+            scene = scenes[-1]
+        if not data.text or scene is None or (not data.id and len(comments) >= 30):
+            raise HTTPException(422, "Add a comment at a time within this preview. Up to 30 confirmed comments are allowed.")
+        comment = {"id": data.id or uuid4().hex, "time": round(data.time, 3), "text": data.text,
+                   "format": data.format, "scene_id": scene["id"]}
+        comments = [c for c in comments if c["id"] != data.id] + [comment]
+        comments.sort(key=lambda c: c["time"])
+    save_comments(path, data.revision, comments)
+    return {"comments": comments}
 
 
 @app.get("/jobs/{job_id}/delete", response_class=HTMLResponse)
@@ -283,6 +344,8 @@ async def preview(request: Request, job_id: str, name: str):
     if not allowed:
         raise HTTPException(404, "Preview file not found.")
     path = confined_file(job_path(job_id) / "site", name)
+    if name == "harness/harness.js":
+        path = HERE.parent / "harness" / "harness.js"
     source = f"{str(request.base_url).rstrip('/')}/preview/{job_id}/"
     return FileResponse(path, headers={
         "Access-Control-Allow-Origin": "*",  # fonts loaded from the iframe's opaque origin

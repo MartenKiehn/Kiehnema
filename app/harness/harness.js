@@ -205,9 +205,14 @@
     fit();
     let playing = false;
     let last = 0;
-    const update = () => {
+    let lastMessage = 0;
+    const update = (force = false) => {
       scrub.value = tl.time() / DURATION;
       time.textContent = `${tl.time().toFixed(2)} s`;
+      if (parent !== window && (force || performance.now() - lastMessage > 100)) {
+        parent.postMessage({type: 'kiehnema.time', time: tl.time(), playing}, location.origin);
+        lastMessage = performance.now();
+      }
     };
     const loop = (now) => {
       if (!playing) return;
@@ -223,10 +228,20 @@
       play.textContent = playing ? '❚❚' : '▶︎';
       play.setAttribute('aria-label', playing ? 'Pause preview' : 'Play preview');
       if (playing) { last = performance.now(); requestAnimationFrame(loop); }
+      update(true);
     };
     play.onclick = toggle;
     addEventListener('keydown', (e) => { if (e.code === 'Space') { e.preventDefault(); toggle(); } });
-    scrub.oninput = () => { tl.seek(scrub.value * DURATION); update(); };
+    scrub.oninput = () => { tl.seek(scrub.value * DURATION); update(true); };
+    addEventListener('message', (event) => {
+      if (event.source !== parent || parent === window || !event.data) return;
+      if (event.data.type === 'kiehnema.seek' && Number.isFinite(event.data.time)) {
+        if (playing) toggle();
+        tl.seek(Math.max(0, Math.min(DURATION, event.data.time)));
+        update(true);
+      } else if (event.data.type === 'kiehnema.play' && typeof event.data.playing === 'boolean' && event.data.playing !== playing) toggle();
+    });
+    if (parent !== window) parent.postMessage({type: 'kiehnema.ready'}, location.origin);
   }
 
   document.addEventListener('DOMContentLoaded', start);

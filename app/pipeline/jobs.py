@@ -73,7 +73,7 @@ async def start_job(url: str, duration: float, description: str = "", *, allow_c
 
 
 async def resume_job(job_id: str, decision: dict, *, llm: LLM | None = None, guard: UrlGuard | None = None) -> dict:
-    """decision: {"action": "approve"} | {"action": "edit", "texts": {id: text}} | {"action": "feedback", "text": "..."}"""
+    """Resume with approve, edit or feedback; revisions may include ordered scenes and timeline comments."""
     job_dir = jobs_dir() / job_id
     async with _graph() as graph:
         snapshot = await graph.aget_state({"configurable": {"thread_id": job_id}})

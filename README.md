@@ -117,10 +117,30 @@ Existing jobs appear in the workspace automatically. Keep the app running while 
 page reloads are safe. Jobs run one at a time. Restarting the app preserves finished/review jobs
 and marks unfinished work as interrupted without automatically spending more on model calls.
 
-Implementation and test status: `docs/phase4-ui.md`. API and review tests pass; real-browser/renderer
-verification remains pending because this session's sandbox blocks local listeners and Chromium.
+Implementation and test status: `docs/phase4-ui.md`. Browser checks use a temporary local server
+and scripted generation; they do not call Bedrock.
 
 ```bash
 uv run pytest tests/test_web.py -m 'not browser' -q  # web routes, no browser or Bedrock
 uv run pytest tests/test_web.py -m browser -q        # full UI smoke in Chromium, no Bedrock
 ```
+
+The review timeline seeks both formats to the selected moment. Write a comment, choose its format,
+and **Confirm comment** to save it; markers and the comment list let you edit or delete it later.
+Confirmed comments survive reloads. Scene text, visual direction, duration and order can be edited
+below the timeline. These scene edits are drafts until **Revise preview**; leaving the page warns
+about unsaved drafts. The original preview and its comment times remain unchanged until revision.
+**Revise preview** submits scene edits, confirmed comments and general feedback together. The next
+preview starts with a fresh comment list; submitted comments remain in the job's review checkpoint.
+
+Capture a running local page for frontend inspection (no model calls):
+
+```bash
+uv run python -m app.web.screenshot http://127.0.0.1:8000/jobs/<job_id> --out out/screenshots/review.png --time 7.1
+uv run python -m app.web.screenshot http://127.0.0.1:8000/jobs/<job_id> --out out/screenshots/mobile.png --width 390
+# Optional: --selector .timeline-editor for a cropped screenshot.
+```
+
+The command waits for fonts, images and video previews, and writes a PNG plus a JSON report of
+browser errors, horizontal overflow and broken page images. `--time` seeks both review previews;
+omit it on other pages. Screenshots and their reports under `out/` remain outside Git.

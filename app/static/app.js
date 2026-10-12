@@ -1,4 +1,5 @@
 document.addEventListener('submit', (event) => {
+  if (event.defaultPrevented) return;
   const form = event.target;
   if (form.dataset.submitting) {
     event.preventDefault();

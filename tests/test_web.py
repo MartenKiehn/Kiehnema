@@ -340,10 +340,11 @@ async def test_progress_insights_survive_polling_and_expand_as_results_arrive(re
 
 
 @pytest.mark.browser
-async def test_browser_form_review_preview_and_results(review_job, monkeypatch, tmp_path):
-    """Real Chromium, with HTTP routed to ASGI in memory: no listener and no Bedrock."""
+async def test_browser_form_review_preview_and_results(review_job, monkeypatch, tmp_path, live_web):
+    """Real Chromium and native form redirects on a local server; no Bedrock."""
+    origin = live_web
     import shutil
-    from playwright.async_api import async_playwright
+    from playwright.async_api import async_playwright, expect
 
     monkeypatch.setattr("app.web.main.UrlGuard.check", lambda self, url: url)
     ready_for_review = asyncio.Event()
@@ -373,73 +374,208 @@ async def test_browser_form_review_preview_and_results(review_job, monkeypatch, 
 
     monkeypatch.setattr(jobs, "run_job", fake_run)
     monkeypatch.setattr(jobs, "resume_job", fake_resume)
-    async with app.router.lifespan_context(app), async_playwright() as pw:
-        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
-            browser = await pw.chromium.launch()
-            try:
-                context = await browser.new_context(viewport={"width": 1440, "height": 1000})
-                external = []
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        try:
+            context = await browser.new_context(viewport={"width": 1440, "height": 1000})
+            external = []
 
-                async def route_http(route):
-                    req = route.request
-                    if not req.url.startswith(ORIGIN + "/"):
-                        external.append(req.url)
-                        await route.abort()
-                        return
-                    response = await client.request(req.method, req.url, headers=await req.all_headers(), content=req.post_data_buffer)
-                    await route.fulfill(status=response.status_code, headers=dict(response.headers), body=response.content)
+            async def route_http(route):
+                req = route.request
+                if not req.url.startswith(origin + "/"):
+                    external.append(req.url)
+                    await route.abort()
+                    return
+                await route.continue_()
 
-                await context.route("**/*", route_http)
-                page = await context.new_page()
-                errors = []
-                page.on("pageerror", lambda error: errors.append(str(error)))
-                await page.goto(ORIGIN)
-                await page.get_by_label("Website URL", exact=True).fill("https://example.com/")
-                await page.get_by_label("Creative direction", exact=False).fill("A brief browser test")
-                await page.get_by_role("button", name="Create preview").click()
-                await page.get_by_text("Activity log", exact=True).click()
-                activity = await page.locator("details.activity").element_handle()
-                entries = await page.locator("#activity-entries").element_handle()
-                job_id = page.url.rsplit("/", 1)[1]
-                for count in (2002, 4004):
-                    message = f"Writing the composition code – {count:,} characters so far"
-                    write_status(jobs.jobs_dir() / job_id, "compose", message, cost_usd=0.75)
-                    await page.wait_for_function("text => document.querySelector('.progress-message')?.textContent === text", arg=message)
-                    assert await activity.evaluate("el => el.isConnected && el.open")
-                    assert await entries.evaluate("el => el.isConnected")
-                    assert message in await page.locator("#activity-entries").inner_text()
-                    assert "$0.75" in await page.locator("#job-cost").inner_text()
-                ready_for_review.set()
-                await page.get_by_role("heading", name="Fine-tune the details.").wait_for(timeout=15000)
-                frame = page.frame_locator('iframe[title="4:5 · Feed animation preview"]')
-                await frame.get_by_role("button", name="Play preview", exact=True).wait_for()
-                await frame.get_by_role("button", name="Play preview", exact=True).click()
-                await frame.get_by_role("button", name="Pause preview", exact=True).wait_for()
-                preview_frame = next(f for f in page.frames if "/preview/" in f.url and "format=feed" in f.url)
-                await preview_frame.wait_for_function("window.__ready === true")
-                assert await preview_frame.evaluate("document.fonts.status") == "loaded"
-                assert await preview_frame.evaluate("[...document.fonts].every(font => font.status !== 'error')")
-                assert await preview_frame.evaluate("() => { try { return !!parent.document.body; } catch { return false; } }") is False
-                assert await preview_frame.evaluate("async () => { try { await fetch('/healthz'); return false; } catch { return true; } }")
-                await frame.get_by_role("button", name="Pause preview", exact=True).click()
-                await frame.get_by_label("Preview position").evaluate("el => { el.value = '0.5'; el.dispatchEvent(new Event('input')); }")
-                assert "15.00 s" in await frame.locator("#mg-time").inner_text()
-                assert await page.locator(".keyframe-pair img").evaluate_all("imgs => imgs.every(img => img.complete && img.naturalWidth > 0)")
-                await page.locator('[data-text-id="hook-title"]').fill("Better robots")
-                await page.get_by_role("button", name="Approve & render").click()
-                assert "unapplied changes" in await page.get_by_role("alert").inner_text()
-                await page.get_by_role("button", name="Revise preview").click()
-                await page.get_by_role("heading", name="Fine-tune the details.").wait_for(timeout=15000)
-                assert await page.locator('[data-text-id="hook-title"]').input_value() == "Better robots"
-                await page.screenshot(path=str(tmp_path / "review-desktop.png"), full_page=True)
-                await page.set_viewport_size({"width": 390, "height": 844})
-                assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
-                await page.screenshot(path=str(tmp_path / "review-mobile.png"), full_page=True)
-                await page.get_by_role("button", name="Approve & render").click()
-                await page.get_by_role("heading", name="Your videos are ready.").wait_for(timeout=15000)
-                await page.reload()
-                assert await page.locator("video").count() == 2
-                assert not errors
-                assert not external
-            finally:
-                await browser.close()
+            await context.route("**/*", route_http)
+            page = await context.new_page()
+            errors = []
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            await page.goto(origin)
+            await page.get_by_label("Website URL", exact=True).fill("https://example.com/")
+            await page.get_by_label("Creative direction", exact=False).fill("A brief browser test")
+            await page.get_by_role("button", name="Create preview").click()
+            await page.get_by_text("Activity log", exact=True).click()
+            activity = await page.locator("details.activity").element_handle()
+            entries = await page.locator("#activity-entries").element_handle()
+            job_id = page.url.rsplit("/", 1)[1]
+            for count in (2002, 4004):
+                message = f"Writing the composition code – {count:,} characters so far"
+                write_status(jobs.jobs_dir() / job_id, "compose", message, cost_usd=0.75)
+                await page.wait_for_function("text => document.querySelector('.progress-message')?.textContent === text", arg=message)
+                assert await activity.evaluate("el => el.isConnected && el.open")
+                assert await entries.evaluate("el => el.isConnected")
+                assert message in await page.locator("#activity-entries").inner_text()
+                assert "$0.75" in await page.locator("#job-cost").inner_text()
+            ready_for_review.set()
+            await page.get_by_role("heading", name="Fine-tune the details.").wait_for(timeout=15000)
+            frame = page.frame_locator('iframe[title="4:5 · Feed animation preview"]')
+            await page.locator("iframe.preview.feed").scroll_into_view_if_needed()
+            await frame.get_by_role("button", name="Play preview", exact=True).wait_for()
+            await frame.get_by_role("button", name="Play preview", exact=True).click()
+            await frame.get_by_role("button", name="Pause preview", exact=True).wait_for()
+            preview_frame = next(f for f in page.frames if "/preview/" in f.url and "format=feed" in f.url)
+            await preview_frame.wait_for_function("window.__ready === true")
+            assert await preview_frame.evaluate("document.fonts.status") == "loaded"
+            assert await preview_frame.evaluate("[...document.fonts].every(font => font.status !== 'error')")
+            assert await preview_frame.evaluate("() => { try { return !!parent.document.body; } catch { return false; } }") is False
+            assert await preview_frame.evaluate("async () => { try { await fetch('/healthz'); return false; } catch { return true; } }")
+            await frame.get_by_role("button", name="Pause preview", exact=True).click()
+            await expect(page.locator("#timeline-play")).to_have_text("Play both previews")
+            await frame.get_by_label("Preview position").evaluate("el => { el.value = '0.5'; el.dispatchEvent(new Event('input')); }")
+            assert "15.00 s" in await frame.locator("#mg-time").inner_text()
+            assert await page.locator(".keyframe-pair img").evaluate_all("imgs => imgs.every(img => img.complete && img.naturalWidth > 0)")
+            await page.locator('[data-text-id="hook-title"]').fill("Better robots")
+            await page.get_by_role("button", name="Approve & render").click()
+            assert "unapplied changes" in await page.get_by_role("alert").inner_text()
+            await page.get_by_role("button", name="Revise preview").click()
+            await page.get_by_role("heading", name="Fine-tune the details.").wait_for(timeout=15000)
+            assert await page.locator('[data-text-id="hook-title"]').input_value() == "Better robots"
+            await page.screenshot(path=str(tmp_path / "review-desktop.png"), full_page=True)
+            await page.set_viewport_size({"width": 390, "height": 844})
+            assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+            await page.screenshot(path=str(tmp_path / "review-mobile.png"), full_page=True)
+            await page.get_by_role("button", name="Approve & render").click()
+            await page.get_by_role("heading", name="Your videos are ready.").wait_for(timeout=15000)
+            await page.reload()
+            assert await page.locator("video").count() == 2
+            assert not errors
+            assert not external
+        finally:
+            await browser.close()
+
+
+def test_timeline_comments_persist_validate_and_revise(review_job, client, monkeypatch):
+    form = review_form(client)
+    url = f"/jobs/{JOB}/comments"
+    payload = {"revision": form["revision"], "time": 4.2, "text": "Use a brighter background", "format": "story"}
+    first = client.post(url, json=payload)
+    assert first.status_code == 200
+    comment = first.json()["comments"][0]
+    assert comment["scene_id"] == "s-hook"
+    assert "Use a brighter background" in client.get(f"/jobs/{JOB}").text
+    assert client.post(f"/jobs/{JOB}/review", data=form).status_code == 422
+    for invalid in ({"time": -1}, {"time": 16}, {"time": "NaN"}, {"text": " "}, {"text": "x" * 2001}, {"format": "bad"}):
+        assert client.post(url, json={**payload, **invalid}).status_code == 422
+    assert client.post(url, json=payload, headers={"Origin": "null"}).status_code == 403
+    assert client.post(url, json={**payload, "revision": "old"}).status_code == 409
+    assert client.post(url, json={**payload, "id": "abc"}).status_code == 404
+    changed = client.post(url, json={**payload, "id": comment["id"], "time": 15, "text": "Completely change the ending"}).json()["comments"]
+    assert len(changed) == 1 and changed[0]["time"] == 15
+    captured = []
+    monkeypatch.setattr("app.web.main.enqueue", lambda job_id, decision: captured.append(decision))
+    assert client.post(f"/jobs/{JOB}/review", data={**form, "action": "revise"}, follow_redirects=False).status_code == 303
+    assert captured[0]["comments"] == changed
+    assert client.post(url, json={"revision": form["revision"], "action": "delete", "id": comment["id"]}).json() == {"comments": []}
+    assert not json.loads((review_job / "review-comments.json").read_text())["comments"]
+    write_status(review_job, "review", "New preview")
+    assert client.post(url, json=payload).status_code == 409
+
+
+@pytest.mark.parametrize("duration,order", [("NaN", ["s-hook"]), ("14", ["s-hook"]), ("61", ["s-hook"]), ("30", ["s-hook", "s-hook"])])
+def test_scene_edit_validation_preserves_draft(review_job, client, duration, order):
+    form = {**review_form(client), "action": "revise", "scene-order": order,
+            "scene-duration:s-hook": duration, "scene-visual:s-hook": "A quiet product shot"}
+    response = client.post(f"/jobs/{JOB}/review", data=form)
+    assert response.status_code == 422
+    assert "A quiet product shot" in response.text
+    assert "Keep each scene once" in response.text
+
+
+@pytest.mark.browser
+async def test_timeline_browser_on_running_server(review_job, monkeypatch, tmp_path, live_web):
+    """Exercise real form redirects, sandbox messages and persisted edits, without a model."""
+    from playwright.async_api import async_playwright, expect
+    from app.web.screenshot import capture
+
+    concept = json.loads(json.dumps(CONCEPT))
+    concept["scenes"].append({"id": "s-end", "purpose": "Ending", "visual": "Logo and closing line", "start": 15,
+                               "duration": 15, "texts": [{"id": "end-title", "role": "headline", "text": "Get started", "fact_ids": []}]})
+    (review_job / "concept.json").write_text(json.dumps(concept))
+    captured = []
+    monkeypatch.setattr("app.web.main.enqueue", lambda job_id, decision: captured.append(decision))
+    base = live_web
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        page = await browser.new_page(viewport={"width": 1440, "height": 1000})
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        await page.goto(f"{base}/jobs/{JOB}")
+        for frame in page.frames[1:]:
+            await frame.wait_for_function("window.__ready === true")
+        await page.locator('#timeline-position').fill('4.2')
+        for frame in page.frames[1:]:
+            await expect(frame.locator('#mg-time')).to_have_text('4.20 s')
+            assert await frame.evaluate("(() => {try {return !!parent.document.body} catch {return false}})()") is False
+        await page.locator('#comment-text').fill('Make this scene lighter')
+        assert not (review_job / 'review-comments.json').exists()
+        await page.get_by_role('button', name='Revise preview').click()
+        await expect(page.locator('#comment-status')).to_contain_text('Confirm or clear')
+        assert not captured
+        await page.get_by_role('button', name='Confirm comment', exact=True).click()
+        await expect(page.locator('#comment-list li')).to_have_count(1)
+        await page.reload()
+        await expect(page.locator('#comment-list')).to_contain_text('Make this scene lighter')
+        await page.locator('.comment-marker').click()
+        await page.locator('#comment-text').fill('Use a close-up instead')
+        await page.get_by_role('button', name='Confirm changes').click()
+        await expect(page.locator('#comment-list')).to_contain_text('Use a close-up instead')
+        await page.locator('#comment-time').fill('18')
+        await page.locator('#comment-text').fill('Finish with our logo')
+        await page.get_by_role('button', name='Confirm comment', exact=True).click()
+        await expect(page.locator('#comment-list li')).to_have_count(2)
+        await page.locator('#comment-list li').first.get_by_role('button', name='Delete', exact=True).click()
+        await expect(page.locator('#comment-list li')).to_have_count(1)
+        await page.locator('#timeline-play').click()
+        await expect(page.locator('#timeline-play')).to_have_text('Pause both previews')
+        await page.locator('#timeline-play').click()
+        await expect(page.locator('#timeline-play')).to_have_text('Play both previews')
+        await page.locator('#scene-s-end [data-move="-1"]').click()
+        await expect(page.locator('#scene-editor > article').first).to_have_attribute('data-scene-id', 's-end')
+        await page.locator('#duration-s-end').fill('10')
+        await page.locator('#visual-s-end').fill('Show the product first')
+        await expect(page.locator('#planned-duration')).to_contain_text('25.0 s')
+        await page.get_by_role('button', name='Revise preview').click()
+        await page.wait_for_url(f'{base}/jobs/{JOB}')
+        await expect(page.locator('#review-form')).not_to_have_attribute('data-submitting', 'true')
+        assert captured[0]['scenes'] == [{'id': 's-end', 'duration': 10, 'visual': 'Show the product first'},
+                                          {'id': 's-hook', 'duration': 15, 'visual': 'Large type'}]
+        assert captured[0]['comments'][0]['scene_id'] == 's-end'
+        assert captured[0]['comments'][0]['time'] == 18
+        assert not errors
+        await browser.close()
+    for width in (1440, 390):
+        report = await capture(f'{base}/jobs/{JOB}', tmp_path / f'review-{width}.png', width=width, time=4.2)
+        assert not report['page_errors'] and not report['horizontal_overflow'] and not report['broken_images']
+        assert Path(report['screenshot']).stat().st_size > 1000
+
+
+async def test_screenshot_rejects_invalid_target_and_options(tmp_path):
+    from app.web.screenshot import capture
+    for url, options in [('https://example.com', {}), ('http://127.0.0.1', {'time': float('nan')}),
+                         ('http://127.0.0.1', {'width': 0})]:
+        with pytest.raises(ValueError):
+            await capture(url, tmp_path / 'invalid.png', **options)
+
+
+@pytest.fixture
+async def live_web(review_job):
+    import socket
+    import uvicorn
+
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    server = uvicorn.Server(uvicorn.Config(app, log_level="error"))
+    task = asyncio.create_task(server.serve(sockets=[sock]))
+    try:
+        for _ in range(200):
+            if server.started:
+                break
+            await asyncio.sleep(.01)
+        assert server.started
+        yield f"http://127.0.0.1:{sock.getsockname()[1]}"
+    finally:
+        server.should_exit = True
+        await task
+        sock.close()

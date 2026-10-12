@@ -9,36 +9,48 @@
 {% elif job.status in ['failed', 'interrupted'] %}
   <section class="card"><p class="eyebrow">{{ job.status|upper }}</p><h2>This video needs another take.</h2><p class="notice error">{{ job.message }}</p><p>Your saved job and its files are kept. You can start a new video from the workspace.</p><a class="button" href="/">New video</a></section>
 {% else %}
+  {% if job.status == 'review' %}<div id="review-workspace" data-url="/jobs/{{ job.id }}" data-revision="{{ revision }}" data-duration="{{ preview_duration }}" data-comments='{{ comments|tojson }}'>{% endif %}
   {% if job.status == 'done' %}
   <section class="card"><div class="section-heading"><div><h2>Your videos are ready.</h2><p class="muted">Two formats. Original music. All yours.</p></div><span class="badge status-done">Finished</span></div>
     <div class="video-grid">{% for fmt, label, dimensions in [('feed', '4:5 · Feed', '1080 × 1350'), ('story', '9:16 · Story', '1080 × 1920')] %}{% if job.outputs.get(fmt) %}<div><div class="section-heading"><h3>{{ label }}</h3><span class="muted">{{ dimensions }}</span></div><video class="result-video {{ fmt }}" controls playsinline preload="metadata" src="/jobs/{{ job.id }}/files/{{ job.outputs[fmt] }}"><a href="/jobs/{{ job.id }}/files/{{ job.outputs[fmt] }}?download=true">Download {{ label }}</a></video><a class="button secondary wide" href="/jobs/{{ job.id }}/files/{{ job.outputs[fmt] }}?download=true" download>Download {{ fmt }} MP4 ↓</a></div>{% endif %}{% endfor %}</div>
   </section>
   {% endif %}
-  {% if board %}<details class="card brand-board" {% if job.status == 'review' %}open{% endif %}><summary>Your brand board <span class="muted">Colours, typography & imagery</span></summary><img src="/jobs/{{ job.id }}/files/brand/board.png" alt="Extracted brand colours, fonts, logo and website imagery" loading="lazy"></details>{% endif %}
+  {% if board %}<details class="card brand-board"><summary>Your brand board <span class="muted">Colours, typography & imagery</span></summary><img src="/jobs/{{ job.id }}/files/brand/board.png" alt="Extracted brand colours, fonts, logo and website imagery" loading="lazy"></details>{% endif %}
   {% if job.status == 'review' and preview %}
   <section class="card"><div class="section-heading"><div><h2>Play it before you approve it.</h2><p class="muted">Play or scrub through each format. Music is added in the final render.</p></div></div>
     <div class="preview-grid">{% for fmt, label in [('feed', '4:5 · Feed'), ('story', '9:16 · Story')] %}<div><h3>{{ label }}</h3><iframe class="preview {{ fmt }}" title="{{ label }} animation preview" sandbox="allow-scripts" src="/preview/{{ job.id }}/index.html?format={{ fmt }}"></iframe></div>{% endfor %}</div>
+    {% include "partials/timeline.html" %}
   </section>
   {% endif %}
   {% if job.status == 'review' %}
   <div class="review-health"><span class="badge {% if can_approve %}status-done{% else %}status-failed{% endif %}">{% if can_approve %}✓ Automatic checks passed{% else %}Checks need attention{% endif %}</span><details><summary>Review notes</summary><p>{{ qa.summary|default('No visual review is available.') }}</p>{% if job.history|selectattr('status', 'equalto', 'fix')|list %}<p class="help">Visual review notes refer to the initial review; later revisions are checked automatically for layout and readability.</p>{% endif %}<ul>{% for issue in check.get('issues', []) %}<li>{{ issue.message }}</li>{% endfor %}{% for issue in qa.get('issues', []) %}<li>{{ issue.scene_id }} · {{ issue.format }}: {{ issue.problem }}</li>{% endfor %}</ul></details></div>
-  <form action="/jobs/{{ job.id }}/review" method="post">
+  <form id="review-form" action="/jobs/{{ job.id }}/review" method="post">
     <input type="hidden" name="revision" value="{{ revision }}">
   {% endif %}
     <div class="section-heading scene-heading"><div><p class="eyebrow">THE STORY, FRAME BY FRAME</p><h2>{% if job.status == 'review' %}Fine-tune the details.{% else %}The story & its sources{% endif %}</h2></div><span class="muted">{{ concept.scenes|length }} scenes</span></div>
-    {% for scene in concept.scenes %}{% set scene_index = loop.index %}
-    <article class="card scene-card"><div class="scene-title"><span class="scene-number">{{ '%02d'|format(loop.index) }}</span><div><h3>{{ scene.purpose|capitalize }}</h3><p class="help">{{ '%.1f'|format(scene.start) }}–{{ '%.1f'|format(scene.start + scene.duration) }} s · {{ scene.visual }}</p></div></div>
+    {% if job.status == 'review' %}<p class="notice scene-plan-note">Move scenes and adjust their duration below. <strong id="planned-duration"></strong><br>The player and comment times refer to the current preview until you revise it.</p>{% endif %}
+    <div id="scene-editor">
+    {% for scene in edit_scenes|default(concept.scenes) %}{% set scene_index = loop.index %}
+    <article class="card scene-card" id="scene-{{ scene.id }}" data-scene-id="{{ scene.id }}"><div class="scene-title"><span class="scene-number">{{ '%02d'|format(loop.index) }}</span><div><h3>{{ scene.purpose|capitalize }}</h3><p class="help">{{ '%.1f'|format(scene.start) }}–{{ '%.1f'|format(scene.start + scene.duration) }} s · current preview</p></div>{% if job.status == 'review' %}<div class="scene-move"><button type="button" class="button secondary small" data-move="-1" aria-label="Move scene up">↑</button><button type="button" class="button secondary small" data-move="1" aria-label="Move scene down">↓</button></div>{% endif %}</div>
+      {% if job.status == 'review' %}
+      <input type="hidden" name="scene-order" value="{{ scene.id }}">
+      <div class="scene-plan"><div><label for="duration-{{ scene.id }}">Scene duration <span class="optional">seconds</span></label><input id="duration-{{ scene.id }}" name="scene-duration:{{ scene.id }}" type="number" min="0.5" max="60" step="0.001" required value="{{ scene_draft[scene.id].duration if scene_draft is defined and scene.id in scene_draft else scene.duration }}"><p class="help scene-new-time"></p></div><div><label for="visual-{{ scene.id }}">How should this scene look?</label><textarea id="visual-{{ scene.id }}" name="scene-visual:{{ scene.id }}" rows="3" required maxlength="4000">{{ scene_draft[scene.id].visual if scene_draft is defined and scene.id in scene_draft else scene.visual }}</textarea></div></div>
+      {% endif %}
+      <details class="scene-details" {% if loop.first or job.status != 'review' %}open{% endif %}><summary>Scene images, text & sources</summary>
       <div class="scene-layout"><div class="keyframe-pair">{% for fmt, label in [('feed', '4:5'), ('story', '9:16')] %}<figure><figcaption>{{ label }}</figcaption>{% set frame = frames.get(scene.id, {}).get(fmt) %}{% if frame %}<a href="/jobs/{{ job.id }}/files/{{ frame.file }}" target="_blank" rel="noopener"><img src="/jobs/{{ job.id }}/files/{{ frame.file }}" alt="Scene {{ scene_index }}: {{ scene.purpose }} in {{ label }} format" loading="lazy"></a>{% else %}<p class="help">Keyframe unavailable</p>{% endif %}</figure>{% endfor %}</div>
       <div class="scene-copy">{% for text in scene.texts %}<div class="copy-field">{% if job.status == 'review' %}<label for="text-{{ text.id }}">{{ text.role|capitalize }}</label><textarea id="text-{{ text.id }}" name="text:{{ text.id }}" data-text-id="{{ text.id }}" rows="2" maxlength="500" required>{{ draft.get(text.id, text.text) if draft is defined else text.text }}</textarea>{% else %}<p class="eyebrow">{{ text.role }}</p><p class="finished-copy">{{ text.text }}</p>{% endif %}
         {% if text.fact_ids %}<details class="sources"><summary>{{ text.fact_ids|length }} source{% if text.fact_ids|length != 1 %}s{% endif %}</summary>{% for fid in text.fact_ids %}{% if fid in facts %}{% set fact = facts[fid] %}<blockquote>{{ fact.quote }}{% if fact.attribution %}<cite>{{ fact.attribution }}</cite>{% endif %}</blockquote><a href="{{ fact.source_url|safe_url }}" target="_blank" rel="noopener noreferrer">Read on the website ↗</a>{% endif %}{% endfor %}</details>{% else %}<p class="help">Creative copy · no factual claim linked</p>{% endif %}</div>{% endfor %}</div></div>
-    </article>
+      </details></article>
     {% endfor %}
+    </div>
   {% if job.status == 'review' %}
-    <section class="card feedback-card"><div><p class="eyebrow">ONE MORE THING?</p><h2>Give it your direction.</h2><p class="muted">Ask for a stronger hook, a different pace or a visual adjustment. Text edits and feedback are applied together.</p></div><div><label for="feedback">Feedback <span class="optional">optional</span></label><textarea id="feedback" name="feedback" rows="4" maxlength="4000" placeholder="Make the opening bolder. Hold the last scene a little longer…">{{ feedback|default('') }}</textarea><p class="help">Revisions use the model and return here for another review.</p></div></section>
-    <div class="review-actions"><p>Happy with this version?<small>Apply any text edits or feedback before approving.</small></p><div><button class="button secondary" type="submit" name="action" value="revise">Revise preview ↻</button><button class="button" type="submit" name="action" value="approve" {% if not can_approve %}disabled{% endif %}>Approve & render ↗</button></div></div>
+    <section class="card feedback-card"><div><p class="eyebrow">ONE MORE THING?</p><h2>Give it your direction.</h2><p class="muted">Ask for a stronger hook, a different pace or a visual adjustment. Scene edits, confirmed comments and feedback are applied together.</p></div><div><label for="feedback">Feedback <span class="optional">optional</span></label><textarea id="feedback" name="feedback" rows="4" maxlength="4000" placeholder="Make the opening bolder. Hold the last scene a little longer…">{{ feedback|default('') }}</textarea><p class="help">Revisions use the model and return here for another review.</p></div></section>
+    <div class="review-actions"><p>Happy with this version?<small>Apply scene edits, comments and feedback before approving.</small></p><div><button class="button secondary" type="submit" name="action" value="revise">Revise preview ↻</button><button class="button" type="submit" name="action" value="approve" {% if not can_approve %}disabled{% endif %}>Approve & render ↗</button></div></div>
   </form>
+  </div>
   {% endif %}
   <p class="help centered">Estimated model cost at Anthropic list prices. Bedrock billing may differ.</p>
 {% endif %}
 {% if not job.active and not job.poll %}<p class="job-management"><a class="text-link muted" href="/jobs/{{ job.id }}/delete">Delete this job and its files</a></p>{% endif %}
 {% endblock %}
+{% block scripts %}{% if job.status == 'review' %}<script src="/static/review.js" defer></script>{% endif %}{% endblock %}
