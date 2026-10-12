@@ -160,7 +160,7 @@ async def crawl(
                     result.skipped_robots.append(url)
                     continue
                 if progress:
-                    r = progress(f"crawling {url}")
+                    r = progress(f"Reading page {len(result.pages) + 1} (limit {max_pages}): {url}")
                     if asyncio.iscoroutine(r):
                         await r
                 try:

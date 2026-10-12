@@ -205,6 +205,8 @@ async def test_saved_scan_settings_reach_crawler(site, data_dir, monkeypatch, li
     result = CrawlResult.load(path / "crawl")
     assert len(result.pages) == expected_pages
     assert max(page.depth for page in result.pages) == expected_depth
+    history = json.loads((path / "status.json").read_text())["history"]
+    assert f"Reading page 1 (limit {limits.get('max_pages', 20)}): {site}" in [item["message"] for item in history]
 
 
 async def test_saved_review_combines_edits_and_feedback_and_deletes_checkpoint(data_dir, monkeypatch):

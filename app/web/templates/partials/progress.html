@@ -1,9 +1,43 @@
+{% set phase_copy = {
+    "queued": ("Waiting for the worker", "Your video is queued. It will start or continue automatically when the worker is free.",
+               "The next generation step will begin automatically."),
+    "crawl": ("Reading your website", "Following links and collecting the words and images that tell your story.",
+              "Build your brand board with colours, fonts and imagery."),
+    "brand": ("Finding your visual identity", "Gathering your logo, colours, fonts and images into a brand board.",
+              "Find the facts and messages that make your business distinctive."),
+    "distill": ("Finding your story", "Extracting key facts and checking them against your website.",
+                "Turn those facts into a scene-by-scene storyboard."),
+    "concept": ("Planning each scene", "Shaping the opening, messages and final call to action.",
+                "Bring the storyboard to life with animation."),
+    "compose": ("Bringing your story to life", "Creating the layouts, transitions and motion for both video formats. This can take around 11 minutes.",
+                "Check the animation for layout and readability."),
+    "check": ("Checking the details", "Checking text, layout and timing in both formats. Any issues may send the animation back for a revision.",
+              "Create preview frames, or revise the animation if needed."),
+    "fix": ("Refining the animation", "Adjusting the video to address feedback or issues found during review.",
+            "Run the automatic checks again before preparing your preview."),
+    "keyframes": ("Preparing your preview", "Capturing a still from each scene so you can review both formats.",
+                  "Review the frames for visual quality."),
+    "qa": ("Taking a closer look", "Reviewing the images, visual consistency and story. A final correction may be needed.",
+           "Your turn to review the preview, after any necessary corrections."),
+    "render": ("Making the final cut", "Rendering both videos and adding original music. The frame count below tracks the current format.",
+               "Download your feed and story videos."),
+    "working": ("Finishing this step", "Saving the latest results before opening the next view.",
+                "Your updated video workspace will open automatically."),
+} %}
+{% set progress_copy = phase_copy.get(job.status, phase_copy.working) %}
+{% set current_step = "compose" if job.status == "fix" else job.status %}
+{% set step_keys = steps|map(attribute=0)|list %}
+{% set current_index = step_keys.index(current_step) if current_step in step_keys else -1 %}
 <section class="card progress-card" id="progress" {% if job.poll %}hx-get="/jobs/{{ job.id }}/progress" hx-trigger="every 2s" hx-target="#progress-status" hx-select="#progress-status" hx-select-oob="#activity-entries:innerHTML,#job-cost:innerHTML" hx-swap="outerHTML"{% endif %}>
+  <div class="progress-signal"><p class="eyebrow">WORK IN PROGRESS</p><span class="live-dot" aria-hidden="true"></span></div>
+  <div class="progress-motion" aria-hidden="true"></div>
   <div id="progress-status">
-  <div class="section-heading"><h2>{% if job.status == 'queued' %}In the queue{% elif job.status == 'render' %}Making the final cut{% else %}Your story is taking shape{% endif %}</h2><span class="live-dot" aria-hidden="true"></span></div>
+  <div class="section-heading"><h2>{{ progress_copy[0] }}</h2>{% if current_index >= 0 %}<span class="badge">STEP {{ current_index + 1 }} / {{ steps|length }}</span>{% endif %}</div>
+  <p class="progress-description">{{ progress_copy[1] }}</p>
   <p class="progress-message" role="status" aria-live="polite">{{ job.message }}</p>
-  <ol class="steps">{% for key, label in steps %}<li class="{% if key == job.status or key == 'compose' and job.status == 'fix' %}current{% elif key in seen %}complete{% endif %}"><span aria-hidden="true">{% if key in seen and key != job.status %}✓{% else %}{{ loop.index }}{% endif %}</span>{{ label }}</li>{% endfor %}</ol>
-  <div class="progress-footer"><p>Writing the animation can take around 11 minutes.<br>You can leave this page and return while the app stays running.</p><div><b>${{ '%.2f'|format(job.cost_usd|default(0)) }}</b><small>Estimated so far · updates after model calls</small></div></div>
+  <div class="progress-next"><span class="eyebrow">UP NEXT <span aria-hidden="true">↗</span></span><p>{{ progress_copy[2] }}</p></div>
+  <ol class="steps" aria-label="Video production steps">{% for key, label in steps %}{% set complete = key in seen and loop.index0 < current_index %}<li class="{% if key == current_step %}current{% elif complete %}complete{% endif %}" {% if key == current_step %}aria-current="step"{% endif %}><span aria-hidden="true">{% if complete %}✓{% else %}{{ loop.index }}{% endif %}</span>{{ label }}</li>{% endfor %}</ol>
+  <div class="progress-footer"><p>Steps can take different amounts of time and may repeat during revisions.<br>You can leave this page and return while the app stays running.</p><div><b>${{ '%.2f'|format(job.cost_usd|default(0)) }}</b><small>Estimated so far · updates after model calls</small></div></div>
   </div>
   <details class="activity"><summary>Activity log</summary><ol id="activity-entries">{% for item in job.history|default([])|reverse %}<li>{{ item.message }}</li>{% endfor %}</ol></details>
 </section>

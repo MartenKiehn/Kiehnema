@@ -105,8 +105,19 @@ form > .help:last-child { margin-bottom: 0; }
 .cost-pill { padding: 12px 18px; flex-shrink: 0; border: 1px solid var(--line); border-radius: 4px; font-variant-numeric: tabular-nums; }
 .cost-pill small { display: block; font-size: 10px; color: var(--muted); }
 .progress-card { padding: 36px; }
-.progress-message { color: #686449; font-variant-numeric: tabular-nums; }
-.live-dot { width: 11px; height: 11px; border-radius: 50%; background: #b58b49; box-shadow: 0 0 0 6px #f3eddf; }
+.progress-signal { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.progress-signal .eyebrow { margin: 0; }
+.progress-motion { height: 5px; overflow: hidden; border-radius: 3px; background: #eee7d8; margin-bottom: 28px; }
+.progress-motion::after { content: ""; display: block; width: 25%; height: 100%; background: var(--accent); border-radius: inherit; animation: scan-motion 3s ease-in-out infinite alternate; }
+.progress-description { color: var(--muted); max-width: 70ch; }
+.progress-message { color: #686449; background: #f4f0e7; padding: 12px 16px; border-left: 3px solid var(--accent); border-radius: 3px; font-size: 13px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.progress-next { display: flex; align-items: baseline; gap: 20px; padding: 12px 0 0; }
+.progress-next .eyebrow { flex-shrink: 0; color: #886334; }
+.progress-next p { margin: 0; font-size: 14px; }
+.live-dot { width: 11px; height: 11px; border-radius: 50%; background: #b58b49; box-shadow: 0 0 0 6px #f3eddf; animation: signal-pulse 2s ease-in-out infinite; }
+@keyframes scan-motion { from { transform: translateX(0); } to { transform: translateX(300%); } }
+@keyframes signal-pulse { 50% { box-shadow: 0 0 0 10px #f3eddf00; } }
+@media (prefers-reduced-motion: reduce) { .progress-motion::after, .live-dot { animation: none; } }
 .steps { list-style: none; padding: 20px 0; margin: 25px 0; display: flex; flex-wrap: wrap; gap: 18px 27px; border-block: 1px solid var(--line); }
 .steps li { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
 .steps li > span { display: grid; place-items: center; width: 23px; height: 23px; border: 1px solid var(--line); border-radius: 50%; font-size: 10px; }
@@ -199,6 +210,9 @@ cite { display: block; margin-top: 5px; }
   .result-video { height: auto; max-height: 580px; }
   .brand-board summary span { float: none; display: block; margin-top: 6px; font-size: 11px; }
   .progress-footer { flex-direction: column; }
+  .progress-next { flex-direction: column; gap: 4px; }
+  .progress-next .eyebrow { margin-bottom: 0; }
+  .progress-card .section-heading { align-items: flex-start; flex-wrap: wrap; }
   .review-health { flex-direction: column; gap: 14px; }
   .review-actions { position: static; flex-direction: column; align-items: stretch; padding: 18px; }
   .review-actions > div { flex-direction: column; }

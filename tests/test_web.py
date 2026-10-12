@@ -110,6 +110,36 @@ def test_form_origin_policy_preserves_local_posts_and_rejects_other_origins(work
         assert len(list(jobs.jobs_dir().iterdir())) == 1
 
 
+@pytest.mark.parametrize("status,heading,next_text,step", [
+    ("queued", "Waiting for the worker", "begin automatically", None),
+    ("crawl", "Reading your website", "Build your brand board", 1),
+    ("brand", "Finding your visual identity", "Find the facts", 2),
+    ("distill", "Finding your story", "scene-by-scene storyboard", 3),
+    ("concept", "Planning each scene", "Bring the storyboard to life", 4),
+    ("compose", "Bringing your story to life", "Check the animation", 5),
+    ("check", "Checking the details", "or revise the animation", 6),
+    ("fix", "Refining the animation", "Run the automatic checks again", 5),
+    ("keyframes", "Preparing your preview", "Review the frames", 7),
+    ("qa", "Taking a closer look", "Your turn to review", 8),
+    ("render", "Making the final cut", "Download your feed and story", 10),
+    ("working", "Finishing this step", "open automatically", None),
+])
+def test_progress_explains_current_and_next_step(client, status, heading, next_text, step):
+    job_id = jobs.create_job("https://example.com/", 30)
+    path = jobs.jobs_dir() / job_id
+    for previous in ("crawl", "brand", "distill", "concept", "compose", "check", "keyframes", "qa"):
+        write_status(path, previous, "Earlier pass")
+    write_status(path, status, "Latest activity")
+    html = client.get(f"/jobs/{job_id}/progress").text
+    assert heading in html and next_text in html and "Latest activity" in html
+    assert html.count('aria-current="step"') == (1 if step else 0)
+    if step:
+        assert f"STEP {step} / 11" in html
+    if status == "fix":
+        assert '<li class="current" aria-current="step"><span aria-hidden="true">5</span>Animation' in html
+        assert '<li class="" ><span aria-hidden="true">6</span>Checks' in html
+
+
 async def test_background_create_reload_queue_and_failure(workspace, monkeypatch):
     release = asyncio.Event()
     entered = asyncio.Event()
@@ -261,6 +291,45 @@ def test_restart_marks_unfinished_work_without_restarting_it(workspace):
         assert "app stopped" in client.get(f"/jobs/{job_id}").text
         assert not app.state.tasks
         assert json.loads((path / "status.json").read_text())["status"] == "interrupted"
+
+
+@pytest.mark.browser
+async def test_progress_motion_survives_polling_and_respects_reduced_motion(review_job, tmp_path):
+    from playwright.async_api import async_playwright
+
+    async with app.router.lifespan_context(app), async_playwright() as pw:
+        write_status(review_job, "crawl", "Reading page 1 (limit 20): https://example.com/")
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+            browser = await pw.chromium.launch()
+            try:
+                page = await browser.new_page(viewport={"width": 1440, "height": 1000})
+
+                async def route_http(route):
+                    response = await client.get(route.request.url)
+                    await route.fulfill(status=response.status_code, headers=dict(response.headers), body=response.content)
+
+                await page.route(ORIGIN + "/**", route_http)
+                await page.goto(f"{ORIGIN}/jobs/{JOB}")
+                await page.get_by_role("heading", name="Reading your website").wait_for()
+                await page.get_by_text("Activity log", exact=True).click()
+                activity = await page.locator("details.activity").element_handle()
+                motion = await page.locator(".progress-motion").element_handle()
+                assert await motion.evaluate("el => getComputedStyle(el, '::after').animationName") == "scan-motion"
+                await page.screenshot(path=str(tmp_path / "progress-desktop.png"), full_page=True)
+                write_status(review_job, "brand", "Brand assets found")
+                await page.get_by_role("heading", name="Finding your visual identity").wait_for(timeout=10000)
+                assert await motion.evaluate("el => el.isConnected")
+                assert await activity.evaluate("el => el.isConnected && el.open")
+                assert "Find the facts" in await page.locator(".progress-next").inner_text()
+                assert await page.locator('[aria-current="step"]').text_content() == "2Brand"
+                await page.set_viewport_size({"width": 390, "height": 844})
+                assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+                await page.screenshot(path=str(tmp_path / "progress-mobile.png"), full_page=True)
+                await page.emulate_media(reduced_motion="reduce")
+                assert await motion.evaluate("el => getComputedStyle(el, '::after').animationName") == "none"
+                assert await page.locator(".live-dot").evaluate("el => getComputedStyle(el).animationName") == "none"
+            finally:
+                await browser.close()
 
 
 @pytest.mark.browser

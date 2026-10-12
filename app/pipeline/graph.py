@@ -173,7 +173,8 @@ async def n_crawl(state: JobState, config: RunnableConfig) -> dict:
     _status(state, "crawl", f"Crawling {state['url']}")
     out = _dir(state) / "crawl"
     result = await crawl(state["url"], out, _guard(config),
-                         max_pages=state.get("max_pages", 20), max_depth=state.get("max_depth", 2))
+                         max_pages=state.get("max_pages", 20), max_depth=state.get("max_depth", 2),
+                         progress=lambda message: _status(state, "crawl", message))
     if not result.pages:
         return {"error": f"could not load the website: {(result.errors + result.blocked)[:3]}", "status": "failed"}
     (out / "site.md").write_text(site_markdown(result))
