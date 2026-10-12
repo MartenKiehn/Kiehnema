@@ -163,6 +163,8 @@ class JobRequest(BaseModel):
     duration: int = Field(default=30, ge=15, le=60)
     description: str = Field(default="", max_length=4000)
     allow_client_logos: bool = False
+    max_pages: int = Field(default=20, ge=1, le=50)
+    max_depth: int = Field(default=2, ge=0, le=5)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -184,7 +186,8 @@ async def create_job(request: Request):
     except (ValidationError, ValueError) as exc:
         error = "; ".join(f"{e['loc'][0]}: {e['msg']}" for e in exc.errors()) if isinstance(exc, ValidationError) else str(exc)
         return templates.TemplateResponse(request, "index.html", {"jobs": all_jobs(), "values": form, "error": error}, status_code=422)
-    job_id = jobs.create_job(url, data.duration, data.description, allow_client_logos=data.allow_client_logos)
+    job_id = jobs.create_job(url, data.duration, data.description, allow_client_logos=data.allow_client_logos,
+                             max_pages=data.max_pages, max_depth=data.max_depth)
     enqueue(job_id)
     return RedirectResponse(f"/jobs/{job_id}", status_code=303)
 

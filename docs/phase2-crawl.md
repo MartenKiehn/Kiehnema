@@ -12,7 +12,7 @@ uv run python -m app.brand.board data/brands/x                        # board.ht
 | SSRF to internal hosts / cloud metadata | `UrlGuard`: http(s) only, no credentials, host must resolve **only** to global unicast addresses (blocks loopback, RFC 1918, link-local incl. 169.254.169.254, CGNAT, ULA, multicast, reserved, IPv4-mapped forms, decimal IPs) |
 | Redirect to an internal host | **Finding:** Playwright does not route redirect targets (neither `continue_()` nor fulfilling a 3xx). The route handler therefore fetches every request itself with redirects disabled; sub-resource chains are followed hop by hop through the guard, navigations are aborted and re-issued by the crawler after the guard check. HTTP downloads (`fetch.py`) do the same. Tested with redirects to 169.254.169.254 and 127.0.0.2. |
 | Other channels | service workers blocked, WebSockets closed, media/beacons skipped, downloads disabled |
-| Resource exhaustion | ≤ 20 pages, depth ≤ 2, 240 s budget, 30 s per navigation, size caps (images 15 MB, fonts 5 MB, robots 0.5 MB), text cap per page |
+| Resource exhaustion | Default 20 pages and depth 2; web form allows 1–50 pages and depth 0–5. 240 s budget, 30 s per navigation, size caps (images 15 MB, fonts 5 MB, robots 0.5 MB), text cap per page |
 | Malicious SVG (logo, client logos) | parsed with `defusedxml` (no entity expansion), `<script>`, `foreignObject`, animations, event handlers, external `href`s and external CSS `url()`/`@import` removed |
 | Malicious raster files | verified and re-encoded with Pillow (PNG/JPEG, metadata stripped, ≤ 2400 px) |
 | Prompt injection via page text | page text is data only; it reaches the model in Phase 3 inside clearly delimited blocks, and generated code is sandboxed (CSP + network block) |

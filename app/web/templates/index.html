@@ -13,6 +13,20 @@
       <label for="website">Website URL</label>
       <input id="website" name="url" type="url" required maxlength="2048" placeholder="https://your-company.com" value="{{ values.get('url', '') }}" aria-describedby="url-help">
       <p id="url-help" class="help">We’ll find your colours, fonts, imagery and the story behind your brand.</p>
+      <details class="crawl-settings" {% if error %}open{% endif %}>
+        <summary>Website scan settings</summary>
+        <div class="field-row">
+          <div><label for="max-pages">Maximum pages</label>
+            <input id="max-pages" name="max_pages" type="number" min="1" max="50" step="1" required value="{{ values.get('max_pages', 20) }}" aria-describedby="max-pages-help">
+            <p id="max-pages-help" class="help">1–50 pages, including the starting page.</p>
+          </div>
+          <div><label for="max-depth">Link depth</label>
+            <input id="max-depth" name="max_depth" type="number" min="0" max="5" step="1" required value="{{ values.get('max_depth', 2) }}" aria-describedby="max-depth-help">
+            <p id="max-depth-help" class="help">0 = starting page only. 1 = directly linked pages. Up to 5 levels.</p>
+          </div>
+        </div>
+        <p class="help">We follow links within the same website. These are upper limits; the scan stops after about 4 minutes. More pages can increase processing time and model costs.</p>
+      </details>
       <div class="field-row">
         <div><label for="duration">Duration <span class="optional">seconds</span></label>
           <input id="duration" name="duration" type="number" min="15" max="60" step="1" required value="{{ values.get('duration', 30) }}" aria-describedby="duration-help">

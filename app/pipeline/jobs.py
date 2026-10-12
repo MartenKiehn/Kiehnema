@@ -46,13 +46,14 @@ def _bedrock(job_dir: Path, usage: dict | None = None) -> BedrockLLM:
 
 
 def create_job(url: str, duration: float, description: str = "", *, allow_client_logos: bool = False,
-               job_id: str | None = None) -> str:
+               max_pages: int = 20, max_depth: int = 2, job_id: str | None = None) -> str:
     """Persist a job before scheduling it, so it is immediately reloadable."""
     job_id = job_id or time.strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(3)
     job_dir = jobs_dir() / job_id
     job_dir.mkdir(parents=True)
     (job_dir / "request.json").write_text(json.dumps(
-        {"url": url, "duration": duration, "description": description, "allow_client_logos": allow_client_logos}, ensure_ascii=False))
+        {"url": url, "duration": duration, "description": description, "allow_client_logos": allow_client_logos,
+         "max_pages": max_pages, "max_depth": max_depth}, ensure_ascii=False))
     write_status(job_dir, "queued", "Waiting to start")
     return job_id
 

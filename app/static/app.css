@@ -42,6 +42,9 @@ input:focus, textarea:focus { border-color: #94723e; background: var(--white); }
 .optional { font-weight: 400; color: var(--muted); margin-left: 5px; }
 .help { font-size: 11px; color: var(--muted); margin: 7px 0 19px; line-height: 1.6; }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 25px; }
+.crawl-settings { margin-bottom: 20px; }
+.crawl-settings summary { font-size: 12px; font-weight: 600; }
+.crawl-settings .field-row { margin-top: 16px; align-items: start; }
 .format-note { display: flex; align-items: center; justify-content: flex-end; gap: 10px; font-size: 11px; color: var(--muted); padding-bottom: 8px; }
 .ratio { display: block; height: 32px; width: 26px; border: 1px solid #9a998b; border-radius: 3px; }
 .ratio.story { height: 38px; width: 22px; }

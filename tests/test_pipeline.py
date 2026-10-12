@@ -175,6 +175,38 @@ def test_lint_flags_sandbox_violations():
         assert needle in joined, needle
 
 
+@pytest.mark.parametrize("limits,expected_pages,expected_depth", [
+    ({"max_pages": 7, "max_depth": 0}, 1, 0),
+    ({"max_pages": 1, "max_depth": 2}, 1, 0),
+    ({"max_pages": 2, "max_depth": 1}, 2, 1),
+    ({}, 3, 1),
+])
+async def test_saved_scan_settings_reach_crawler(site, data_dir, monkeypatch, limits, expected_pages, expected_depth):
+    from langgraph.graph import END, START, StateGraph
+    from app.crawl.crawler import CrawlResult
+    from app.pipeline import jobs
+    from app.pipeline.graph import JobState, n_crawl
+
+    def crawl_graph(saver):
+        graph = StateGraph(JobState)
+        graph.add_node("crawl", n_crawl)
+        graph.add_edge(START, "crawl")
+        graph.add_edge("crawl", END)
+        return graph.compile(checkpointer=saver)
+
+    monkeypatch.setattr(jobs, "build_graph", crawl_graph)
+    job_id = jobs.create_job(site, 30, **limits)
+    path = data_dir / "jobs" / job_id
+    if not limits:
+        request = json.loads((path / "request.json").read_text())
+        del request["max_pages"], request["max_depth"]
+        (path / "request.json").write_text(json.dumps(request))
+    await jobs.run_job(job_id, llm=FakeLLM({}), guard=UrlGuard(allow_hosts={"127.0.0.1"}))
+    result = CrawlResult.load(path / "crawl")
+    assert len(result.pages) == expected_pages
+    assert max(page.depth for page in result.pages) == expected_depth
+
+
 async def test_saved_review_combines_edits_and_feedback_and_deletes_checkpoint(data_dir, monkeypatch):
     """A saved review survives moving the workspace, without a browser or model call."""
     from langgraph.graph import END, START, StateGraph

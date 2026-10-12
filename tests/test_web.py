@@ -68,6 +68,7 @@ def test_index_validation_and_static_assets(client):
     assert "Motion Studio" not in html and "kiehnema.svg" in html
     assert "New video" in html and 'name="url"' in html and 'name="duration"' in html and 'name="description"' in html
     assert 'name="allow_client_logos"' in html and "checked" not in html
+    assert 'name="max_pages"' in html and 'name="max_depth"' in html
     assert client.get("/static/vendor/htmx.min.js").status_code == 200
     assert client.get("/static/kiehnema.svg").headers["content-type"].startswith("image/svg+xml")
     assert client.get("/favicon.ico").status_code == 200
@@ -76,6 +77,19 @@ def test_index_validation_and_static_assets(client):
                  {"url": "https://example.com", "description": "x" * 4001}):
         response = client.post("/jobs", data=data)
         assert response.status_code == 422 and 'role="alert"' in response.text
+    assert not list(jobs.jobs_dir().iterdir())
+
+
+@pytest.mark.parametrize("field,value", [
+    ("max_pages", "0"), ("max_pages", "51"), ("max_pages", "1.5"),
+    ("max_depth", "-1"), ("max_depth", "6"), ("max_depth", "1.5"), ("max_depth", "abc"),
+])
+def test_scan_settings_validation_preserves_form(client, field, value):
+    response = client.post("/jobs", data={"url": "https://example.com/", "max_pages": "7", "max_depth": "3",
+                                         field: value})
+    assert response.status_code == 422
+    assert f'value="{value}"' in response.text
+    assert 'class="crawl-settings" open' in response.text
     assert not list(jobs.jobs_dir().iterdir())
 
 
@@ -112,7 +126,8 @@ async def test_background_create_reload_queue_and_failure(workspace, monkeypatch
     monkeypatch.setattr(jobs, "run_job", fake_run)
     async with app.router.lifespan_context(app):
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN, headers={"Origin": ORIGIN}) as client:
-            first = await client.post("/jobs", data={"url": "https://example.com", "duration": 30, "allow_client_logos": "true"})
+            first = await client.post("/jobs", data={"url": "https://example.com", "duration": 30,
+                                                    "allow_client_logos": "true", "max_pages": 7, "max_depth": 0})
             second = await client.post("/jobs", data={"url": "https://example.org", "duration": 15})
             assert first.status_code == second.status_code == 303
             await asyncio.wait_for(entered.wait(), 2)
@@ -131,6 +146,9 @@ async def test_background_create_reload_queue_and_failure(workspace, monkeypatch
             assert len(calls) == 1  # second job is queued, including its eventual render
             stored = json.loads((jobs.jobs_dir() / location.rsplit("/", 1)[1] / "request.json").read_text())
             assert stored["allow_client_logos"] is True
+            assert (stored["max_pages"], stored["max_depth"]) == (7, 0)
+            defaults = json.loads((jobs.jobs_dir() / second.headers["location"].rsplit("/", 1)[1] / "request.json").read_text())
+            assert (defaults["max_pages"], defaults["max_depth"]) == (20, 2)
             assert (await client.post(location + "/delete")).status_code == 409
             tasks = list(app.state.tasks.values())
             release.set()

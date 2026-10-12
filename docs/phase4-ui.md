@@ -10,6 +10,7 @@ uv run python -m app
 ## Workflow
 
 - **New video:** public website URL, 15–60 seconds, optional creative direction and client logos (off by default).
+- **Website scan settings:** maximum pages (1–50, default 20) and link depth (0–5, default 2), saved per new video. Depth 0 reads only the starting page. The existing 240-second scan budget still applies; older jobs use the defaults.
 - **Progress:** persisted job URL, HTMX polling every two seconds, pipeline steps, streamed character counts, render frame counts, activity log and accumulated model cost. Targeted swaps update the status block, log entries and header cost while keeping the activity disclosure and its scroll container mounted. Cost updates when model calls finish; it is not live billing.
 - **Review:** brand board, two sandboxed playable previews with scrubbers, paired 4:5/9:16 scene keyframes, editable copy and linked source quotes. Text edits and feedback can be submitted together. Revisions return to review. Approval rejects unapplied changes, stale submissions and compositions that failed automatic checks.
 - **Results:** both MP4 players, downloads with range support, scene keyframes, copy, sources and cost.
