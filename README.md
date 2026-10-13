@@ -127,8 +127,13 @@ uv run pytest tests/test_web.py -m browser -q        # full UI smoke in Chromium
 
 The review timeline seeks both formats to the selected moment. Write a comment, choose its format,
 and **Confirm comment** to save it; markers and the comment list let you edit or delete it later.
-Confirmed comments survive reloads. Scene text, visual direction, duration and order can be edited
-below the timeline. These scene edits are drafts until **Revise preview**; leaving the page warns
+Confirmed comments survive reloads. The Comments tab shares the editor beside the preview.
+While commenting, scrubbing updates the draft timestamp without clearing its text; the preview
+and timeline stay visible, with compact sticky controls on mobile. Scene text, visual direction, duration and order can be edited
+in the selected scene editor beside the preview (below the timeline on mobile). Select a frame
+or use the previous/next buttons to switch scenes; playback keeps the editor on your selection.
+Edited scenes are marked in the filmstrip, and timing changes show the proposed sequence.
+These scene edits are drafts until **Revise preview**; leaving the page warns
 about unsaved drafts. The original preview and its comment times remain unchanged until revision.
 **Revise preview** submits scene edits, confirmed comments and general feedback together. The next
 preview starts with a fresh comment list; submitted comments remain in the job's review checkpoint.

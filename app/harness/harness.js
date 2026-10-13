@@ -193,13 +193,14 @@
   function preview() {
     const controls = document.getElementById('mg-controls');
     if (!controls) return;
-    controls.hidden = false;
+    controls.hidden = parent !== window;
     const scrub = $('#mg-scrub');
     const time = $('#mg-time');
     const play = $('#mg-play');
     const fit = () => {
-      const s = Math.min(innerWidth / W, (innerHeight - 56) / H);
-      stage.style.transform = `translate(${(innerWidth - W * s) / 2}px, 0) scale(${s})`;
+      const height = innerHeight - (controls.hidden ? 0 : 56);
+      const s = Math.min(innerWidth / W, height / H);
+      stage.style.transform = `translate(${(innerWidth - W * s) / 2}px, ${(height - H * s) / 2}px) scale(${s})`;
     };
     addEventListener('resize', fit);
     fit();

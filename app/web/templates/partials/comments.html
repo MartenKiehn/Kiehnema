@@ -1,0 +1,13 @@
+<section class="timeline-comments" id="timeline-comments" role="tabpanel" aria-labelledby="comments-tab" hidden>
+  <div class="comment-workspace">
+    <div class="comment-composer" id="comment-composer">
+      <h3 id="comment-editor-title">Add a comment</h3>
+      <div class="field-row"><div><label for="comment-time">At second</label><input id="comment-time" type="number" min="0" max="{{ preview_duration }}" step="0.001" required value="0"></div><div><label for="comment-format">Applies to</label><select id="comment-format"><option value="both">Both formats</option><option value="feed">4:5 · Feed</option><option value="story">9:16 · Story</option></select></div></div>
+      <label for="comment-text">What should change?</label><textarea id="comment-text" rows="3" maxlength="2000" placeholder="Replace this scene with a close-up of the product. Use a lighter background and a calmer entrance." aria-describedby="comment-help"></textarea>
+      <p id="comment-help" class="help">Scrub the timeline to set this comment’s time. Confirm to save; Revise preview applies it.</p>
+      <div class="actions"><button type="button" class="button small" id="save-comment">Confirm comment</button><button type="button" class="button secondary small" id="cancel-comment">Clear draft</button></div>
+      <p id="comment-status" class="help" role="status" aria-live="polite"></p>
+    </div>
+    <div><h3>Confirmed comments <span id="comment-count">{{ comments|length }}</span></h3><p class="help" id="comments-empty">Your confirmed comments will appear here and on the timeline.</p><ol id="comment-list" class="comment-list"></ol></div>
+  </div>
+</section>

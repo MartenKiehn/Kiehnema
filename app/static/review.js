@@ -9,6 +9,8 @@
   const text = $('#comment-text');
   const timeInput = $('#comment-time');
   const formatInput = $('#comment-format');
+  const sceneButtons = [...root.querySelectorAll('.timeline-frame')];
+  let activeScene = '';
   let comments = JSON.parse(root.dataset.comments);
   let editing = null;
   let selected = '';
@@ -22,6 +24,54 @@
     editing && (Number(timeInput.value) !== editing.time || formatInput.value !== editing.format));
   const send = (message) => frames.forEach((frame) => frame.contentWindow?.postMessage(message, '*'));
 
+  function selectScene(id) {
+    const cards = [...root.querySelectorAll('#scene-editor > .scene-card')];
+    if (!cards.some((card) => card.dataset.sceneId === id)) return;
+    const changed = activeScene !== id;
+    activeScene = id;
+    if (changed) {
+      const frame = sceneButtons.find((b) => b.dataset.scene === id);
+      if (frame) {
+        const strip = frame.parentElement;
+        strip.scrollLeft += frame.getBoundingClientRect().left - strip.getBoundingClientRect().left - strip.clientWidth / 2 + frame.clientWidth / 2;
+      }
+      $('.scene-inspector').scrollTop = 0;
+    }
+    cards.forEach((card) => { card.hidden = card.dataset.sceneId !== id; });
+    sceneButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.scene === id)));
+    const index = sceneButtons.findIndex((b) => b.dataset.scene === id);
+    $('#selected-scene-number').textContent = String(index + 1).padStart(2, '0');
+    $('#scene-previous').disabled = index <= 0;
+    $('#scene-next').disabled = index === sceneButtons.length - 1;
+  }
+  function sceneAt(t) {
+    return sceneButtons.find((b) => t >= Number(b.dataset.start) && t < Number(b.dataset.start) + Number(b.dataset.duration)) || sceneButtons.at(-1);
+  }
+  function setInspector(panel) {
+    const isComment = panel === 'comments';
+    $('#scene-panel').hidden = isComment;
+    $('#timeline-comments').hidden = !isComment;
+    $('.review-studio').classList.toggle('comment-mode', isComment);
+    [$('#scene-tab'), $('#comments-tab')].forEach((tab, i) => {
+      const active = isComment === Boolean(i);
+      tab.setAttribute('aria-selected', String(active));
+      tab.tabIndex = active ? 0 : -1;
+    });
+  }
+  function openComments() {
+    setInspector('comments');
+    $('.studio-grid').scrollIntoView({block: 'start'});
+  }
+  [$('#scene-tab'), $('#comments-tab')].forEach((tab, i, tabs) => {
+    tab.addEventListener('click', () => setInspector(i ? 'comments' : 'scene'));
+    tab.addEventListener('keydown', (event) => {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      const next = event.key === 'Home' ? tabs[0] : event.key === 'End' ? tabs[1] : tabs[1 - i];
+      next.click();
+      next.focus();
+    });
+  });
   function showTime(t) {
     position = Math.min(duration, Math.max(0, t));
     if (!slider) return;
@@ -36,7 +86,9 @@
   function seek(t) {
     playing = false;
     showTime(t);
+    if (!$('#timeline-comments').hidden && !saving) timeInput.value = String(position);
     if ($('#timeline-play')) $('#timeline-play').textContent = 'Play both previews';
+    selectScene(sceneAt(position)?.dataset.scene);
     send({type: 'kiehnema.seek', time: position});
   }
   function resetComment() {
@@ -61,6 +113,7 @@
     $('#save-comment').textContent = 'Confirm changes';
     $('#cancel-comment').textContent = 'Cancel editing';
     renderComments();
+    openComments();
     text.focus();
     status('Changes to this comment must be confirmed.');
   }
@@ -78,7 +131,7 @@
     list.replaceChildren();
     markers.replaceChildren();
     $('#comment-count').textContent = comments.length;
-    $('.timeline-editor .badge').textContent = `${comments.length} confirmed comments`;
+    $('#confirmed-comment-count').textContent = comments.length;
     $('#comments-empty').hidden = comments.length > 0;
     let previous = -100, row = 0, rows = 1;
     comments.forEach((comment, i) => {
@@ -125,6 +178,7 @@
       if (data.action !== 'delete' || editing?.id === data.id) resetComment();
       selected = data.action === 'delete' ? '' : (data.id || comments.find((c) => c.time === data.time && c.text === data.text)?.id || '');
       renderComments();
+      updateScenes();
       status(data.action === 'delete' ? 'Comment deleted.' : 'Comment confirmed and saved. Choose Revise preview when all your changes are ready.');
     } catch (error) {
       status(error.message);
@@ -149,6 +203,7 @@
       if (unsavedComment() && !confirm('Discard the unconfirmed comment changes?')) return;
       seek(position);
       resetComment();
+      openComments();
       text.focus();
     });
     timeInput.addEventListener('change', () => { if (timeInput.checkValidity()) seek(Number(timeInput.value)); });
@@ -172,39 +227,87 @@
       }
     });
     addEventListener('resize', renderComments);
-    showTime(0);
+    seek(Number(sceneButtons[0]?.dataset.time || 0));
+    if (comments.length) setInspector('comments');
     renderComments();
   }
 
   function updateScenes() {
     const cards = [...root.querySelectorAll('#scene-editor > .scene-card')];
-    let total = 0;
+    let total = 0, editedCount = 0, timingChanged = false;
+    const plan = $('#planned-order');
+    plan.replaceChildren();
     cards.forEach((card, i) => {
-      const seconds = Number(card.querySelector('[name^="scene-duration:"]').value);
-      card.querySelector('.scene-number').textContent = String(i + 1).padStart(2, '0');
+      const input = card.querySelector('[name^="scene-duration:"]');
+      const seconds = Number(input.value);
+      const previewIndex = sceneButtons.findIndex((b) => b.dataset.scene === card.dataset.sceneId);
+      const moved = i !== previewIndex;
+      const changed = moved || [...card.querySelectorAll('[data-original-value]')].some((field) =>
+        field.type === 'number' ? Number(field.value) !== Number(field.dataset.originalValue) : field.value !== field.dataset.originalValue);
+      timingChanged ||= moved || seconds !== Number(input.dataset.originalValue);
+      editedCount += changed ? 1 : 0;
+      const frame = sceneButtons[previewIndex];
+      if (frame) frame.querySelector('.frame-edit').hidden = !changed;
+      card.querySelector('.scene-number').textContent = String(previewIndex + 1).padStart(2, '0');
       card.querySelector('.scene-new-time').textContent = `After revision: ${formatTime(total)}–${formatTime(total + seconds)}`;
       card.querySelector('[data-move="-1"]').disabled = i === 0;
       card.querySelector('[data-move="1"]').disabled = i === cards.length - 1;
+      const chip = button(`${String(previewIndex + 1).padStart(2, '0')} · ${formatTime(seconds)}`, () => {
+        if (frame) seek(Number(frame.dataset.time));
+      });
+      chip.title = `Draft position ${i + 1}: ${card.querySelector('h3').textContent}`;
+      chip.setAttribute('aria-label', chip.title);
+      plan.append(chip);
       total += seconds;
     });
-    $('#planned-duration').textContent = `Planned length: ${formatTime(total)} (15–60 seconds).`;
-    $('#planned-duration').classList.toggle('invalid-duration', total < 15 || total > 60);
+    plan.hidden = !timingChanged;
+    $('#planned-duration').textContent = `After revision · ${formatTime(total)}${timingChanged ? ' · Scene order below' : ''}`;
+    const invalid = total < 15 || total > 60;
+    $('#planned-duration').classList.toggle('invalid-duration', invalid);
+    if (invalid) $('#planned-duration').textContent += ' · Choose a total of 15–60 seconds';
+    const hasChanges = editedCount || comments.length || $('#feedback').value.trim();
+    $('#edit-status').textContent = hasChanges ? 'Draft changes · revise to apply' : 'Preview up to date';
+    $('#edit-status').classList.toggle('status-review', Boolean(hasChanges));
+    $('#review-form [value="revise"]').classList.toggle('secondary', !hasChanges);
+    $('#review-form [value="approve"]').classList.toggle('secondary', Boolean(hasChanges));
   }
+  [$('#scene-previous'), $('#scene-next')].forEach((button, direction) => {
+    button.addEventListener('click', () => {
+      const index = sceneButtons.findIndex((b) => b.dataset.scene === activeScene);
+      const next = sceneButtons[index + (direction ? 1 : -1)];
+      if (next) seek(Number(next.dataset.time));
+    });
+  });
+  $('.timeline-frames')?.addEventListener('keydown', (event) => {
+    const index = sceneButtons.indexOf(event.target);
+    if (index < 0 || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === 'Home' ? sceneButtons[0] : event.key === 'End' ? sceneButtons.at(-1) : sceneButtons[index + (event.key === 'ArrowRight' ? 1 : -1)];
+    if (next) { next.focus(); next.click(); }
+  });
   $('#scene-editor').addEventListener('click', (event) => {
     const move = event.target.closest('[data-move]');
     if (!move) return;
     const card = move.closest('.scene-card');
     if (move.dataset.move === '-1' && card.previousElementSibling) card.previousElementSibling.before(card);
-    else if (card.nextElementSibling) card.nextElementSibling.after(card);
+    else if (move.dataset.move === '1' && card.nextElementSibling) card.nextElementSibling.after(card);
     updateScenes();
-    move.focus();
+    if (move.disabled) card.querySelector('[data-move]:not(:disabled)')?.focus();
+    else move.focus();
   });
   form.addEventListener('input', updateScenes);
-  form.addEventListener('invalid', (event) => { const details = event.target.closest('details'); if (details) details.open = true; }, true);
+  form.addEventListener('invalid', (event) => {
+    const card = form.querySelector(':invalid')?.closest('.scene-card');
+    if (card) { setInspector('scene'); selectScene(card.dataset.sceneId); }
+    else if (event.target.closest('#timeline-comments')) openComments();
+    const details = event.target.closest('details');
+    if (details) details.open = true;
+  }, true);
   form.addEventListener('submit', (event) => {
     if (saving || unsavedComment()) {
       event.preventDefault();
       status(saving ? 'Wait until the comment has been saved.' : 'Confirm or clear your unfinished comment before continuing.');
+      openComments();
       text?.focus();
     }
   });

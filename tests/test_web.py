@@ -412,20 +412,22 @@ async def test_browser_form_review_preview_and_results(review_job, monkeypatch, 
             await page.get_by_role("heading", name="Fine-tune the details.").wait_for(timeout=15000)
             frame = page.frame_locator('iframe[title="4:5 · Feed animation preview"]')
             await page.locator("iframe.preview.feed").scroll_into_view_if_needed()
-            await frame.get_by_role("button", name="Play preview", exact=True).wait_for()
-            await frame.get_by_role("button", name="Play preview", exact=True).click()
-            await frame.get_by_role("button", name="Pause preview", exact=True).wait_for()
+            await expect(frame.locator("#mg-controls")).to_be_hidden()
+            await page.locator("#timeline-play").click()
+            await expect(page.locator("#timeline-play")).to_have_text("Pause both previews")
             preview_frame = next(f for f in page.frames if "/preview/" in f.url and "format=feed" in f.url)
             await preview_frame.wait_for_function("window.__ready === true")
             assert await preview_frame.evaluate("document.fonts.status") == "loaded"
             assert await preview_frame.evaluate("[...document.fonts].every(font => font.status !== 'error')")
             assert await preview_frame.evaluate("() => { try { return !!parent.document.body; } catch { return false; } }") is False
             assert await preview_frame.evaluate("async () => { try { await fetch('/healthz'); return false; } catch { return true; } }")
-            await frame.get_by_role("button", name="Pause preview", exact=True).click()
+            await page.locator("#timeline-play").click()
             await expect(page.locator("#timeline-play")).to_have_text("Play both previews")
-            await frame.get_by_label("Preview position").evaluate("el => { el.value = '0.5'; el.dispatchEvent(new Event('input')); }")
-            assert "15.00 s" in await frame.locator("#mg-time").inner_text()
-            assert await page.locator(".keyframe-pair img").evaluate_all("imgs => imgs.every(img => img.complete && img.naturalWidth > 0)")
+            await page.locator("#timeline-position").fill("7.5")
+            await expect(frame.locator("#mg-time")).to_have_text("7.50 s")
+            await page.locator(".scene-stills summary").click()
+            await page.locator(".keyframe-pair img").first.wait_for()
+            await page.wait_for_function("() => [...document.querySelectorAll('.keyframe-pair img')].every(img => img.complete && img.naturalWidth > 0)")
             await page.locator('[data-text-id="hook-title"]').fill("Better robots")
             await page.get_by_role("button", name="Approve & render").click()
             assert "unapplied changes" in await page.get_by_role("alert").inner_text()
@@ -504,10 +506,16 @@ async def test_timeline_browser_on_running_server(review_job, monkeypatch, tmp_p
         await page.goto(f"{base}/jobs/{JOB}")
         for frame in page.frames[1:]:
             await frame.wait_for_function("window.__ready === true")
+        await page.locator('#duration-s-hook').fill('16')
+        await expect(page.locator('.timeline-frame[data-scene="s-hook"] .frame-edit')).to_be_visible()
+        await page.locator('#duration-s-hook').fill('15.0')
+        await expect(page.locator('.timeline-frame[data-scene="s-hook"] .frame-edit')).to_be_hidden()
+        await expect(page.locator('#planned-order')).to_be_hidden()
         await page.locator('#timeline-position').fill('4.2')
         for frame in page.frames[1:]:
             await expect(frame.locator('#mg-time')).to_have_text('4.20 s')
             assert await frame.evaluate("(() => {try {return !!parent.document.body} catch {return false}})()") is False
+        await page.locator('#comment-here').click()
         await page.locator('#comment-text').fill('Make this scene lighter')
         assert not (review_job / 'review-comments.json').exists()
         await page.get_by_role('button', name='Revise preview').click()
@@ -531,11 +539,43 @@ async def test_timeline_browser_on_running_server(review_job, monkeypatch, tmp_p
         await expect(page.locator('#timeline-play')).to_have_text('Pause both previews')
         await page.locator('#timeline-play').click()
         await expect(page.locator('#timeline-play')).to_have_text('Play both previews')
+        await page.locator('#scene-tab').click()
+        await page.locator('.timeline-frame[data-scene="s-end"]').click()
+        await expect(page.locator('#scene-s-end')).to_be_visible()
+        await expect(page.locator('#scene-s-hook')).to_be_hidden()
+        await page.locator('#visual-s-end').fill('Show the product first')
+        await expect(page.locator('.timeline-frame[data-scene="s-end"] .frame-edit')).to_be_visible()
+        await page.locator('#scene-previous').click()
+        await expect(page.locator('#scene-s-hook')).to_be_visible()
+        await page.locator('.timeline-frame[data-scene="s-hook"]').focus()
+        await page.keyboard.press('ArrowRight')
+        await expect(page.locator('#visual-s-end')).to_have_value('Show the product first')
+        # A playback update must not steal the scene currently being edited.
+        for frame in page.frames[1:]:
+            await expect(frame.locator('#mg-time')).to_have_text('22.50 s')
+            await frame.evaluate('window.__seek(0)')
+        await page.locator('#timeline-play').click()
+        await page.wait_for_function("() => Number(document.querySelector('#timeline-position').value) < 5")
+        await expect(page.locator('#scene-s-end')).to_be_visible()
+        await page.locator('#timeline-play').click()
+        # Native validation reveals a required field even in an unselected scene.
+        await page.locator('#scene-previous').click()
+        await page.locator('[data-text-id="hook-title"]').fill('')
+        await page.locator('#scene-next').click()
+        await page.get_by_role('button', name='Revise preview').click()
+        await expect(page.locator('#scene-s-hook')).to_be_visible()
+        await expect(page.locator('[data-text-id="hook-title"]')).to_be_focused()
+        await page.locator('[data-text-id="hook-title"]').fill('Robots that work.')
+        await page.locator('#scene-next').click()
         await page.locator('#scene-s-end [data-move="-1"]').click()
         await expect(page.locator('#scene-editor > article').first).to_have_attribute('data-scene-id', 's-end')
         await page.locator('#duration-s-end').fill('10')
         await page.locator('#visual-s-end').fill('Show the product first')
         await expect(page.locator('#planned-duration')).to_contain_text('25.0 s')
+        await expect(page.locator('#planned-order')).to_be_visible()
+        await expect(page.locator('#planned-order button').first).to_contain_text('02 · 10.0 s')
+        await expect(page.locator('.timeline-frame').first).to_have_attribute('data-scene', 's-hook')
+        await expect(page.locator('#edit-status')).to_contain_text('Draft changes')
         await page.get_by_role('button', name='Revise preview').click()
         await page.wait_for_url(f'{base}/jobs/{JOB}')
         await expect(page.locator('#review-form')).not_to_have_attribute('data-submitting', 'true')
@@ -549,6 +589,44 @@ async def test_timeline_browser_on_running_server(review_job, monkeypatch, tmp_p
         report = await capture(f'{base}/jobs/{JOB}', tmp_path / f'review-{width}.png', width=width, time=4.2)
         assert not report['page_errors'] and not report['horizontal_overflow'] and not report['broken_images']
         assert Path(report['screenshot']).stat().st_size > 1000
+
+
+@pytest.mark.browser
+async def test_comment_editor_keeps_preview_and_scrubber_visible(review_job, live_web, tmp_path):
+    from playwright.async_api import async_playwright, expect
+
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        page = await browser.new_page()
+        for width, height in ((1440, 900), (1280, 720), (390, 844), (390, 600)):
+            await page.set_viewport_size({"width": width, "height": height})
+            await page.goto(f"{live_web}/jobs/{JOB}")
+            for frame in page.frames[1:]:
+                await frame.wait_for_function("window.__ready === true")
+            await page.locator('#comment-here').click()
+            await page.locator('#comment-text').fill('Keep this draft while finding the frame')
+            await page.locator('#timeline-position').fill('7.2')
+            await expect(page.locator('#comment-text')).to_have_value('Keep this draft while finding the frame')
+            await expect(page.locator('#comment-time')).to_have_value('7.2')
+            for frame in page.frames[1:]:
+                await expect(frame.locator('#mg-time')).to_have_text('7.20 s')
+            for selector in ('iframe.preview.feed', 'iframe.preview.story', '#timeline-position', '#comment-text'):
+                box = await page.locator(selector).bounding_box()
+                assert box and box['y'] >= 0 and box['y'] + box['height'] <= height, (width, height, selector, box)
+            assert await page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+            await page.screenshot(path=str(tmp_path / f'comment-{width}-{height}.png'))
+            await page.locator('#scene-tab').click()
+            await page.locator('#comments-tab').click()
+            await expect(page.locator('#comment-text')).to_have_value('Keep this draft while finding the frame')
+            await page.locator('#cancel-comment').click()
+        # Confirming the selected frame persists the timestamp along with the text.
+        await page.locator('#comment-text').fill('Saved at the selected frame')
+        await page.locator('#timeline-position').fill('8.4')
+        await page.locator('#save-comment').click()
+        await expect(page.locator('#comment-list')).to_contain_text('8.4 s')
+        await page.reload()
+        await expect(page.locator('#comment-list')).to_contain_text('Saved at the selected frame')
+        await browser.close()
 
 
 async def test_screenshot_rejects_invalid_target_and_options(tmp_path):
