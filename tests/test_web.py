@@ -73,11 +73,22 @@ def test_index_validation_and_static_assets(client):
     assert client.get("/static/kiehnema.svg").headers["content-type"].startswith("image/svg+xml")
     assert client.get("/favicon.ico").status_code == 200
     for data in ({"url": "file:///etc/passwd"}, {"url": "https://example.com", "duration": 14},
-                 {"url": "https://example.com", "duration": 61}, {"url": "http://127.0.0.1"},
+                 {"url": "https://example.com", "duration": 61}, {"url": "http://192.168.1.1"},
                  {"url": "https://example.com", "description": "x" * 4001}):
         response = client.post("/jobs", data=data)
         assert response.status_code == 422 and 'role="alert"' in response.text
     assert not list(jobs.jobs_dir().iterdir())
+
+
+@pytest.mark.parametrize("url", ["http://127.0.0.1:8000/", "http://localhost:3000/", "http://[::1]:8000/"])
+def test_create_job_accepts_local_website(client, monkeypatch, url):
+    queued = []
+    monkeypatch.setattr("app.web.main.enqueue", queued.append)
+    response = client.post("/jobs", data={"url": url}, follow_redirects=False)
+    assert response.status_code == 303
+    assert len(queued) == 1
+    request = json.loads((jobs.jobs_dir() / queued[0] / "request.json").read_text())
+    assert request["url"] == url
 
 
 @pytest.mark.parametrize("field,value", [
@@ -249,6 +260,68 @@ def test_review_validation_blocks_bad_or_unchecked_copy(review_job, client, monk
     state = {"values": {"check": {"ok": False}}, "next": ["review"], "interrupts": [{}]}
     monkeypatch.setattr(jobs, "job_state", AsyncMock(return_value=state))
     assert client.post(f"/jobs/{JOB}/review", data=form).status_code == 422
+
+
+def test_reopen_completed_job_and_reject_stale_requests(review_job, client, monkeypatch):
+    outputs = {"feed": "renders/feed-1080x1350.mp4"}
+    video = review_job / outputs["feed"]
+    video.parent.mkdir()
+    video.write_bytes(b"last export")
+    write_status(review_job, "done", "Videos ready", outputs=outputs)
+
+    async def reopen(job_id):
+        assert job_id in app.state.tasks
+        write_status(review_job, "review", "Waiting for your review")
+    mock = AsyncMock(side_effect=reopen)
+    monkeypatch.setattr(jobs, "reopen_job", mock)
+    html = client.get(f"/jobs/{JOB}").text
+    assert "Continue editing" in html and 'id="review-form"' not in html
+    form = {"revision": re.search(r'name="revision" value="([a-f0-9]+)"', html)[1]}
+    url = f"/jobs/{JOB}/reopen"
+    assert client.post(url, data={"revision": "stale"}).status_code == 409
+    assert client.post(url, data=form, headers={"Origin": "https://example.com"}).status_code == 403
+    app.state.tasks[JOB] = object()
+    try:
+        assert client.post(url, data=form).status_code == 409
+    finally:
+        app.state.tasks.pop(JOB)
+    mock.assert_not_awaited()
+    response = client.post(url, data=form, follow_redirects=False)
+    assert response.status_code == 303 and response.headers["location"] == f"/jobs/{JOB}"
+    mock.assert_awaited_once_with(JOB)
+    assert JOB not in app.state.tasks
+    html = client.get(f"/jobs/{JOB}").text
+    assert 'id="review-form"' in html and 'id="advanced-tab"' in html
+    assert "Last rendered videos" in html and "Continue editing" not in html
+    assert client.get(f"/jobs/{JOB}/files/{outputs['feed']}").content == b"last export"
+    assert client.post(url, data=form).status_code == 409
+
+
+async def test_reopen_button_returns_to_editor_in_browser(review_job, live_web, monkeypatch, tmp_path):
+    from playwright.async_api import async_playwright, expect
+
+    write_status(review_job, "done", "Videos ready", outputs={"feed": "renders/feed-1080x1350.mp4"})
+    async def reopen(job_id):
+        write_status(review_job, "review", "Waiting for your review")
+    monkeypatch.setattr(jobs, "reopen_job", reopen)
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        page = await browser.new_page(viewport={"width": 1440, "height": 1000})
+        await page.goto(f"{live_web}/jobs/{JOB}")
+        await expect(page.get_by_role("button", name="Continue editing")).to_be_visible()
+        await page.screenshot(path=str(tmp_path / "reopen-desktop.png"))
+        await page.set_viewport_size({"width": 390, "height": 844})
+        assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+        await page.screenshot(path=str(tmp_path / "reopen-mobile.png"))
+        await page.get_by_role("button", name="Continue editing").click()
+        await expect(page.get_by_role("tab", name="Scene", exact=True)).to_be_visible()
+        await page.get_by_role("tab", name="Advanced", exact=True).click()
+        await expect(page.locator("#advanced-panel")).to_be_visible()
+        await page.locator(".rendered-downloads summary").click()
+        await expect(page.get_by_role("link", name="Download 4:5")).to_be_visible()
+        await page.reload()
+        await expect(page.locator("#review-form")).to_be_visible()
+        await browser.close()
 
 
 def test_preview_headers_files_origin_and_traversal(review_job, client, workspace):

@@ -74,7 +74,10 @@ def normalize(url: str) -> str:
     p = urlsplit(url)
     query = "&".join(q for q in p.query.split("&") if q and not q.lower().startswith(("utm_", "fbclid", "gclid")))
     path = p.path or "/"
-    return urlunsplit((p.scheme.lower(), (p.hostname or "").lower() + (f":{p.port}" if p.port else ""), path, query, ""))
+    host = (p.hostname or "").lower()
+    if ":" in host:
+        host = f"[{host}]"
+    return urlunsplit((p.scheme.lower(), host + (f":{p.port}" if p.port else ""), path, query, ""))
 
 
 async def _robots(guard: UrlGuard, start: str) -> RobotFileParser:
@@ -140,7 +143,7 @@ async def crawl(
     time_budget: float = 240.0,
     progress: ProgressFn | None = None,
 ) -> CrawlResult:
-    guard = guard or UrlGuard()
+    guard = guard or UrlGuard.for_site(start_url)
     start = normalize(guard.check(start_url))
     out.mkdir(parents=True, exist_ok=True)
     (out / "screens").mkdir(exist_ok=True)

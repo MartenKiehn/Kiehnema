@@ -90,6 +90,20 @@ async def job_state(job_id: str) -> dict:
                 "interrupts": [i.value for t in snapshot.tasks for i in t.interrupts]}
 
 
+async def reopen_job(job_id: str) -> dict:
+    """Return a completed job to its review interrupt, keeping its latest export."""
+    job_dir = jobs_dir() / job_id
+    config = {"configurable": {"thread_id": job_id}}
+    async with _graph() as graph:
+        snapshot = await graph.aget_state(config)
+        if snapshot.next or snapshot.values.get("status") != "done":
+            raise ValueError(f"job {job_id} is not a completed render")
+        config = _config(job_id, _bedrock(job_dir, snapshot.values.get("usage")), None)
+        # The QA successor is review; clear its routing instruction without rerunning QA.
+        await graph.aupdate_state(config, {"status": "review", "review": {}, "fix_instruction": None}, as_node="qa")
+        return await graph.ainvoke(None, config)
+
+
 async def delete_job(job_id: str) -> None:
     """The caller must ensure the job is idle before removing its checkpoint and files."""
     async with AsyncSqliteSaver.from_conn_string(str(settings.data_dir / "jobs.sqlite")) as saver:

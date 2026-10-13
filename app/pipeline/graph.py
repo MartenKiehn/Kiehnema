@@ -80,8 +80,8 @@ def _llm(config: RunnableConfig) -> LLM:
     return config["configurable"]["llm"]
 
 
-def _guard(config: RunnableConfig) -> UrlGuard:
-    return config["configurable"].get("guard") or UrlGuard()
+def _guard(config: RunnableConfig) -> UrlGuard | None:
+    return config["configurable"].get("guard")
 
 
 def _dir(state: JobState) -> Path:

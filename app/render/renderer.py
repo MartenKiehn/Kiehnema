@@ -8,6 +8,7 @@ paused GSAP timeline at time ``t``. The page receives ``?render=1&format=<name>`
 from __future__ import annotations
 
 import asyncio
+import base64
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,7 +16,7 @@ from typing import Awaitable, Callable
 from urllib.parse import urlsplit
 
 import imageio_ffmpeg
-from playwright.async_api import Browser, Page, Route, async_playwright
+from playwright.async_api import Browser, CDPSession, Page, Route, async_playwright
 
 log = logging.getLogger(__name__)
 
@@ -85,6 +86,12 @@ async def _seek(page: Page, t: float) -> None:
     await page.evaluate("t => { window.__seek(t); }", t)
 
 
+async def _capture_frame(session: CDPSession) -> bytes:
+    # Frames only travel to ffmpeg: favour lossless encoding speed over PNG size.
+    result = await session.send("Page.captureScreenshot", {"format": "png", "optimizeForSpeed": True})
+    return base64.b64decode(result["data"])
+
+
 def _ffmpeg_args(out: Path, audio: Path | None, duration: float) -> list[str]:
     args = [
         imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error",
@@ -100,7 +107,7 @@ def _ffmpeg_args(out: Path, audio: Path | None, duration: float) -> list[str]:
         "-vf", "scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,"
         "setparams=color_primaries=bt709:color_trc=iec61966-2-1:colorspace=bt709:range=tv",
         "-color_primaries", "bt709", "-color_trc", "iec61966-2-1", "-colorspace", "bt709", "-color_range", "tv",
-        "-c:v", "libx264", "-preset", "slow", "-crf", "16", "-profile:v", "high", "-r", str(FPS),
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "16", "-profile:v", "high", "-r", str(FPS),
     ]
     if audio is not None:
         args += ["-c:a", "aac", "-b:a", "192k"]
@@ -124,6 +131,7 @@ async def render_video(
             raise RenderError(f"{fmt.name}: {missing[:3]}")
         duration = float(await page.evaluate("() => window.__duration"))
         frames = round(duration * FPS)
+        session = await page.context.new_cdp_session(page)
         out.parent.mkdir(parents=True, exist_ok=True)
         proc = await asyncio.create_subprocess_exec(
             *_ffmpeg_args(out, audio, duration),
@@ -132,7 +140,7 @@ async def render_video(
         assert proc.stdin is not None
         for i in range(frames):
             await _seek(page, i / FPS)
-            proc.stdin.write(await page.screenshot(type="png"))
+            proc.stdin.write(await _capture_frame(session))
             await proc.stdin.drain()
             if progress and i % FPS == 0:
                 result = progress(fmt.name, i, frames)

@@ -618,7 +618,7 @@ async def _save_images(client, guard, crawl: CrawlResult, logo_url: str | None, 
 # ---------------------------------------------------------------- entry point
 
 async def extract_brand(crawl: CrawlResult, out: Path, guard: UrlGuard | None = None) -> BrandKit:
-    guard = guard or UrlGuard()
+    guard = guard or UrlGuard.for_site(crawl.start_url)
     out.mkdir(parents=True, exist_ok=True)
     notes: list[str] = []
     home = crawl.home.data

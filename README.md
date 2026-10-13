@@ -101,6 +101,16 @@ uv run python -m app.brand.extract data/crawls/x data/brands/x       # brand kit
 uv run python -m app.brand.board data/brands/x                       # brand board PNG
 ```
 
+After rendering, **Continue editing** reopens the same video in the scene, comment and
+advanced editor without a model call. The last MP4s remain available under **Last rendered videos**
+until the next render replaces them.
+
+Local website URLs such as `http://127.0.0.1:8000/`, `http://localhost:3000/` and
+`http://[::1]:8000/` also work in the form and CLI. The source must be reachable from
+the computer running Kiehnema. Only the entered local scheme, host and port are
+allowed for pages and assets; other local services, private networks and cloud metadata
+remain blocked, including redirects from public websites.
+
 ```bash
 uv run python -m app.pipeline start https://www.example.com/ --duration 30 --description "..."   # until review
 uv run python -m app.pipeline resume <job_id> --approve                                        # render MP4s

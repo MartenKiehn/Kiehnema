@@ -190,7 +190,7 @@ async def create_job(request: Request):
     form = dict(await request.form())
     try:
         data = JobRequest.model_validate(form)
-        url = await asyncio.to_thread(UrlGuard().check, str(data.url))
+        url = await asyncio.to_thread(UrlGuard.for_site(str(data.url)).check, str(data.url))
     except (ValidationError, ValueError) as exc:
         error = "; ".join(f"{e['loc'][0]}: {e['msg']}" for e in exc.errors()) if isinstance(exc, ValidationError) else str(exc)
         return templates.TemplateResponse(request, "index.html", {"jobs": all_jobs(), "values": form, "error": error}, status_code=422)
@@ -211,6 +211,22 @@ async def progress(request: Request, job_id: str):
     if not context["job"]["poll"]:
         return HTMLResponse(headers={"HX-Redirect": f"/jobs/{job_id}"})
     return templates.TemplateResponse(request, "partials/progress.html", {**context, "poll_response": True})
+
+
+@app.post("/jobs/{job_id}/reopen")
+async def reopen(request: Request, job_id: str):
+    path = job_path(job_id)
+    form = await request.form()
+    if job_id in app.state.tasks or job_summary(path)["status"] != "done" or form.get("revision") != revision(path):
+        raise HTTPException(409, "This video has changed. Reload it before opening the editor.")
+    app.state.tasks[job_id] = asyncio.current_task()
+    try:
+        await jobs.reopen_job(job_id)
+    except ValueError as exc:
+        raise HTTPException(409, "This video is not a completed render. Reload to see its current state.") from exc
+    finally:
+        app.state.tasks.pop(job_id, None)
+    return RedirectResponse(f"/jobs/{job_id}", status_code=303)
 
 
 @app.post("/jobs/{job_id}/review")

@@ -7,10 +7,12 @@ import os
 from pathlib import Path
 
 import pytest
+import httpx
 
 from app.brand.extract import extract_brand, parse_color, sanitize_svg
 from app.crawl.crawler import crawl, normalize, site_markdown
 from app.crawl.guard import BlockedURL, UrlGuard
+from app.crawl.fetch import fetch
 
 FIX = Path(__file__).parent / "fixtures" / "site"
 
@@ -41,14 +43,51 @@ def test_guard_allows_public_hosts():
     assert guard.check("https://www.example.com/a?b=1") == "https://www.example.com/a?b=1"
 
 
+@pytest.mark.parametrize("site", ["http://127.0.0.1:8000", "http://localhost:8000", "http://[::1]:8000"])
+def test_local_site_guard_is_scoped_to_origin(site):
+    guard = UrlGuard.for_site(site)
+    assert guard.check(site + "/") == site + "/"
+    assert guard.check(site + "/assets/logo.svg") == site + "/assets/logo.svg"
+    for url in [site.replace(":8000", ":8001"), site.replace("http:", "https:"),
+                "http://127.0.0.2:8000/", "http://192.168.1.1/", "http://169.254.169.254/latest/meta-data/",
+                "file:///etc/passwd", "http://user:password@localhost:8000/"]:
+        with pytest.raises(BlockedURL):
+            guard.check(url)
+
+
+def test_public_site_cannot_gain_loopback_access_through_dns():
+    guard = UrlGuard.for_site("https://example.com/")
+    guard.resolver = fake_resolver({"example.com": ["127.0.0.1"]})
+    with pytest.raises(BlockedURL):
+        guard.check("https://example.com/")
+
+
+@pytest.mark.parametrize("source,target", [
+    ("http://127.0.0.1:8000/", "http://127.0.0.1:8001/"),
+    ("https://example.com/", "http://127.0.0.1:8000/"),
+])
+async def test_site_guard_blocks_redirects_to_other_local_services(source, target):
+    guard = UrlGuard.for_site(source)
+    guard.resolver = lambda host, port: ["93.184.216.34"] if host == "example.com" else [host]
+    requested = []
+    def redirect(request):
+        requested.append(str(request.url))
+        return httpx.Response(302, headers={"Location": target})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(redirect)) as client:
+        with pytest.raises(BlockedURL):
+            await fetch(client, source, guard)
+    assert requested == [source]
+
+
 def test_normalize_drops_fragments_and_tracking():
     assert normalize("https://Ex.com/a?utm_source=x&id=2#top") == "https://ex.com/a?id=2"
+    assert normalize("http://[::1]:8000/a#top") == "http://[::1]:8000/a"
 
 
 # ---------------------------------------------------------------- fixture site
 
 async def test_crawl_and_brand_fixture_site(site, tmp_path):
-    guard = UrlGuard(allow_hosts={"127.0.0.1"})
     snapshots = []
 
     def progress(message):
@@ -56,7 +95,7 @@ async def test_crawl_and_brand_fixture_site(site, tmp_path):
         if saved.exists():
             snapshots.append(json.loads(saved.read_text()))
 
-    result = await crawl(site, tmp_path / "crawl", guard, max_pages=10, progress=progress)
+    result = await crawl(site, tmp_path / "crawl", max_pages=10, progress=progress)
     assert snapshots and len(snapshots[0]["pages"]) == 1
     assert not (tmp_path / "crawl/crawl.tmp").exists()
     urls = {p.url for p in result.pages}
@@ -69,7 +108,7 @@ async def test_crawl_and_brand_fixture_site(site, tmp_path):
     assert "# Robots that work." in md and "- Fixed-price projects" in md and "Book a call" in md
     assert (tmp_path / "crawl" / "screens" / "home-full.png").exists()
 
-    kit = await extract_brand(result, tmp_path / "brand", guard)
+    kit = await extract_brand(result, tmp_path / "brand")
     assert kit.site_name == "Acme" and kit.language == "en"
     assert kit.logo and kit.logo.kind == "svg" and kit.logo.shapes == 3
     logo_svg = (tmp_path / "brand" / "logo.svg").read_text()

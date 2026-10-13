@@ -16,7 +16,7 @@ import pytest
 
 from app.config import settings
 from app.crawl.guard import UrlGuard
-from app.pipeline.jobs import job_state, resume_job, start_job
+from app.pipeline.jobs import job_state, reopen_job, resume_job, start_job
 from app.pipeline.llm import FakeLLM
 from app.pipeline.schemas import CompanyProfile, Concept, QAReport
 from app.pipeline.verify import QuoteIndex, lint_composition, validate_concept
@@ -89,7 +89,7 @@ def data_dir(tmp_path, monkeypatch):
     return tmp_path / "data"
 
 
-async def test_full_pipeline_with_fake_model(site, data_dir):
+async def test_full_pipeline_with_fake_model(site, data_dir, monkeypatch):
     llm = FakeLLM({
         "distill": [CompanyProfile.model_validate(_profile(site))],
         "concept": [Concept.model_validate(CONCEPT)],
@@ -97,9 +97,7 @@ async def test_full_pipeline_with_fake_model(site, data_dir):
         "fix": [FIX_LINT, FIX_EDIT],
         "qa": [QAReport(approved=True, summary="Looks good.", issues=[])],
     })
-    guard = UrlGuard(allow_hosts={"127.0.0.1"})
-
-    job_id, result = await start_job(site, 6, "Short ad for factories", llm=llm, guard=guard)
+    job_id, result = await start_job(site, 6, "Short ad for factories", llm=llm)
     assert not result.get("error"), result.get("error")
     assert "__interrupt__" in result  # paused for review
     job = data_dir / "jobs" / job_id
@@ -120,13 +118,13 @@ async def test_full_pipeline_with_fake_model(site, data_dir):
     state = await job_state(job_id)
     assert state["next"] == ["review"] and state["interrupts"][0]["concept"]["title"] == CONCEPT["title"]
 
-    result = await resume_job(job_id, {"action": "edit", "texts": {"proof-title": "Fixed prices"}}, llm=llm, guard=guard)
+    result = await resume_job(job_id, {"action": "edit", "texts": {"proof-title": "Fixed prices"}}, llm=llm)
     assert "__interrupt__" in result and result["check"]["ok"]
     assert 'data-text-id="proof-title">Fixed prices' in (job / "composition" / "composition.html").read_text()
     concept = json.loads((job / "concept.json").read_text())
     assert concept["scenes"][1]["texts"][0]["text"] == "Fixed prices"
 
-    result = await resume_job(job_id, {"action": "approve"}, llm=llm, guard=guard)
+    result = await resume_job(job_id, {"action": "approve"}, llm=llm)
     assert result["status"] == "done"
     for name, size in (("feed", "1080x1350"), ("story", "1080x1920")):
         video = job / result["outputs"][name]
@@ -136,6 +134,29 @@ async def test_full_pipeline_with_fake_model(site, data_dir):
     assert status["status"] == "done" and status["cost_usd"] > 0
     assert any("characters so far" in h["message"] for h in status["history"])
     assert [c[0] for c in llm.calls] == ["distill", "concept", "compose", "fix", "qa", "fix"]
+
+    exports = {name: (job / file).read_bytes() for name, file in result["outputs"].items()}
+    monkeypatch.setattr("app.pipeline.jobs._bedrock", lambda *args: FakeLLM({}, usage=llm.usage))
+    reopened = await reopen_job(job_id)
+    assert "__interrupt__" in reopened
+    saved = await job_state(job_id)
+    assert saved["next"] == ["review"] and saved["interrupts"]
+    assert saved["values"]["status"] == "review" and saved["values"]["usage"] == result["usage"]
+    assert saved["values"]["keyframes"] == result["keyframes"]
+    reopened_status = json.loads((job / "status.json").read_text())
+    assert reopened_status["status"] == "review" and reopened_status["cost_usd"] == status["cost_usd"]
+    assert all((job / result["outputs"][name]).read_bytes() == content for name, content in exports.items())
+    with pytest.raises(ValueError, match="not a completed render"):
+        await reopen_job(job_id)
+
+    llm.script["fix"] = ['<edit file="composition.html"><search>data-text-id="proof-title">Fixed prices</search>'
+                         '<replace>data-text-id="proof-title">Clear prices</replace></edit>']
+    edited = await resume_job(job_id, {"action": "edit", "texts": {"proof-title": "Clear prices"}}, llm=llm)
+    assert "__interrupt__" in edited and edited["check"]["ok"]
+    assert 'data-text-id="proof-title">Clear prices' in (job / "composition/composition.html").read_text()
+    rendered = await resume_job(job_id, {"action": "approve"}, llm=llm)
+    assert rendered["status"] == "done" and not (await job_state(job_id))["next"]
+    assert [c[0] for c in llm.calls] == ["distill", "concept", "compose", "fix", "qa", "fix", "fix"]
 
 
 def test_concept_validation_catches_unbacked_claims_and_long_text():

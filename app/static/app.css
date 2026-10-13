@@ -149,6 +149,8 @@ summary { cursor: pointer; }
 .preview-grid > div, .video-grid > div { min-width: 0; }
 .preview { display: block; width: 100%; height: 590px; border: 0; border-radius: 9px; background: #222420; }
 .result-video { display: block; width: 100%; height: 540px; object-fit: contain; background: #222420; border-radius: 9px; margin-bottom: 16px; }
+.result-heading { flex-wrap: wrap; align-items: flex-start; }
+.rendered-downloads summary { font-weight: 600; }
 .review-health { display: flex; align-items: baseline; gap: 24px; padding: 4px 0 26px; font-size: .9375rem; }
 .review-health details { flex: 1; }
 .review-health details > p { margin-top: 15px; }

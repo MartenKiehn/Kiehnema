@@ -1,6 +1,7 @@
 """SSRF guard for user-supplied URLs.
 
-Only http(s) URLs whose host resolves exclusively to *global* unicast addresses are allowed.
+By default only http(s) URLs whose host resolves exclusively to *global* unicast addresses are allowed.
+An explicitly supplied loopback website grants access to that origin only via ``for_site``.
 This blocks loopback, private (RFC 1918), link-local (incl. the cloud metadata endpoint
 169.254.169.254), CGNAT, multicast, reserved, unspecified, ULA and IPv4-mapped variants of those.
 
@@ -43,7 +44,18 @@ class UrlGuard:
     # host names that may resolve to non-public addresses (tests / explicit local use only)
     allow_hosts: set[str] = field(default_factory=set)
     allowed_ports: frozenset[int] | None = None  # None: any port
+    local_origin: tuple[str, str, int] | None = None
     _cache: dict[tuple[str, int], bool] = field(default_factory=dict, repr=False)
+
+    @classmethod
+    def for_site(cls, url: str) -> "UrlGuard":
+        """Allow the user's local starting site, without opening other local services."""
+        parts = urlsplit(url)
+        host = (parts.hostname or "").rstrip(".").lower()
+        origin = None
+        if host in {"localhost", "127.0.0.1", "::1"}:
+            origin = (parts.scheme, host, parts.port or (443 if parts.scheme == "https" else 80))
+        return cls(local_origin=origin)
 
     def check(self, url: str) -> str:
         """Return the URL if it is safe to fetch, else raise BlockedURL."""
@@ -61,6 +73,8 @@ class UrlGuard:
             raise BlockedURL(f"invalid port: {exc}") from exc
         if self.allowed_ports is not None and port not in self.allowed_ports:
             raise BlockedURL(f"port not allowed: {port}")
+        if (parts.scheme, host, port) == self.local_origin:
+            return url
         if host in self.allow_hosts:
             return url
         key = (host, port)
