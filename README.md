@@ -1,174 +1,157 @@
 # Kiehnema
 
-Website → on-brand motion graphics, with human review and two social video formats.
-The branding pairs warm ivory and graphite with muted amber, film perforations and camera-style labels.
-The logo combines a geometric **K** with a prominent amber play triangle in a film frame:
-[SVG](app/static/kiehnema.svg) · [PNG](app/static/kiehnema.png).
+**Deine Website. Deine Marke. Dein Video.**
 
-## Original example: they consulting (30 s)
+[Deutsch](#deutsch) · [English](#english)
 
-Social-Media-Spot für LinkedIn & Instagram, gebaut aus Inhalten, Farben, Schriften und Logo von
-[they-consulting.de](https://www.they-consulting.de/).
+![Kiehnema-Demo / Kiehnema demo](assets/readme/kiehnema-preview.mp4){width=432}
 
-## Ergebnis
+[▶ Demo ansehen / Watch demo — 60 s · MP4 · 1080 × 1350](assets/readme/kiehnema-preview.mp4)
 
-| Datei | Format | Einsatz |
+<details>
+<summary>Vorschaubild / Preview image</summary>
+
+[![Kiehnema: Von der Website zum Video im Markenlook / From website to on-brand video](assets/readme/kiehnema-preview.jpg)](assets/readme/kiehnema-preview.mp4)
+
+</details>
+
+## Deutsch
+
+Kiehnema macht aus einer Website animierte Social-Media-Videos im passenden Markenlook.
+Die Anwendung liest Inhalte, Farben, Schriften und Bilder, entwickelt daraus ein Storyboard
+und erstellt eine animierte Vorschau. Du prüfst und bearbeitest das Ergebnis, bevor die
+fertigen Videos gerendert werden. Das Video oben zeigt Kiehnema selbst als Beispiel.
+
+### Von der URL zum fertigen Video
+
+1. **Website und Briefing eingeben.** URL, Videolänge und kreative Richtung festlegen.
+2. **Marke und Geschichte entwickeln.** Kiehnema analysiert die Website und erzeugt Markenübersicht, Storyboard und Animation.
+3. **Vorschau gestalten.** Beide Formate ansehen, Szenentexte, Reihenfolge und Dauer ändern, Kommentare setzen oder visuelle Ideen mit Texten und Bildern ergänzen.
+4. **Freigeben und herunterladen.** Mit **Approve & render** entstehen beide MP4s inklusive Musik. **Continue editing** öffnet das Video später erneut zur Bearbeitung.
+
+| Ausgabe | Auflösung | Geeignet für |
 |---|---|---|
-| `out/they-consulting-feed-1080x1350.mp4` | 4:5 | LinkedIn-Feed, Instagram-Feed |
-| `out/they-consulting-story-1080x1920.mp4` | 9:16 | Instagram Reels/Stories, LinkedIn mobil |
+| Feed · 4:5 | 1080 × 1350 | LinkedIn- und Instagram-Feed |
+| Story · 9:16 | 1080 × 1920 | Reels und Stories |
 
-30 fps, H.264 (BT.709, korrekt getaggt), AAC-Stereo mit eigens erzeugter Musik.
-Diese Ausgabedateien sind lokal und werden mit `npm run render` erzeugt; sie gehören nicht ins Git-Repo.
+Beide Formate werden mit 30 fps, H.264 und AAC-Stereoton ausgegeben. Die Oberfläche ist auf Englisch.
 
-## Storyboard
+### Lokal starten
 
-| Zeit | Szene | Inhalt (Quelle) |
-|---|---|---|
-| 0,0–5,5 s | Hook | „Noch ein KI-Prototyp für die Schublade?“ – ein Prototyp sinkt in die Schublade „Prototypen“, wird herausgezogen, die Schublade knallt zu, „Schublade?“ wird gestrichen → „Nicht bei uns. Wir entwickeln KI, die im Tagesgeschäft wirkt.“ – die Karte wird zum Live-Dashboard (Startseite: „keine Prototypen, die in der Schublade landen“) |
-| 5,5–9,0 s | Claim | heller Grund, Logo setzt sich in Originalfarben zusammen → „they make AI work.“ |
-| 9,0–14,5 s | Vorgehen | 5 Phasen: KI Kompass → Discovery Workshop → Opportunity Sprint → Implementierung → Rollout & Enablement, 12 Wochen |
-| 14,5–19,0 s | Budgetgarantie | Zitat Lars Quell: „Was wir sagen, gilt. Was wir kalkulieren, bleibt. Was wir starten, bringen wir zu Ende.“ |
-| 19,0–22,5 s | Souveränität | TISAX-konform · Hosting in Europa · DSGVO-ready · KI ohne Datenweitergabe |
-| 22,5–25,5 s | Kunden | VW, DB, Bentley, Cariad, LHIND, Contipark, EJF, VKU, Bankenverband |
-| 25,5–30,0 s | Outro | Farb-Wipe, Logo, CTA „Erstgespräch vereinbaren“, they-consulting.de |
-
-Lesbarkeit: Jeder Text ist nach spätestens ~1 s komplett eingeblendet und steht dann mindestens ~1,5–2 s ruhig.
-
-## Musik
-
-`music.mjs` synthetisiert den Track komplett im Code (keine Samples → keine Lizenzfragen):
-120 BPM, Am–F–C–G. Im Hook: Ticken, Schubladen-Geräusch, Rums beim Zuknallen, danach öffnet sich die Musik
-mit Riser bis zum Drop + Impact genau auf dem Logo (5,5 s). Whooshes auf
-jedem Szenenwechsel, Glockentöne beim Zusammensetzen des Logos, Auflösung nach C im Outro.
-Die Zeitpunkte kommen aus `plan.js`, Ton und Bild bleiben also synchron, wenn sich das Timing ändert.
-
-## Bearbeiten & neu rendern
-
-```bash
-npm install
-npx playwright install chromium   # einmalig
-npm run preview                   # http://127.0.0.1:5173  (Leertaste = Play, ?format=story für 9:16; ohne Ton)
-npm run render                    # Musik erzeugen + beide Formate nach out/
-node render.mjs --format=feed --stills=5,12.5   # einzelne Standbilder zur Kontrolle
-```
-
-- Szenen-Timing (Bild **und** Ton): `plan.js`
-- Texte und Szenenaufbau: `index.html`
-- Farben, Größen, Layout: `style.css` (9:16-Anpassungen unter `.fmt-story`)
-- Animationen: `main.js`
-- Musik, Sounddesign, Lautheit: `music.mjs`
-
-Technik: HTML/CSS + [GSAP](https://gsap.com) (kostenlos, auch kommerziell). Playwright rendert jedes Frame
-deterministisch, ffmpeg (`ffmpeg-static`) kodiert das MP4.
-
----
-
-# Kiehnema app
-
-Python + HTMX app that turns any website into the same kind of motion graphic, generated by
-Claude Opus 5.5 on AWS Bedrock (LangChain/LangGraph). Plan: approach B (model writes the composition
-against a harness contract), human review before the final render, local only, English UI.
-
-The project folder is intended to be named `Kiehnema` (package identifiers: `kiehnema`). After moving
-the folder, recreate the virtual environment with `uv venv --clear --prompt Kiehnema` and `uv sync --frozen`
-to replace old absolute interpreter paths. Stop the app before moving it. Saved jobs and videos stay
-in `data/` and `out/`; review jobs resolve their files relative to the current data directory.
+Du brauchst Python 3.13+, `uv`, Node.js/npm und AWS-Zugang mit Zugriff auf das konfigurierte
+Bedrock-Modell. Modellaufrufe verursachen Kosten in deinem AWS-Konto.
 
 ```bash
 uv sync
+npm install
 uv run playwright install chromium
-uv run python -m app            # http://127.0.0.1:8000
-uv run pytest                   # MG_LIVE_BEDROCK=1 also runs a live Bedrock smoke test
-npm run music                   # generate the demo audio for the command below
-uv run python -m app.render.renderer --root . --format feed --audio assets/audio/music.wav --out out/py
+cp .env.example .env
+# AWS-Profil, Region und Modell in .env an deinen Zugang anpassen.
+uv run python -m app
 ```
 
-Git contains source code, tests, documentation, example assets and dependency lockfiles.
-Jobs, databases, crawled content and rendered videos in `data/` and `out/` stay local, as do
-generated demo music, installed dependencies, caches, `.env` files and personal editor settings.
-A fresh checkout starts without saved jobs; the app creates its data directory when needed.
-The `spikes/partial_concept.py` experiment requires the crawl and brand extraction commands below first.
+Öffne anschließend **http://127.0.0.1:8000**. Die Einstellungen stehen in
+[`.env.example`](.env.example); AWS-Anmeldedaten werden über die übliche AWS-Konfiguration bereitgestellt.
+
+Lass die Anwendung während der Verarbeitung laufen. Jobs werden nacheinander ausgeführt;
+ein Neuladen der Seite unterbricht sie nicht. Nach einem Neustart bleiben abgeschlossene
+Jobs und gespeicherte Vorschauen erhalten. Unterbrochene Arbeit startet nicht automatisch neu.
+
+### Daten und Betriebsmodell
+
+Der Stand auf `main` ist eine lokale Einzelbenutzer-Anwendung. Betreibe sie auf dem eigenen
+Rechner und mache sie nicht öffentlich zugänglich. Nutzerverwaltung und verschlüsselte
+Arbeitsbereiche sind noch nicht Bestandteil dieses Branches.
+
+Jobs, Website-Inhalte und Renderings liegen lokal in `data/` beziehungsweise `out/` und sind
+von Git ausgeschlossen. Für die KI-Verarbeitung werden ausgewählte Inhalte an AWS Bedrock
+übermittelt. Die Demo oben ist bewusst als separate Kopie unter [`assets/readme/`](assets/readme/)
+versioniert und bleibt auch beim Löschen des ursprünglichen Jobs erhalten.
+
+### Technik und Weiterentwicklung
+
+Python, FastAPI und HTMX bilden die Anwendung; LangChain/LangGraph steuern die Generierung
+über AWS Bedrock. HTML/CSS und GSAP liefern die Animation, Playwright und FFmpeg die Videos.
 
 ```bash
-uv run python -m app.harness examples/they data/sites/they      # build a composition into a site
-uv run python -m app.checks.runtime data/sites/they             # contract / determinism / readability / layout
-uv run python -m app.render.job data/sites/they data/renders/they   # music + 4:5 + 9:16 MP4
+uv run pytest                                   # ohne Live-Bedrock-Aufrufe
+uv run pytest tests/test_web.py -m browser -q    # UI-Prüfungen mit Chromium
 ```
+
+- [Bedienung, CLI und Entwicklung](docs/usage.md)
+- [Weboberfläche und Review-Ablauf](docs/phase4-ui.md)
+- [Kompositionsvertrag](docs/harness-contract.md) und [Pipeline](docs/phase3-pipeline.md)
+- [Ursprüngliche Demo: they consulting](docs/original-demo.md)
+- [Projektplan](docs/PLAN.md) und [Beitragsrichtlinien](AGENTS.md)
+
+---
+
+## English
+
+**Your website. Your brand. Your video.**
+
+Kiehnema turns a website into animated social videos that match its brand.
+The app reads content, colors, fonts and images, develops a storyboard and creates an
+animated preview. You review and edit the result before the final videos are rendered.
+The video above uses Kiehnema itself as the example.
+
+### From URL to finished video
+
+1. **Enter a website and brief.** Set the URL, video length and creative direction.
+2. **Develop the brand and story.** Kiehnema analyzes the website and generates a brand overview, storyboard and animation.
+3. **Shape the preview.** Watch both formats, change scene copy, order and duration, add comments or contribute visual ideas using text and images.
+4. **Approve and download.** **Approve & render** produces both MP4s with music. **Continue editing** lets you return to the video later.
+
+| Output | Resolution | Designed for |
+|---|---|---|
+| Feed · 4:5 | 1080 × 1350 | LinkedIn and Instagram feeds |
+| Story · 9:16 | 1080 × 1920 | Reels and Stories |
+
+Both formats export at 30 fps with H.264 video and AAC stereo audio. The interface is in English.
+
+### Run locally
+
+You need Python 3.13+, `uv`, Node.js/npm and AWS credentials with access to the configured
+Bedrock model. Model calls incur charges in your AWS account.
 
 ```bash
-uv run python -m app.crawl https://www.example.com/ data/crawls/x    # crawl (SSRF-guarded)
-uv run python -m app.brand.extract data/crawls/x data/brands/x       # brand kit
-uv run python -m app.brand.board data/brands/x                       # brand board PNG
+uv sync
+npm install
+uv run playwright install chromium
+cp .env.example .env
+# Adjust the AWS profile, region and model in .env for your account.
+uv run python -m app
 ```
 
-After rendering, **Continue editing** reopens the same video in the scene, comment and
-advanced editor without a model call. The last MP4s remain available under **Last rendered videos**
-until the next render replaces them.
+Then open **http://127.0.0.1:8000**. Settings are listed in
+[`.env.example`](.env.example); AWS credentials use the standard AWS configuration.
 
-Local website URLs such as `http://127.0.0.1:8000/`, `http://localhost:3000/` and
-`http://[::1]:8000/` also work in the form and CLI. The source must be reachable from
-the computer running Kiehnema. Only the entered local scheme, host and port are
-allowed for pages and assets; other local services, private networks and cloud metadata
-remain blocked, including redirects from public websites.
+Keep the app running while it processes jobs. Jobs run sequentially; reloading the page
+does not interrupt them. Completed jobs and saved previews survive an app restart.
+Interrupted work does not restart automatically.
+
+### Data and deployment
+
+The version on `main` is a local, single-user app. Run it on your own machine and do not
+expose it publicly. User management and encrypted workspaces are not yet part of this branch.
+
+Jobs, website content and renders are stored locally in `data/` or `out/` and excluded from Git.
+Selected content is sent to AWS Bedrock for AI processing. The demo above is deliberately
+versioned as a separate copy in [`assets/readme/`](assets/readme/), so it remains available
+even if the original job is deleted.
+
+### Technology and development
+
+Python, FastAPI and HTMX power the app; LangChain/LangGraph orchestrate generation through
+AWS Bedrock. HTML/CSS and GSAP provide the animation, while Playwright and FFmpeg produce the videos.
 
 ```bash
-uv run python -m app.pipeline start https://www.example.com/ --duration 30 --description "..."   # until review
-uv run python -m app.pipeline resume <job_id> --approve                                        # render MP4s
+uv run pytest                                   # no live Bedrock calls
+uv run pytest tests/test_web.py -m browser -q    # Chromium UI checks
 ```
 
-Plan and phase status: `docs/PLAN.md`.
-
-Status: Phases 0–3 done – see `docs/phase0-spike.md`, `docs/harness-contract.md`, `docs/phase2-crawl.md`,
-`docs/phase3-pipeline.md`.
-
-Phase 4's English UI is implemented: open `http://127.0.0.1:8000`, enter a website and brief, review
-the brand board, both animation formats and sourced copy, then **Approve & render** to get both MP4s.
-Existing jobs appear in the workspace automatically. Keep the app running while jobs work;
-page reloads are safe. Jobs run one at a time. Restarting the app preserves finished/review jobs
-and marks unfinished work as interrupted without automatically spending more on model calls.
-
-Implementation and test status: `docs/phase4-ui.md`. Browser checks use a temporary local server
-and scripted generation; they do not call Bedrock.
-
-```bash
-uv run pytest tests/test_web.py -m 'not browser' -q  # web routes, no browser or Bedrock
-uv run pytest tests/test_web.py -m browser -q        # full UI smoke in Chromium, no Bedrock
-```
-
-The review timeline seeks both formats to the selected moment. Write a comment, choose its format,
-and **Confirm comment** to save it; markers and the comment list let you edit or delete it later.
-Confirmed comments survive reloads. The Comments tab shares the editor beside the preview.
-While commenting, scrubbing updates the draft timestamp without clearing its text; the preview
-and timeline stay visible, with compact sticky controls on mobile. Scene text, visual direction, duration and order can be edited
-in the selected scene editor beside the preview (below the timeline on mobile). Select a frame
-or use the previous/next buttons to switch scenes; playback keeps the editor on your selection.
-Edited scenes are marked in the filmstrip, and timing changes show the proposed sequence.
-These scene edits are drafts until **Revise preview**; leaving the page warns
-about unsaved drafts. The original preview and its comment times remain unchanged until revision.
-The **Advanced** tab turns one paused frame into a visual direction: add text boxes, drop or upload
-PNG/JPEG/WebP images (up to 10 MB), drag elements, and move layers forward or backward. Double-click
-new text to type on the frame; existing artwork moves as groups. Pull the selection's corners or
-edges to resize; corners preserve image and artwork proportions. **Remove** also hides existing
-artwork and requests its removal from both formats on revision, including any contained text.
-Select any element to add a **Comment on this element**; the comment stays attached to its element
-and is sent with the frame idea on revision. Commented elements are marked in Layers.
-**Undo** restores a removed element; **Reset changes** clears an existing element's edits and comment.
-The frame stays visible while
-editing properties. Each scene can have one draft per reference format, with Undo for recent changes.
-These drafts stay on the page until revision. AI receives the exact new text and uploaded images,
-plus approximate positions and layer order, and integrates them with the brand and animation in
-both formats. These are creative references, not fixed overlays or pixel-exact placement.
-**Revise preview** submits scene edits, frame ideas, confirmed comments and general feedback together. The next
-preview starts with a fresh comment list; submitted comments remain in the job's review checkpoint.
-
-Capture a running local page for frontend inspection (no model calls):
-
-```bash
-uv run python -m app.web.screenshot http://127.0.0.1:8000/jobs/<job_id> --out out/screenshots/review.png --time 7.1
-uv run python -m app.web.screenshot http://127.0.0.1:8000/jobs/<job_id> --out out/screenshots/mobile.png --width 390
-# Optional: --selector .timeline-editor for a cropped screenshot.
-```
-
-The command waits for fonts, images and video previews, and writes a PNG plus a JSON report of
-browser errors, horizontal overflow and broken page images. `--time` seeks both review previews;
-omit it on other pages. Screenshots and their reports under `out/` remain outside Git.
+- [Usage, CLI and development](docs/usage.md)
+- [Web interface and review workflow](docs/phase4-ui.md)
+- [Composition contract](docs/harness-contract.md) and [pipeline](docs/phase3-pipeline.md)
+- [Original demo: they consulting](docs/original-demo.md)
+- [Project plan](docs/PLAN.md) and [contributor guidelines](AGENTS.md)
