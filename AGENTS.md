@@ -1,0 +1,34 @@
+# Repository Guidelines
+
+## Project Structure & Module Organization
+
+Kiehnema turns websites into branded motion graphics with human review. Python source lives in `app/`: `crawl/` fetches content, `brand/` extracts branding, `pipeline/` orchestrates generation, `harness/` builds compositions, and `render/` produces videos. `web/` serves the FastAPI UI; `static/` holds frontend assets. Supporting modules include `llm/`, `music/`, and `checks/`.
+
+Tests and fixtures live in `tests/`. `examples/they/` contains a sample composition; `assets/` holds demo assets. Architecture and composition contracts are documented in `docs/`. Root JavaScript, HTML, and CSS files implement the original video demo. Generated jobs and renders belong in ignored `data/` and `out/` directories.
+
+## Build, Test, and Development Commands
+
+- `uv sync` — install Python dependencies (Python 3.13+).
+- `uv run playwright install chromium` — install the browser used for crawling and rendering.
+- `uv run python -m app` — serve the app at `http://127.0.0.1:8000`.
+- `uv run pytest` — run the test suite; live Bedrock tests are skipped by default.
+- `uv run pytest tests/test_web.py -m browser -q` — run Chromium UI checks without Bedrock calls.
+- `uv run python -m app.harness examples/they data/sites/they` — build the example composition.
+- `npm install`, then `npm run preview` — install demo dependencies and preview on port 5173.
+- `npm run render` — generate demo music and both video formats in `out/`.
+
+## Coding Style & Naming Conventions
+
+Follow surrounding code: four-space Python indentation, `snake_case` functions and modules, `PascalCase` classes, and type hints where appropriate. JavaScript uses ES modules, two-space indentation, and camelCase names. No formatter or linter is configured. Reuse existing helpers and keep changes focused. Follow `docs/harness-contract.md` when changing compositions.
+
+## Testing Guidelines
+
+Use pytest and pytest-asyncio; name files `test_*.py` and functions `test_*`. Reuse fixtures in `tests/conftest.py` and temporary directories for generated files. Add regression tests for behavior changes. No coverage threshold is configured. Enable `MG_LIVE_BEDROCK=1` only intentionally: it makes real, potentially billable model calls.
+
+## Commit & Pull Request Guidelines
+
+Recent commits mostly use `feat:` and `chore:` prefixes with imperative summaries. Follow that pattern. PRs should explain the behavior change, include validation commands/results, link relevant issues, and provide screenshots for UI changes.
+
+## Security & Configuration
+
+Use `.env.example` for local `MG_` settings. Keep credentials, `.env`, databases, crawled content, and rendered videos out of Git. Preserve crawler URL guards and human approval before final rendering.
