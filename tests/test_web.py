@@ -657,3 +657,236 @@ async def live_web(review_job):
         server.should_exit = True
         await task
         sock.close()
+
+
+def design_draft(**overrides):
+    element = {"id": "note-1", "kind": "text", "text": "A better idea", "x": .2, "y": .3,
+               "width": .5, "height": .2, "layer": 3, **overrides}
+    return {"frames": [{"scene_id": "s-hook", "format": "feed", "time": 1, "elements": [element]}]}
+
+
+def test_advanced_images_and_review_validation(review_job, client, monkeypatch):
+    import io
+    from PIL import Image
+
+    form = review_form(client)
+    headers = {"X-Preview-Revision": form["revision"]}
+    image = io.BytesIO()
+    Image.new("RGB", (50, 30), "orange").save(image, "PNG")
+    response = client.post(f"/jobs/{JOB}/design-assets", content=image.getvalue(), headers=headers)
+    assert response.status_code == 200
+    asset = response.json()["asset"]
+    assert (review_job / "review-assets" / asset).is_file()
+    assert client.get(f"/preview/{JOB}/assets/user/{asset}").status_code == 200
+    assert client.get(f"/jobs/{JOB}/files/review-assets/{asset}").status_code == 200
+    invalid_image = client.post(f"/jobs/{JOB}/design-assets", content=b'<svg onload="alert(1)"></svg>', headers=headers)
+    assert invalid_image.status_code == 422 and 'valid PNG' in invalid_image.json()['detail']
+    assert client.post(f"/jobs/{JOB}/design-assets", content=b'x' * (10 * 1024 * 1024 + 1), headers=headers).status_code == 413
+    assert client.post(f"/jobs/{JOB}/design-assets", content=image.getvalue(), headers={**headers, "Origin": "null"}).status_code == 403
+    assert client.post(f"/jobs/{JOB}/design-assets", content=image.getvalue(), headers={"X-Preview-Revision": "old"}).status_code == 409
+    captured = []
+    monkeypatch.setattr("app.web.main.enqueue", lambda job_id, decision: captured.append(decision))
+    for invalid in (design_draft(x=float('nan')), design_draft(text=''), design_draft(removed=True), design_draft(comment='x' * 2001),
+                    design_draft(kind='existing', selector='#s-hook > :nth-child(1)', removed=True, text_ids=['unrelated-text']),
+                    design_draft(kind='image', asset='../secret.png'),
+                    design_draft(kind='image', asset='a' * 32 + '.png'), {"frames": [{**design_draft()['frames'][0], 'scene_id': 'missing'}]}):
+        response = client.post(f"/jobs/{JOB}/review", data={**form, "action": "revise", "advanced": json.dumps(invalid)})
+        assert response.status_code == 422
+    valid = design_draft()
+    valid['frames'][0]['elements'].append({**valid['frames'][0]['elements'][0], 'id': 'image-1', 'kind': 'image', 'asset': asset, 'text': ''})
+    response = client.post(f"/jobs/{JOB}/review", data={**form, "advanced": json.dumps(valid)})
+    assert response.status_code == 422 and 'unapplied changes' in response.text
+    assert 'A better idea' in response.text
+    assert not captured
+    response = client.post(f"/jobs/{JOB}/review", data={**form, "action": "revise", "advanced": json.dumps(valid)})
+    assert response.status_code == 200
+    assert captured[0]['design']['frames'][0]['elements'][1]['asset'] == asset
+
+
+@pytest.mark.browser
+async def test_advanced_editor_drag_layers_images_and_revision(review_job, monkeypatch, live_web, tmp_path):
+    import io
+    from PIL import Image
+    from playwright.async_api import async_playwright, expect
+
+    # Deletion validates contained text IDs against the storyboard, including the example's artwork.
+    concept = json.loads((review_job / 'concept.json').read_text())
+    concept['scenes'][0]['texts'] += [
+        {'id': tid, 'role': 'label', 'text': copy} for tid, copy in [
+            ('hook-question', 'Noch ein KI-Prototyp für die Schublade?'),
+            ('hook-answer', 'Nicht bei uns.'), ('hook-sub', 'Wir entwickeln KI, die im Tagesgeschäft wirkt.')]]
+    (review_job / 'concept.json').write_text(json.dumps(concept))
+    captured = []
+    monkeypatch.setattr("app.web.main.enqueue", lambda job_id, decision: captured.append(decision))
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        page = await browser.new_page(viewport={"width": 1440, "height": 1000})
+        errors = []
+        page.on('pageerror', lambda error: errors.append(str(error)))
+        await page.goto(f'{live_web}/jobs/{JOB}')
+        await page.locator('#advanced-tab').click()
+        await page.locator('#design-layers button').first.wait_for()
+        await expect(page.locator('#timeline-play')).to_be_disabled()
+        frame = page.frame_locator('iframe.preview.feed')
+        async def resize_handle(edge, dx, dy):
+            handle = frame.locator(f'[data-resize="{edge}"]')
+            box = await handle.bounding_box()
+            await page.mouse.move(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
+            await page.mouse.down()
+            await page.mouse.move(box['x'] + box['width'] / 2 + dx, box['y'] + box['height'] / 2 + dy, steps=8)
+            await page.mouse.up()
+        await page.locator('#design-add-text').click()
+        await page.locator('#design-text').fill('Make it memorable')
+        note = frame.locator('[data-design-id]').first
+        await expect(note).to_have_text('Make it memorable')
+        await note.dblclick()
+        await page.keyboard.press('Meta+a')
+        await page.keyboard.insert_text('Make it memorable')
+        await expect(note).to_have_attribute('contenteditable', 'plaintext-only')
+        await page.locator('#design-status').click()
+        await page.locator('iframe.preview.feed').scroll_into_view_if_needed()
+        before = await note.bounding_box()
+        await resize_handle('e', 35, 0)
+        await page.wait_for_function("() => JSON.parse(document.querySelector('#advanced-draft').value).frames[0].elements[0].width > .55")
+        resized = await note.bounding_box()
+        assert resized['width'] == pytest.approx(before['width'] + 35, abs=2)
+        assert resized['height'] == pytest.approx(before['height'], abs=2)
+        box = await note.bounding_box()
+        await page.mouse.move(box['x'] + 20, box['y'] + 20)
+        await page.mouse.down()
+        await page.mouse.move(box['x'] + 80, box['y'] + 65, steps=8)
+        await page.mouse.up()
+        await page.wait_for_function("() => JSON.parse(document.querySelector('#advanced-draft').value).frames[0].elements[0].x > .2")
+        moved = json.loads(await page.locator('#advanced-draft').input_value())
+        await page.locator('#design-back').click()
+        await page.wait_for_function("() => JSON.parse(document.querySelector('#advanced-draft').value).frames[0].elements.some(e => e.kind === 'existing')")
+        # Undo restores both layers, then existing artwork can be moved independently.
+        await page.locator('#design-undo').click()
+        await page.locator('#design-layers button').last.click()
+        await page.locator('#design-geometry summary').click()
+        await page.locator('#design-x').fill('12')
+        await expect(page.locator('#design-reset')).to_be_visible()
+        await page.locator('iframe.preview.feed').scroll_into_view_if_needed()
+        selected_box = frame.locator('[data-design-selection]')
+        before = await selected_box.bounding_box()
+        await resize_handle('nw', 25, 15)
+        await page.wait_for_function("() => JSON.parse(document.querySelector('#advanced-draft').value).frames[0].elements.some(e => e.kind === 'existing' && e.x > .12)")
+        resized = await selected_box.bounding_box()
+        assert resized['width'] < before['width']
+        assert resized['width'] / resized['height'] == pytest.approx(before['width'] / before['height'], abs=.02)
+        assert resized['x'] + resized['width'] == pytest.approx(before['x'] + before['width'], abs=2)
+        assert resized['y'] + resized['height'] == pytest.approx(before['y'] + before['height'], abs=2)
+        resized_existing = next(e for e in json.loads(await page.locator('#advanced-draft').input_value())['frames'][0]['elements'] if e['kind'] == 'existing')
+        await page.locator('#design-undo').click()
+        await page.locator('#design-layers button').last.click()
+        assert (await selected_box.bounding_box())['width'] == pytest.approx(before['width'], abs=2)
+        await resize_handle('nw', 25, 15)
+        image = io.BytesIO()
+        Image.new('RGB', (60, 40), 'orange').save(image, 'PNG')
+        await page.locator('#design-image').set_input_files({'name': 'idea.png', 'mimeType': 'image/png', 'buffer': image.getvalue()})
+        await expect(page.locator('#design-status')).to_contain_text('Image added')
+        await expect(frame.locator('img[data-design-id]')).to_have_count(1)
+        # Dropped files follow the same upload path, with frame-relative positioning.
+        await frame.locator('#stage').evaluate("""(stage, bytes) => {
+          const transfer = new DataTransfer();
+          transfer.items.add(new File([new Uint8Array(bytes)], 'drop.png', {type: 'image/png'}));
+          const box = stage.getBoundingClientRect();
+          stage.dispatchEvent(new DragEvent('drop', {bubbles: true, dataTransfer: transfer,
+            clientX: box.left + box.width * .6, clientY: box.top + box.height * .3}));
+        }""", list(image.getvalue()))
+        await expect(frame.locator('img[data-design-id]')).to_have_count(2)
+        await page.locator('#design-remove').click()
+        await expect(frame.locator('img[data-design-id]')).to_have_count(1)
+        await page.locator('#design-format').select_option('story')
+        await expect(page.locator('iframe.preview.feed')).to_be_hidden()
+        await expect(page.locator('iframe.preview.story')).to_be_visible()
+        await page.locator('#design-format').select_option('feed')
+        await expect(frame.locator('[data-design-id]').first).to_have_text('Make it memorable')
+        await page.locator('#scene-tab').click()
+        await expect(frame.locator('[data-design-id]')).to_have_count(0)
+        await expect(frame.locator('[data-design-selection]')).to_have_count(0)
+        await page.locator('#advanced-tab').click()
+        await expect(frame.locator('[data-design-id]')).to_have_count(2)
+        # Existing elements become removal instructions, survive switching tabs, and support Undo.
+        artwork = frame.locator(resized_existing['selector'])
+        await page.locator('#design-layers button').last.click()
+        await page.locator('#design-remove').click()
+        await expect(artwork).to_be_hidden()
+        await expect(page.locator('#design-status')).to_contain_text('Undo restores it')
+        await page.locator('#scene-tab').click()
+        await expect(artwork).to_be_visible()
+        await page.locator('#advanced-tab').click()
+        await expect(artwork).to_be_hidden()
+        await page.locator('#design-undo').click()
+        await expect(artwork).to_be_visible()
+        await page.locator('#design-layers button').last.click()
+        await page.locator('#design-remove').click()
+        await expect(artwork).to_be_hidden()
+        await page.screenshot(path=str(tmp_path / 'advanced-desktop.png'), full_page=True)
+        await page.set_viewport_size({'width': 390, 'height': 844})
+        assert await page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+        await page.locator('#design-layers').scroll_into_view_if_needed()
+        preview_box = await page.locator('iframe.preview.feed').bounding_box()
+        assert 0 <= preview_box['y'] < 100
+        assert preview_box['y'] + preview_box['height'] < 450
+        await page.get_by_role('button', name='Revise preview').click()
+        await page.wait_for_url(f'{live_web}/jobs/{JOB}')
+        assert captured and len(captured[0]['design']['frames']) == 1
+        elements = captured[0]['design']['frames'][0]['elements']
+        assert {e['kind'] for e in elements} == {'existing', 'text', 'image'}
+        assert next(e for e in elements if e['kind'] == 'text')['text'] == 'Make it memorable'
+        assert next(e for e in elements if e['kind'] == 'text')['x'] == moved['frames'][0]['elements'][0]['x']
+        assert next(e for e in elements if e['kind'] == 'existing')['width'] == pytest.approx(resized_existing['width'], abs=.01)
+        assert next(e for e in elements if e['kind'] == 'existing')['removed'] is True
+        assert not errors
+        await browser.close()
+
+
+@pytest.mark.browser
+async def test_advanced_element_comment_stays_with_selection(review_job, monkeypatch, live_web):
+    from playwright.async_api import async_playwright, expect
+
+    captured = []
+    monkeypatch.setattr('app.web.main.enqueue', lambda job_id, decision: captured.append(decision))
+    comment = 'Round this drawer’s corners and make its entrance slower.'
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        page = await browser.new_page(viewport={'width': 1440, 'height': 1000})
+        errors = []
+        page.on('pageerror', lambda error: errors.append(str(error)))
+        await page.goto(f'{live_web}/jobs/{JOB}')
+        await page.locator('#advanced-tab').click()
+        frame = page.frame_locator('iframe.preview.feed')
+        await frame.locator('.drawer-scene').click()
+        await expect(page.locator('#design-comment-target')).to_contain_text('KI-Prototyp')
+        await page.locator('#design-comment').fill(comment)
+        await expect(page.locator('#design-layers button').filter(has_text='KI-Prototypv0.1')).to_contain_text('Comment')
+        await page.locator('#design-comment').fill('')
+        await page.locator('#design-undo').click()
+        await page.locator('#design-layers button').filter(has_text='KI-Prototypv0.1').click()
+        await expect(page.locator('#design-comment')).to_have_value(comment)
+        # An animated element's comment survives a seek where the artwork is invisible.
+        await page.locator('#timeline-position').fill('0')
+        await page.locator('#design-add-text').click()
+        await expect(page.locator('#design-comment')).to_have_value('')
+        await page.locator('#design-comment').fill('Use a lighter font for this new text.')
+        await page.locator('#design-remove').click()
+        await page.locator('#timeline-position').fill('1')
+        await page.locator('#design-format').select_option('story')
+        await page.locator('#design-format').select_option('feed')
+        await frame.locator('.drawer-scene').click()
+        await expect(page.locator('#design-comment')).to_have_value(comment)
+        await page.locator('#scene-tab').click()
+        await page.locator('#advanced-tab').click()
+        await frame.locator('.drawer-scene').click()
+        await expect(page.locator('#design-comment')).to_have_value(comment)
+        await page.get_by_role('button', name='Revise preview').click()
+        await page.wait_for_url(f'{live_web}/jobs/{JOB}')
+        assert len(captured) == 1
+        elements = captured[0]['design']['frames'][0]['elements']
+        assert len(elements) == 1 and elements[0]['kind'] == 'existing'
+        assert elements[0]['comment'] == comment
+        assert elements[0]['selector'].startswith('#s-hook > ')
+        assert 'KI-Prototypv0.1' in elements[0]['label']
+        assert not errors
+        await browser.close()

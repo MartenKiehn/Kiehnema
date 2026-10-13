@@ -301,12 +301,16 @@ def test_composition_includes_all_offered_replacement_images(data_dir, allow_cli
     (brand / 'brand.json').write_text(json.dumps({'theme': {'colors': CONCEPT['palette'], 'fonts': []}, 'images': images}))
     files = {'composition.html': HTML.replace('assets/brand/logo.svg', 'assets/brand/img/replacement.png'),
              'composition.css': CSS, 'composition.js': JS_GOOD}
+    uploads = job / 'review-assets'
+    uploads.mkdir()
+    Image.new('RGB', (20, 20), 'purple').save(uploads / ('a' * 32 + '.png'))
     state = {'job_id': job_id, 'duration': 6, 'allow_client_logos': allow_clients}
     for _ in range(2):  # Rebuilding during a later repair must also keep replacement images.
         assert not _save_files(state, files)
         site = build_site(job / 'composition', job / 'site')
         assert (site / 'assets/brand/img/replacement.png').read_bytes() == (brand / 'img/replacement.png').read_bytes()
         assert (site / 'assets/brand/clients/client.png').exists() == allow_clients
+        assert (site / 'assets/user' / ('a' * 32 + '.png')).read_bytes() == (uploads / ('a' * 32 + '.png')).read_bytes()
 
 
 async def test_reviewer_image_request_survives_automatic_repair(data_dir, monkeypatch):
@@ -337,3 +341,52 @@ async def test_reviewer_image_request_survives_automatic_repair(data_dir, monkey
     state.update(await n_review(state, config))
     assert request not in state['review_requirements']
     assert 'Now change only the heading' in state['review_requirements']
+
+
+async def test_advanced_ideas_reach_model_and_survive_repairs(data_dir, monkeypatch):
+    from PIL import Image
+    from app.pipeline import jobs
+    from app.pipeline.graph import n_review, n_fix
+
+    job_id = jobs.create_job('https://example.com', 6)
+    path = data_dir / 'jobs' / job_id
+    (path / 'concept.json').write_text(json.dumps(CONCEPT))
+    (path / 'review-assets').mkdir()
+    asset = 'a' * 32 + '.png'
+    Image.new('RGB', (30, 20), 'orange').save(path / 'review-assets' / asset)
+    base = {'x': .25, 'y': .3, 'width': .4, 'height': .2, 'layer': 2}
+    decision = {'action': 'feedback', 'text': '', 'design': {'frames': [
+        {'scene_id': 's-proof', 'format': 'story', 'time': 3, 'elements': [
+            {**base, 'id': 'new-caption', 'kind': 'text', 'text': 'Made for your team'},
+            {**base, 'id': 'photo', 'kind': 'image', 'asset': asset, 'comment': 'Give this image a softer entrance.'},
+            {**base, 'id': 'existing-0', 'kind': 'existing', 'selector': '#s-proof > :nth-child(1)',
+             'removed': True, 'text_ids': ['proof-title']}]}]}}
+    monkeypatch.setattr('app.pipeline.graph.interrupt', lambda value: decision)
+    state = {'job_id': job_id, 'duration': 6}
+    llm = FakeLLM({'fix': [FIX_LINT]})
+    config = {'configurable': {'llm': llm}}
+    state.update(await n_review(state, config))
+    concept = json.loads((path / 'concept.json').read_text())
+    assert concept['scenes'][1]['texts'][-1]['id'] == 'design-new-caption'
+    assert concept['scenes'][1]['texts'][-1]['text'] == 'Made for your team'
+    assert not any(t['id'] == 'proof-title' for t in concept['scenes'][1]['texts'])
+    assert concept['scenes'][0]['texts'] == CONCEPT['scenes'][0]['texts']
+    monkeypatch.setattr('app.pipeline.graph._compose_context', lambda state: {'concept': concept, 'theme': {}, 'assets': []})
+    monkeypatch.setattr('app.pipeline.graph._files', lambda state: {'composition.js': JS_BAD})
+    monkeypatch.setattr('app.pipeline.graph._save_files', lambda state, files: [])
+    for _ in range(2):
+        state.update(await n_fix(state, config))
+        state['problems'] = 'Repair animation timing'
+        prompt = llm.calls[-1][1][1].content
+        assert prompt[2]['type'] == 'image'
+        assert 'assets/user/' + asset in prompt[1]['text']
+        assert 'NOT strict coordinates' in prompt[0]['text']
+        assert 'entrance/exit animation' in prompt[0]['text']
+        assert 'Made for your team' in prompt[0]['text']
+        assert 'BOTH formats' in prompt[0]['text']
+        assert 'DELETE that entire group' in prompt[0]['text']
+        assert 'Do not recreate removed content elsewhere' in prompt[0]['text']
+        assert '"removed":true' in prompt[0]['text']
+        assert 'Give this image a softer entrance.' in prompt[0]['text']
+        assert 'reviewer feedback specifically for that element' in prompt[0]['text']
+        assert 'do not turn the comment into on-screen copy' in prompt[0]['text']

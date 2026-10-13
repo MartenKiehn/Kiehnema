@@ -1,0 +1,28 @@
+<section id="advanced-panel" role="tabpanel" aria-labelledby="advanced-tab" hidden>
+  <div class="section-heading"><h3>Shape your idea.</h3><button type="button" class="button secondary small" id="design-undo" disabled>Undo</button></div>
+  <p class="help">Arrange text, images and existing artwork on a paused frame. AI refines your layout and animation for both formats when you revise.</p>
+  <label for="design-format">Reference format</label>
+  <select id="design-format"><option value="feed">4:5 · Feed</option><option value="story">9:16 · Story</option></select>
+  <div class="actions design-tools"><button type="button" class="button small" id="design-add-text">+ Text box</button><button type="button" class="button secondary small" id="design-add-image">+ Image</button><input hidden id="design-image" type="file" accept="image/png,image/jpeg,image/webp"></div>
+  <p class="help">Drop an image onto the frame, or choose Image. PNG, JPEG or WebP · up to 10 MB.</p>
+  <p id="design-status" class="help" role="status" aria-live="polite">Select an element on the frame or in Layers.</p>
+  <div id="design-properties" hidden>
+    <label for="design-comment">Comment on this element <span class="optional">optional</span></label>
+    <p class="help" id="design-comment-target"></p>
+    <textarea id="design-comment" rows="3" maxlength="2000" aria-describedby="design-comment-target design-comment-help" placeholder="Use softer edges and a slower entrance…"></textarea>
+    <p class="help" id="design-comment-help">Included with this element when you choose Revise preview.</p>
+    <label for="design-text">Text</label><textarea id="design-text" rows="3" maxlength="500"></textarea>
+    <details id="design-geometry"><summary>Size &amp; position</summary>
+    <div class="field-row"><div><label for="design-x">Left <span class="optional">%</span></label><input type="number" id="design-x" min="-90" max="95" step="1"></div><div><label for="design-y">Top <span class="optional">%</span></label><input type="number" id="design-y" min="-90" max="95" step="1"></div></div>
+    <div id="design-size"><div class="field-row"><div><label for="design-width">Width <span class="optional">%</span></label><input type="number" id="design-width" min="5" max="300" step="1"></div><div><label for="design-height">Height <span class="optional">%</span></label><input type="number" id="design-height" min="3" max="300" step="1"></div></div></div>
+    </details>
+    <div class="field-row" id="design-type"><div><label for="design-font-size">Text size</label><input id="design-font-size" type="number" min="24" max="180" step="2"></div><div><label for="design-color">Colour</label><input id="design-color" type="color" value="#ffffff"></div></div>
+    <div class="actions"><button type="button" class="button secondary small" id="design-back">↓ Backward</button><button type="button" class="button secondary small" id="design-forward">↑ Forward</button><button type="button" class="button secondary small" id="design-remove">Remove</button><button type="button" class="button secondary small" id="design-reset" hidden>Reset changes</button></div>
+  </div>
+  <h3 class="design-layer-title">Layers <span class="optional">front to back</span></h3>
+  <div id="design-layers" class="design-layers" role="group" aria-label="Frame layers"></div>
+  <p class="help">Drag to move; pull a handle to resize. Corners keep images and artwork proportional. Use arrow keys for small adjustments. Double-click a new text box to type on the frame.</p>
+  <div id="design-drafts" hidden><h3>Frame ideas</h3><div id="design-frames" class="actions"></div></div>
+  <p class="help">Drafts stay on this page until you choose Revise preview.</p>
+</section>
+<input type="hidden" id="advanced-draft" name="advanced" value="{{ advanced_draft|default('{\"frames\":[]}') }}">

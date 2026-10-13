@@ -391,3 +391,42 @@ main:has(#review-workspace) { max-width: 1360px; padding-top: 28px; }
   .comment-mode .timeline-range { margin: 0; }
   .comment-mode .scene-inspector { margin-top: 0; border-top: 0; padding-top: 0; }
 }
+
+/* Advanced ideas use one larger paused frame, with the same timeline and inspector. */
+.advanced-mode .preview-grid { grid-template-columns: 1fr; }
+.advanced-mode .studio-preview .preview { height: clamp(260px, 48dvh, 560px); }
+.advanced-mode .studio-preview > .help { display: none; }
+.advanced-mode .studio-monitor { position: sticky; top: 16px; }
+.advanced-mode #timeline-play, .advanced-mode #comment-here { display: none; }
+.advanced-mode .timeline-editor { margin-top: 12px; padding-top: 12px; }
+.advanced-mode .timeline-editor > .section-heading { display: none; }
+.advanced-mode .timeline-transport { margin: 0; }
+.advanced-mode .timeline-transport::before { content: 'Reference frame'; color: var(--muted); font-size: .8125rem; }
+#advanced-panel > select { margin-bottom: 14px; }
+#advanced-panel .section-heading { margin-bottom: 12px; }
+#advanced-panel .help { font-size: .8125rem; }
+.design-tools { margin-bottom: 8px; }
+.design-tools label { margin: 0; }
+#design-properties .field-row > div { min-width: 0; }
+#design-properties { padding: 16px; margin: 18px 0; background: var(--paper); border-radius: 5px; }
+#design-properties .field-row { gap: 12px; margin-bottom: 12px; }
+#design-properties textarea { margin-bottom: 12px; }
+#design-properties input[type=color] { height: 45px; padding: 5px; }
+#design-geometry { margin-bottom: 14px; }
+#design-geometry summary { margin-bottom: 12px; font-size: .8125rem; }
+.design-layer-title { font-size: 16px; margin: 20px 0 10px; }
+.design-layer-title .optional { font-size: .8125rem; }
+.design-layers { display: grid; gap: 5px; max-height: 220px; overflow: auto; padding: 3px; }
+.design-layer { display: block; width: 100%; border: 1px solid var(--line); border-radius: 4px; padding: 9px 12px; background: var(--white); color: var(--ink); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.design-layer[aria-pressed=true] { border-color: #886334; background: #f7edd8; }
+@media (max-width: 900px) {
+  .advanced-mode .studio-monitor { top: 0; z-index: 3; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .advanced-mode .studio-preview .preview { height: clamp(150px, 28dvh, 260px); }
+  .advanced-mode .studio-preview h3 { margin-bottom: 5px; }
+  .advanced-mode .timeline-editor { margin-top: 8px; padding-top: 0; border: 0; }
+  .advanced-mode .timeline-frames, .advanced-mode .timeline-scale, .advanced-mode #comment-markers { display: none; }
+  .advanced-mode .timeline-range { margin: 0; }
+  .advanced-mode .scene-inspector { margin-top: 0; padding-top: 12px; border: 0; }
+  .advanced-mode #advanced-panel input, .advanced-mode #advanced-panel textarea, .advanced-mode #advanced-panel select { scroll-margin-top: calc(clamp(150px, 28dvh, 260px) + 95px); }
+  .inspector-tabs { gap: 16px; }
+}

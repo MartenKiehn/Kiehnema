@@ -13,7 +13,7 @@ from urllib.parse import urlsplit
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import AnyHttpUrl, BaseModel, Field, ValidationError
@@ -22,6 +22,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from app.crawl.guard import UrlGuard
 from app.pipeline import jobs
 from app.pipeline.schemas import SceneChange
+from app.pipeline.design import DesignDraft
 from app.pipeline.status import write_status
 from app.web.insights import job_insights
 from app.web.review import CommentRequest, saved_comments, save_comments
@@ -230,6 +231,12 @@ async def review(request: Request, job_id: str):
     action = form.get("action")
     comments = saved_comments(path, context["revision"])
     scenes = context["concept"].get("scenes", [])
+    design_raw = str(form.get("advanced", '{"frames":[]}'))
+    design = DesignDraft()
+    try:
+        design = DesignDraft.model_validate_json(design_raw).validate_context(scenes, path)
+    except (ValueError, ValidationError):
+        error = "Check the advanced frame ideas: use this preview’s scenes, nonempty text and uploaded images."
     scene_changes = []
     scene_draft = {}
     order = submitted.getlist("scene-order")
@@ -250,17 +257,17 @@ async def review(request: Request, job_id: str):
                                      "visual": form.get(f"scene-visual:{s['id']}", s["visual"])} for s in scenes}
     if draft.keys() != texts.keys() or any(not v or len(v) > 500 for v in draft.values()) or len(feedback) > 4000:
         error = "Keep every text between 1 and 500 characters and feedback under 4,000 characters."
-    elif action == "approve" and (edits or feedback or comments or scene_changes):
+    elif action == "approve" and (edits or feedback or comments or scene_changes or design.frames):
         error = "You have unapplied changes. Choose Revise preview, then review the updated version before approving."
     elif action == "approve" and not context["can_approve"]:
         error = "Automatic checks still report errors. Request a revision before rendering."
-    elif action == "revise" and not edits and not feedback and not comments and not scene_changes:
+    elif action == "revise" and not edits and not feedback and not comments and not scene_changes and not design.frames:
         error = error or "Edit a scene, confirm a timeline comment or add feedback to request a revision."
     elif action not in {"approve", "revise"}:
         error = "Choose Revise preview or Approve & render."
     if error:
         return templates.TemplateResponse(request, "job.html", {**context, "error": error, "draft": draft, "feedback": feedback,
-                                          "scene_draft": scene_draft,
+                                          "scene_draft": scene_draft, "advanced_draft": design_raw,
                                           "edit_scenes": sorted(scenes, key=lambda s: order.index(s["id"]))
                                           if len(order) == len(scenes) and set(order) == {s["id"] for s in scenes} else scenes}, status_code=422)
     decision = {"action": "approve"} if action == "approve" else (
@@ -269,6 +276,8 @@ async def review(request: Request, job_id: str):
         decision["comments"] = comments
     if scene_changes:
         decision["scenes"] = scene_changes
+    if design.frames:
+        decision["design"] = design.model_dump()
     enqueue(job_id, decision)
     return RedirectResponse(f"/jobs/{job_id}", status_code=303)
 
@@ -301,6 +310,40 @@ async def review_comment(job_id: str, data: CommentRequest):
     return {"comments": comments}
 
 
+@app.post("/jobs/{job_id}/design-assets")
+async def upload_design_asset(request: Request, job_id: str):
+    import io
+    from PIL import Image, ImageOps, UnidentifiedImageError
+
+    path = job_path(job_id)
+    if job_id in app.state.tasks or job_summary(path)["status"] != "review" or request.headers.get("x-preview-revision") != revision(path):
+        raise HTTPException(409, "This preview has changed. Reload before uploading images.")
+    folder = path / "review-assets"
+    if len(list(folder.glob("*.png"))) >= 40:
+        raise HTTPException(422, "This job already has 40 uploaded images.")
+    content = bytearray()
+    async for chunk in request.stream():
+        content.extend(chunk)
+        if len(content) > 10 * 1024 * 1024:
+            raise HTTPException(413, "Choose an image smaller than 10 MB.")
+    try:
+        with Image.open(io.BytesIO(content)) as source:
+            if source.format not in {"PNG", "JPEG", "WEBP"} or source.width * source.height > 20_000_000:
+                raise ValueError("Unsupported image")
+            source.seek(0)
+            image = ImageOps.exif_transpose(source).convert("RGBA")
+            image.thumbnail((2048, 2048))
+    except (ValueError, OSError, UnidentifiedImageError, Image.DecompressionBombError):
+        raise HTTPException(422, "Use a valid PNG, JPEG or WebP image, up to 20 megapixels.")
+    # The streamed request may overlap a revision; recheck before saving.
+    if job_id in app.state.tasks or request.headers.get("x-preview-revision") != revision(path):
+        raise HTTPException(409, "The preview changed during upload. Reload and try again.")
+    folder.mkdir(exist_ok=True)
+    name = uuid4().hex + ".png"
+    image.save(folder / name, "PNG")
+    return {"asset": name, "width": image.width, "height": image.height}
+
+
 @app.get("/jobs/{job_id}/delete", response_class=HTMLResponse)
 async def confirm_delete(request: Request, job_id: str):
     return templates.TemplateResponse(request, "delete.html", {"job": job_summary(job_path(job_id))})
@@ -329,7 +372,7 @@ def confined_file(root: Path, name: str) -> Path:
 
 @app.get("/jobs/{job_id}/files/{name:path}")
 async def artifact(job_id: str, name: str, download: bool = False):
-    if not (name == "brand/board.png" or re.fullmatch(r"keyframes/r\d+/(feed|story)-[\d.]+s\.png", name)
+    if not (re.fullmatch(r"review-assets/[a-f0-9]{32}\.png", name) or name == "brand/board.png" or re.fullmatch(r"keyframes/r\d+/(feed|story)-[\d.]+s\.png", name)
             or re.fullmatch(r"renders/(feed-1080x1350|story-1080x1920)\.mp4", name)):
         raise HTTPException(404, "File not found.")
     path = confined_file(job_path(job_id), name)
@@ -339,13 +382,16 @@ async def artifact(job_id: str, name: str, download: bool = False):
 @app.get("/preview/{job_id}/{name:path}")
 async def preview(request: Request, job_id: str, name: str):
     allowed = (name in {"index.html", "theme.css", "composition/composition.css", "composition/composition.js",
-                        "harness/harness.css", "harness/harness.js", "harness/gsap.min.js"}
+                        "harness/harness.css", "harness/harness.js", "harness/design.js", "harness/gsap.min.js"}
                or name.startswith("assets/") and Path(name).suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".svg", ".woff", ".woff2", ".ttf", ".otf"})
     if not allowed:
         raise HTTPException(404, "Preview file not found.")
-    path = confined_file(job_path(job_id) / "site", name)
-    if name == "harness/harness.js":
-        path = HERE.parent / "harness" / "harness.js"
+    if name in {"harness/harness.js", "harness/design.js"}:
+        path = HERE.parent / name
+    elif re.fullmatch(r"assets/user/[a-f0-9]{32}\.png", name):
+        path = confined_file(job_path(job_id) / "review-assets", Path(name).name)
+    else:
+        path = confined_file(job_path(job_id) / "site", name)
     source = f"{str(request.base_url).rstrip('/')}/preview/{job_id}/"
     return FileResponse(path, headers={
         "Access-Control-Allow-Origin": "*",  # fonts loaded from the iframe's opaque origin
@@ -359,6 +405,8 @@ async def preview(request: Request, job_id: str, name: str):
 
 @app.exception_handler(HTTPException)
 async def http_error(request: Request, exc: HTTPException):
+    if request.url.path.endswith('/design-assets'):
+        return JSONResponse({'detail': exc.detail}, status_code=exc.status_code)
     return templates.TemplateResponse(request, "error.html", {"error": exc.detail}, status_code=exc.status_code)
 
 

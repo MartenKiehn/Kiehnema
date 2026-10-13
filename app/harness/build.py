@@ -127,6 +127,7 @@ def build_site(src: Path, out: Path) -> Path:
     (out / "harness").mkdir(parents=True)
     (out / "composition").mkdir()
     shutil.copy(HERE / "harness.js", out / "harness" / "harness.js")
+    shutil.copy(HERE / "design.js", out / "harness" / "design.js")
     shutil.copy(HERE / "harness.css", out / "harness" / "harness.css")
     shutil.copy(GSAP, out / "harness" / "gsap.min.js")
     for name in ("composition.css", "composition.js"):

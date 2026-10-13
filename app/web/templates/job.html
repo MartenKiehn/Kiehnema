@@ -33,12 +33,14 @@
         <div class="inspector-tabs" role="tablist" aria-label="Review tools">
           <button type="button" id="scene-tab" role="tab" aria-selected="true" aria-controls="scene-panel">Scene</button>
           <button type="button" id="comments-tab" role="tab" aria-selected="false" aria-controls="timeline-comments" tabindex="-1">Comments <span id="confirmed-comment-count">{{ comments|length }}</span></button>
+          <button type="button" id="advanced-tab" role="tab" aria-selected="false" aria-controls="advanced-panel" tabindex="-1">Advanced</button>
         </div>
         <div id="scene-panel" role="tabpanel" aria-labelledby="scene-tab">
         <div class="inspector-heading"><p class="eyebrow">SCENE <span id="selected-scene-number">01</span> / {{ '%02d'|format(concept.scenes|length) }}</p><div class="actions"><button type="button" class="button secondary small" id="scene-previous" aria-label="Previous scene">←</button><button type="button" class="button secondary small" id="scene-next" aria-label="Next scene">→</button></div></div>
         {% include "partials/scenes.html" %}
         </div>
         {% include "partials/comments.html" %}
+        {% include "partials/advanced.html" %}
       </section>
     </div>
     <div class="scene-plan-note"><p id="planned-duration"></p><p class="help">Scene edits are drafts. Choose Revise preview to apply them. Playback and comments use the current preview.</p><div id="planned-order" aria-label="Scene order after revision" hidden></div></div>
@@ -58,4 +60,4 @@
 {% endif %}
 {% if not job.active and not job.poll %}<p class="job-management"><a class="text-link muted" href="/jobs/{{ job.id }}/delete">Delete this job and its files</a></p>{% endif %}
 {% endblock %}
-{% block scripts %}{% if job.status == 'review' %}<script src="/static/review.js" defer></script>{% endif %}{% endblock %}
+{% block scripts %}{% if job.status == 'review' %}<script src="/static/review.js" defer></script><script src="/static/advanced.js" defer></script>{% endif %}{% endblock %}

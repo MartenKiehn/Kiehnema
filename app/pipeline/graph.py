@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import shutil
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, TypedDict
@@ -31,7 +32,8 @@ from app.harness.build import Theme, build_site
 from app.pipeline import prompts
 from app.pipeline.files import COMPOSITION_FILES, apply_edits, parse_files, theme_for, write_composition
 from app.pipeline.llm import LLM, estimate_cost, image_block, messages
-from app.pipeline.schemas import CompanyProfile, Concept, QAReport, SceneChange
+from app.pipeline.schemas import CompanyProfile, Concept, ConceptText, QAReport, SceneChange
+from app.pipeline.design import DesignDraft
 from app.pipeline.status import write_status
 from app.pipeline.verify import lint_composition, validate_concept, verify_profile
 from app.render.job import render_site
@@ -154,6 +156,8 @@ def _compose_context(state: JobState) -> dict:
     assets = _asset_list(brand, state.get("allow_client_logos", False), prefix="assets/brand/")
     if not brand.get("logo") and brand.get("wordmark"):
         assets.append({"kind": "wordmark-text", "note": "no logo image – recreate the brand name typographically", **brand["wordmark"]})
+    assets += [{"file": "assets/user/" + file.name, "kind": "reviewer-image"}
+               for file in sorted((_dir(state) / "review-assets").glob("*.png")) if not file.is_symlink()]
     return {"concept": concept.model_dump(), "theme": theme_vars, "assets": assets}
 
 
@@ -165,6 +169,9 @@ def _save_files(state: JobState, files: dict[str, str]) -> list[str]:
     used = {a["file"] for a in _asset_list(brand, state.get("allow_client_logos", False))}
     write_composition(_dir(state) / "composition", files, concept, state["duration"], _dir(state) / "brand",
                       Theme.model_validate(brand["theme"]), used)
+    uploaded = _dir(state) / "review-assets"
+    if uploaded.is_dir():
+        shutil.copytree(uploaded, _dir(state) / "composition" / "assets" / "user", dirs_exist_ok=True)
     text_ids = {t.id for s in concept.scenes for t in s.texts}
     return lint_composition(files, text_ids)
 
@@ -291,6 +298,13 @@ async def n_fix(state: JobState, config: RunnableConfig) -> dict:
             problems += "\n\nReviewer requirements (still apply throughout this revision):\n" + requirements
     user = prompts.compose_user(**ctx).rsplit("\n\n", 1)[0] + "\n\n" + prompts.fix_user(
         files=files, problems=problems, instruction=instruction)
+    design = state.get("review", {}).get("design", {}).get("frames", [])
+    images = sorted({e["asset"] for frame in design for e in frame["elements"] if e["kind"] == "image"})
+    if images:
+        user = [{"type": "text", "text": user}]
+        for asset in images:
+            user += [{"type": "text", "text": "Reviewer image: assets/user/" + asset},
+                     image_block(_dir(state) / "review-assets" / asset)]
     text = await _llm(config).text(
         "fix", messages(prompts.compose_system(), user), effort="low", max_tokens=48_000,
         on_progress=lambda n: _status(state, "fix", f"Revising the composition (round {rnd}) – {n:,} characters so far"))
@@ -364,6 +378,8 @@ async def n_review(state: JobState, config: RunnableConfig) -> dict:
         return {"review": {"action": "approve"}}
     concept = _concept(state)
     updates = {}
+    design = DesignDraft.model_validate(decision.get("design", {})).validate_context(
+        [scene.model_dump() for scene in concept.scenes], _dir(state))
     if action == "edit":
         edits = decision.get("texts", {})
         problems = "\n".join(f'- text data-text-id="{k}": change the copy to “{v}” (keep its styling)' for k, v in edits.items())
@@ -405,7 +421,32 @@ async def n_review(state: JobState, config: RunnableConfig) -> dict:
         for comment in decision["comments"]:
             problems += (f"\n- At {comment['time']:.3f}s in original scene {comment['scene_id']} "
                          f"({comment['format']} format): {comment['text']}")
-    if action == "edit" or decision.get("scenes"):
+    if design.frames:
+        problems += ("\nAdvanced frame ideas refer to the ORIGINAL scenes and reference format. "
+                     "Treat x/y/width/height as approximate fractions of the frame and layer as back-to-front order. "
+                     "These are creative directions, NOT strict coordinates or a static overlay. Preserve requested text verbatim "
+                     "and use the uploaded images. Integrate them into the scene with brand typography, spacing, readable timing "
+                     "and appropriate entrance/exit animation. Adapt the intent aesthetically to BOTH formats. "
+                     "Existing selectors identify original artwork groups; move/reorder the group without breaking it. "
+                     "An element's comment is reviewer feedback specifically for that element, identified by its selector or ID. "
+                     "Apply it to that element in its scene; do not turn the comment into on-screen copy or apply it to unrelated elements. "
+                     "When removed=true, DELETE that entire group and its contained text in BOTH formats, including its animation targets. "
+                     "Do not recreate removed content elsewhere. Removal overrides earlier copy and visual directions. "
+                     "Keep all unrelated content and factual sources. Reviewer-supplied copy is not a website-verified claim.\n")
+        for frame in design.frames:
+            scene = next(s for s in concept.scenes if s.id == frame.scene_id)
+            for element in frame.elements:
+                if element.removed:
+                    scene.texts = [t for t in scene.texts if t.id not in element.text_ids]
+                if element.kind == "text":
+                    tid = "design-" + element.id
+                    existing = next((t for t in scene.texts if t.id == tid), None)
+                    if existing:
+                        existing.text = element.text
+                    else:
+                        scene.texts.append(ConceptText(id=tid, role="label", text=element.text))
+            problems += "\nFrame idea: " + frame.model_dump_json() + "\nNew text boxes use data-text-id=design-<element id>; uploaded image paths are assets/user/<asset>."
+    if action == "edit" or decision.get("scenes") or design.frames:
         concept_path = _dir(state) / "concept.json"
         temporary = concept_path.with_suffix(".tmp")
         temporary.write_text(concept.model_dump_json(indent=1))

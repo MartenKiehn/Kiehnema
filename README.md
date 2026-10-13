@@ -135,7 +135,20 @@ or use the previous/next buttons to switch scenes; playback keeps the editor on 
 Edited scenes are marked in the filmstrip, and timing changes show the proposed sequence.
 These scene edits are drafts until **Revise preview**; leaving the page warns
 about unsaved drafts. The original preview and its comment times remain unchanged until revision.
-**Revise preview** submits scene edits, confirmed comments and general feedback together. The next
+The **Advanced** tab turns one paused frame into a visual direction: add text boxes, drop or upload
+PNG/JPEG/WebP images (up to 10 MB), drag elements, and move layers forward or backward. Double-click
+new text to type on the frame; existing artwork moves as groups. Pull the selection's corners or
+edges to resize; corners preserve image and artwork proportions. **Remove** also hides existing
+artwork and requests its removal from both formats on revision, including any contained text.
+Select any element to add a **Comment on this element**; the comment stays attached to its element
+and is sent with the frame idea on revision. Commented elements are marked in Layers.
+**Undo** restores a removed element; **Reset changes** clears an existing element's edits and comment.
+The frame stays visible while
+editing properties. Each scene can have one draft per reference format, with Undo for recent changes.
+These drafts stay on the page until revision. AI receives the exact new text and uploaded images,
+plus approximate positions and layer order, and integrates them with the brand and animation in
+both formats. These are creative references, not fixed overlays or pixel-exact placement.
+**Revise preview** submits scene edits, frame ideas, confirmed comments and general feedback together. The next
 preview starts with a fresh comment list; submitted comments remain in the job's review checkpoint.
 
 Capture a running local page for frontend inspection (no model calls):

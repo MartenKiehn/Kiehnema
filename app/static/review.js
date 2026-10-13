@@ -48,28 +48,31 @@
     return sceneButtons.find((b) => t >= Number(b.dataset.start) && t < Number(b.dataset.start) + Number(b.dataset.duration)) || sceneButtons.at(-1);
   }
   function setInspector(panel) {
-    const isComment = panel === 'comments';
-    $('#scene-panel').hidden = isComment;
-    $('#timeline-comments').hidden = !isComment;
-    $('.review-studio').classList.toggle('comment-mode', isComment);
-    [$('#scene-tab'), $('#comments-tab')].forEach((tab, i) => {
-      const active = isComment === Boolean(i);
+    ['scene', 'comments', 'advanced'].forEach((name) => {
+      const active = panel === name;
+      $(name === 'comments' ? '#timeline-comments' : `#${name}-panel`).hidden = !active;
+      const tab = $(`#${name}-tab`);
       tab.setAttribute('aria-selected', String(active));
       tab.tabIndex = active ? 0 : -1;
     });
+    $('.review-studio').classList.toggle('comment-mode', panel === 'comments');
+    $('.review-studio').classList.toggle('advanced-mode', panel === 'advanced');
+    if (panel === 'advanced') seek(position);
+    $('#timeline-play').disabled = panel === 'advanced' || !frames.length;
+    root.dispatchEvent(new CustomEvent('review:panel', {detail: panel}));
   }
   function openComments() {
     setInspector('comments');
     $('.studio-grid').scrollIntoView({block: 'start'});
   }
-  [$('#scene-tab'), $('#comments-tab')].forEach((tab, i, tabs) => {
-    tab.addEventListener('click', () => setInspector(i ? 'comments' : 'scene'));
+  const tabs = [$('#scene-tab'), $('#comments-tab'), $('#advanced-tab')];
+  tabs.forEach((tab, i) => {
+    tab.addEventListener('click', () => setInspector(['scene', 'comments', 'advanced'][i]));
     tab.addEventListener('keydown', (event) => {
       if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
       event.preventDefault();
-      const next = event.key === 'Home' ? tabs[0] : event.key === 'End' ? tabs[1] : tabs[1 - i];
-      next.click();
-      next.focus();
+      const index = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (i + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+      tabs[index].click(); tabs[index].focus();
     });
   });
   function showTime(t) {
@@ -90,6 +93,7 @@
     if ($('#timeline-play')) $('#timeline-play').textContent = 'Play both previews';
     selectScene(sceneAt(position)?.dataset.scene);
     send({type: 'kiehnema.seek', time: position});
+    root.dispatchEvent(new CustomEvent('review:seek', {detail: {time: position, scene_id: sceneAt(position)?.dataset.scene}}));
   }
   function resetComment() {
     editing = null;
@@ -265,7 +269,7 @@
     const invalid = total < 15 || total > 60;
     $('#planned-duration').classList.toggle('invalid-duration', invalid);
     if (invalid) $('#planned-duration').textContent += ' · Choose a total of 15–60 seconds';
-    const hasChanges = editedCount || comments.length || $('#feedback').value.trim();
+    const hasChanges = editedCount || comments.length || $('#feedback').value.trim() || $('#advanced-draft').value !== '{"frames":[]}';
     $('#edit-status').textContent = hasChanges ? 'Draft changes · revise to apply' : 'Preview up to date';
     $('#edit-status').classList.toggle('status-review', Boolean(hasChanges));
     $('#review-form [value="revise"]').classList.toggle('secondary', !hasChanges);

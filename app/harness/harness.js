@@ -191,6 +191,11 @@
 
   // ---------- preview controls (browser only) ----------
   function preview() {
+    if (parent !== window) {
+      const editor = document.createElement('script');
+      editor.src = 'harness/design.js';
+      document.head.append(editor);
+    }
     const controls = document.getElementById('mg-controls');
     if (!controls) return;
     controls.hidden = parent !== window;
@@ -232,12 +237,13 @@
       update(true);
     };
     play.onclick = toggle;
-    addEventListener('keydown', (e) => { if (e.code === 'Space') { e.preventDefault(); toggle(); } });
+    addEventListener('keydown', (e) => { if (e.code === 'Space' && !e.target.isContentEditable && !window.__mgDesign?.active()) { e.preventDefault(); toggle(); } });
     scrub.oninput = () => { tl.seek(scrub.value * DURATION); update(true); };
     addEventListener('message', (event) => {
       if (event.source !== parent || parent === window || !event.data) return;
       if (event.data.type === 'kiehnema.seek' && Number.isFinite(event.data.time)) {
         if (playing) toggle();
+        window.__mgDesign?.clear();
         tl.seek(Math.max(0, Math.min(DURATION, event.data.time)));
         update(true);
       } else if (event.data.type === 'kiehnema.play' && typeof event.data.playing === 'boolean' && event.data.playing !== playing) toggle();
