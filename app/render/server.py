@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import functools
 import threading
+import secrets
+from urllib.parse import urlsplit, unquote
 from contextlib import contextmanager
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -15,6 +17,31 @@ from typing import Iterator
 
 
 class _QuietHandler(SimpleHTTPRequestHandler):
+    def do_GET(self):
+        if not self.path.startswith('/' + self.server.token + '/'):
+            self.send_error(404)
+            return
+        self.path = self.path[len(self.server.token) + 1:]
+        return super().do_GET()
+
+    def do_HEAD(self):
+        if not self.path.startswith('/' + self.server.token + '/'):
+            self.send_error(404)
+            return
+        self.path = self.path[len(self.server.token) + 1:]
+        return super().do_HEAD()
+
+    def list_directory(self, path):
+        self.send_error(404)
+        return None
+
+    def translate_path(self, path):
+        root = Path(self.directory).resolve()
+        relative = unquote(urlsplit(path).path).lstrip('/')
+        result = root / relative
+        if '..' in Path(relative).parts or not result.resolve().is_relative_to(root) or any(p.is_symlink() for p in (result, *result.parents)):
+            return str(root / '.not-found')
+        return str(result)
     extensions_map = {
         **SimpleHTTPRequestHandler.extensions_map,
         ".js": "text/javascript",
@@ -51,10 +78,11 @@ def serve_directory(root: Path) -> Iterator[str]:
     """Serve ``root`` on a random localhost port; yields the base URL."""
     handler = functools.partial(_QuietHandler, directory=str(root.resolve()))
     server = _Server(("127.0.0.1", 0), handler)
+    server.token = secrets.token_urlsafe(32)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        yield f"http://127.0.0.1:{server.server_address[1]}"
+        yield f"http://127.0.0.1:{server.server_address[1]}/{server.token}"
     finally:
         server.shutdown()
         server.server_close()

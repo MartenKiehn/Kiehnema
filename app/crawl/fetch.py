@@ -28,6 +28,7 @@ class Fetched:
 def make_client(timeout: float = 20.0) -> httpx.AsyncClient:
     return httpx.AsyncClient(
         follow_redirects=False,
+        trust_env=False,
         timeout=timeout,
         headers={"User-Agent": USER_AGENT, "Accept-Language": "de,en;q=0.8"},
     )
@@ -36,8 +37,11 @@ def make_client(timeout: float = 20.0) -> httpx.AsyncClient:
 async def fetch(client: httpx.AsyncClient, url: str, guard: UrlGuard, *, max_bytes: int = 10_000_000) -> Fetched:
     """GET ``url`` following at most MAX_REDIRECTS redirects, each hop checked by ``guard``."""
     for _ in range(MAX_REDIRECTS + 1):
-        guard.check(url)
-        async with client.stream("GET", url) as resp:
+        import asyncio
+        address, _ = await asyncio.to_thread(guard.pinned, url)
+        target = httpx.URL(url)
+        async with client.stream("GET", target.copy_with(host=address), headers={'Host': target.netloc.decode()},
+                                 extensions={'sni_hostname': target.raw_host.decode('ascii')}) as resp:
             if resp.is_redirect and "location" in resp.headers:
                 url = urljoin(url, resp.headers["location"])
                 continue
@@ -47,7 +51,7 @@ async def fetch(client: httpx.AsyncClient, url: str, guard: UrlGuard, *, max_byt
                 if size > max_bytes:
                     raise FetchError(f"{url}: larger than {max_bytes} bytes")
                 chunks.append(chunk)
-            return Fetched(str(resp.url), resp.status_code, resp.headers.get("content-type", ""), b"".join(chunks))
+            return Fetched(url, resp.status_code, resp.headers.get("content-type", ""), b"".join(chunks))
     raise FetchError(f"{url}: too many redirects")
 
 

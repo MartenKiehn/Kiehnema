@@ -99,7 +99,7 @@
     const target = {scene, time, format: format.value};
     uploading = true; status('Uploading image…');
     try {
-      const response = await fetch(`${root.dataset.url}/design-assets`, {method: 'POST', headers: {'X-Preview-Revision': root.dataset.revision}, body: file});
+      const response = await fetch(`${root.dataset.url}/design-assets`, {method: 'POST', headers: {'X-Preview-Revision': root.dataset.revision, 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content}, body: file});
       const result = await response.json();
       if (!response.ok) throw new Error(result.detail || 'Could not upload this image.');
       if (scene !== target.scene || time !== target.time || format.value !== target.format || !active) throw new Error('Frame changed during upload. Return to the intended frame and add the image again.');

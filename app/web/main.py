@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import hashlib
 import json
 import logging
+import time
 import re
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -13,7 +15,7 @@ from urllib.parse import urlsplit
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import AnyHttpUrl, BaseModel, Field, ValidationError
@@ -26,6 +28,10 @@ from app.pipeline.design import DesignDraft
 from app.pipeline.status import write_status
 from app.web.insights import job_insights
 from app.web.review import CommentRequest, saved_comments, save_comments
+from app.config import settings
+from app.security import accounts, vault
+from app.web import auth
+from app.security.workspace import memory_policy
 
 HERE = Path(__file__).resolve().parent
 TERMINAL = {"review", "done", "failed", "interrupted"}
@@ -40,22 +46,52 @@ def read_json(path: Path, default=None):
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def _lifespan(app: FastAPI):
+    memory_policy()
     app.state.tasks = {}
     # ponytail: serialize whole jobs for local use; use a worker queue if concurrent generation is needed.
     app.state.worker_lock = asyncio.Lock()
-    for path in jobs.jobs_dir().glob("*/status.json"):
-        if read_json(path).get("status") not in TERMINAL:
-            write_status(path.parent, "interrupted", "The app stopped before this job finished. Start a new video; saved files are still available.")
-    yield
-    tasks = list(app.state.tasks.values())
-    for task in tasks:
-        task.cancel()
-    await asyncio.gather(*tasks, return_exceptions=True)
+    origin = urlsplit(settings.public_origin)
+    if origin.scheme not in {'http', 'https'} or not origin.hostname or origin.path not in {'', '/'} or origin.query or origin.fragment or origin.username or origin.password:
+        raise ValueError('MG_PUBLIC_ORIGIN must be an HTTP(S) origin without a path or credentials.')
+    if (origin.hostname not in {"localhost", "127.0.0.1", "::1"} or settings.host not in {'localhost', '127.0.0.1', '::1'}) and origin.scheme != 'https':
+        raise ValueError("Public deployments require an HTTPS MG_PUBLIC_ORIGIN.")
+    with accounts.database() as con:
+        app.state.interrupted = {row[0] for row in con.execute('SELECT id FROM jobs WHERE active!=0')}
+        con.execute("UPDATE jobs SET active=0")
+    async def expire_secrets():
+        while True:
+            await asyncio.sleep(30)
+            accounts.get_session("")
+            for token, item in list(auth.pending.items()):
+                if item['expires'] < time.time():
+                    auth.pending.pop(token, None)
+    cleanup = asyncio.create_task(expire_secrets(), context=contextvars.Context())
+    try:
+        yield
+    finally:
+        cleanup.cancel()
+        await asyncio.gather(cleanup, return_exceptions=True)
+        tasks = list(app.state.tasks.values())
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        accounts.sessions.clear()
+        auth.grants.clear()
+        auth.pending.clear()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    with accounts.service_lock():
+        async with _lifespan(app):
+            yield
 
 
 app = FastAPI(title="Kiehnema", lifespan=lifespan)
-app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "[::1]"])
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=list({"127.0.0.1", "localhost", "[::1]", urlsplit(settings.public_origin).hostname}))
+app.include_router(auth.router)
+app.middleware("http")(auth.guard)
 app.mount("/static", StaticFiles(directory=HERE.parent / "static"), name="static")
 templates = Jinja2Templates(directory=HERE / "templates")
 
@@ -73,13 +109,20 @@ templates.env.filters["safe_url"] = safe_url
 
 @app.middleware("http")
 async def local_boundary(request: Request, call_next):
+    if settings.public_origin.startswith('https://') and request.url.scheme != 'https':
+        return HTMLResponse('HTTPS is required.', status_code=400)
     # Browser POSTs carry Origin, including "null" from the isolated preview. Never accept that origin.
-    if request.method not in {"GET", "HEAD", "OPTIONS"} and request.headers.get("origin") != str(request.base_url).rstrip("/"):
+    expected_origin = settings.public_origin.rstrip('/')
+    if urlsplit(expected_origin).hostname in {"localhost", "127.0.0.1", "::1"}:
+        expected_origin = str(request.base_url).rstrip('/')
+    if request.method not in {"GET", "HEAD", "OPTIONS"} and request.headers.get("origin") != expected_origin:
         return HTMLResponse("This action must be submitted from the local app.", status_code=403)
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Cache-Control"] = "no-store"
+    if settings.public_origin.startswith('https://'):
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000'
     if not request.url.path.startswith("/preview/"):
         # no-referrer turns native form POST Origins into "null", tripping our own guard.
         response.headers["Referrer-Policy"] = "same-origin"
@@ -102,6 +145,10 @@ def job_path(job_id: str) -> Path:
 def job_summary(path: Path) -> dict:
     status = read_json(path / "status.json", {"status": "interrupted", "message": "No status is available."})
     active = path.name in app.state.tasks
+    if not active and path.name in app.state.interrupted and status['status'] not in TERMINAL:
+        write_status(path, 'interrupted', 'The app stopped before this job finished. Saved files remain encrypted.')
+        status = read_json(path / 'status.json')
+        app.state.interrupted.discard(path.name)
     if active and status["status"] in TERMINAL:
         status = {**status, "status": "working", "message": "Finishing this step…"}
     return {**read_json(path / "request.json"), **status, "id": path.name,
@@ -109,7 +156,7 @@ def job_summary(path: Path) -> dict:
 
 
 def all_jobs() -> list[dict]:
-    return [job_summary(p) for p in sorted(jobs.jobs_dir().iterdir(), reverse=True)
+    return [job_summary(p) for p in jobs.jobs_dir().iterdir()
             if p.is_dir() and not p.is_symlink() and (p / "request.json").is_file()]
 
 
@@ -137,12 +184,14 @@ async def job_context(job_id: str) -> dict:
                        can_approve=bool(values.get("check", {}).get("ok")),
                        revision=revision(path) if concept else "")
         context["comments"] = saved_comments(path, context["revision"])
+        context['preview_prefix'] = f'/preview/{job_id}/_/{auth.preview_grant(job_id)}'
         context["preview_duration"] = max((s["start"] + s["duration"] for s in concept.get("scenes", [])), default=job["duration"])
     return context
 
 
-async def run_background(job_id: str, decision: dict | None):
-    path = job_path(job_id)
+async def run_background(job_id: str, decision: dict | None, capability):
+    token = vault.active_job.set(capability)
+    path = vault.VaultPath(capability)
     try:
         async with app.state.worker_lock:
             result = await (jobs.run_job(job_id) if decision is None else jobs.resume_job(job_id, decision))
@@ -152,18 +201,27 @@ async def run_background(job_id: str, decision: dict | None):
         write_status(path, "interrupted", "The app stopped before this job finished. Start a new video; saved files are still available.")
         raise
     except Exception as exc:
-        log.exception("Job %s failed", job_id)
+        log.error("Job %s failed (%s); details are stored in the encrypted job", job_id, type(exc).__name__)
         write_status(path, "failed", f"{type(exc).__name__}: {exc}")
     finally:
         app.state.tasks.pop(job_id, None)
+        with accounts.database() as con:
+            con.execute('UPDATE jobs SET active=0 WHERE id=?', (job_id,))
+        vault.active_job.reset(token)
 
 
 def enqueue(job_id: str, decision: dict | None = None):
     if job_id in app.state.tasks:
         raise HTTPException(409, "This job already has work in progress.")
+    if len(app.state.tasks) >= 20:
+        raise HTTPException(429, 'The job queue is full. Try again later.')
+    capability = vault.get_job(job_id)
+    with accounts.database() as con:
+        if not con.execute('UPDATE jobs SET active=1 WHERE id=? AND active=0', (job_id,)).rowcount:
+            raise HTTPException(409, 'This job already has work in progress.')
     write_status(job_path(job_id), "queued", "Queued for rendering" if decision and decision["action"] == "approve"
                  else "Waiting for the local worker")
-    app.state.tasks[job_id] = asyncio.create_task(run_background(job_id, decision))
+    app.state.tasks[job_id] = asyncio.create_task(run_background(job_id, decision, capability), context=contextvars.Context())
 
 
 class JobRequest(BaseModel):
@@ -190,7 +248,7 @@ async def create_job(request: Request):
     form = dict(await request.form())
     try:
         data = JobRequest.model_validate(form)
-        url = await asyncio.to_thread(UrlGuard.for_site(str(data.url)).check, str(data.url))
+        url = await asyncio.to_thread(UrlGuard().check, str(data.url))
     except (ValidationError, ValueError) as exc:
         error = "; ".join(f"{e['loc'][0]}: {e['msg']}" for e in exc.errors()) if isinstance(exc, ValidationError) else str(exc)
         return templates.TemplateResponse(request, "index.html", {"jobs": all_jobs(), "values": form, "error": error}, status_code=422)
@@ -356,7 +414,9 @@ async def upload_design_asset(request: Request, job_id: str):
         raise HTTPException(409, "The preview changed during upload. Reload and try again.")
     folder.mkdir(exist_ok=True)
     name = uuid4().hex + ".png"
-    image.save(folder / name, "PNG")
+    buffer = io.BytesIO()
+    image.save(buffer, "PNG")
+    (folder / name).write_bytes(buffer.getvalue())
     return {"asset": name, "width": image.width, "height": image.height}
 
 
@@ -380,23 +440,98 @@ async def delete(request: Request, job_id: str):
 
 
 def confined_file(root: Path, name: str) -> Path:
+    if isinstance(root, vault.VaultPath):
+        path = root / name
+        if not path.is_file():
+            raise HTTPException(404, 'File not found.')
+        return path
     path = (root / name).resolve()
     if not path.is_relative_to(root.resolve()) or not path.is_file():
         raise HTTPException(404, "File not found.")
     return path
 
 
-@app.get("/jobs/{job_id}/files/{name:path}")
-async def artifact(job_id: str, name: str, download: bool = False):
+class PrivateStream(StreamingResponse):
+    async def __call__(self, scope, receive, send):
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            self.source.close()
+
+
+def private_file(request: Request, path, *, download: bool = False, headers=None):
+    import mimetypes
+    item, source = path.job.open_reader(path.relative)
+    size = item['size']
+    start, end, status = 0, size - 1, 200
+    etag = '"' + item['blob'] + '"'
+    result_headers = {'Accept-Ranges': 'bytes', 'ETag': etag, **(headers or {})}
+    requested = request.headers.get('range') if request.headers.get('if-range', etag) == etag else None
+    if requested:
+        match = re.fullmatch(r'bytes=(\d{0,20})-(\d{0,20})', requested)
+        if not match or not any(match.groups()):
+            source.close()
+            return Response(status_code=416, headers={'Content-Range': f'bytes */{size}'})
+        first, last = match.groups()
+        if first:
+            start = int(first)
+            end = min(int(last), end) if last else end
+        else:
+            start = max(0, size - int(last))
+        if start > end or start >= size:
+            source.close()
+            return Response(status_code=416, headers={'Content-Range': f'bytes */{size}'})
+        status = 206
+        result_headers['Content-Range'] = f'bytes {start}-{end}/{size}'
+    result_headers['Content-Length'] = str(max(0, end - start + 1))
+    if download:
+        result_headers['Content-Disposition'] = f'attachment; filename="{path.name}"'
+    def body():
+        with source:
+            # shortcut: Tink Python skips preceding segments; use a seekable primitive for long exports.
+            skip = start
+            while skip:
+                part = source.read(min(skip, 1024 * 1024))
+                if not part:
+                    raise ValueError('Truncated encrypted file')
+                skip -= len(part)
+            remaining = end - start + 1
+            while remaining > 0:
+                part = source.read(min(remaining, 1024 * 1024))
+                if not part:
+                    raise ValueError('Truncated encrypted file')
+                remaining -= len(part)
+                yield part
+            if end == size - 1 and source.read(1):
+                raise ValueError('Invalid encrypted file length')
+    media_type = mimetypes.guess_type(path.name)[0] or 'application/octet-stream'
+    if request.method == 'HEAD':
+        source.close()
+        return Response(status_code=status, media_type=media_type, headers=result_headers)
+    response = PrivateStream(body(), status_code=status, media_type=media_type, headers=result_headers)
+    response.source = source
+    return response
+
+
+@app.api_route("/jobs/{job_id}/files/{name:path}", methods=['GET', 'HEAD'])
+async def artifact(request: Request, job_id: str, name: str, download: bool = False):
     if not (re.fullmatch(r"review-assets/[a-f0-9]{32}\.png", name) or name == "brand/board.png" or re.fullmatch(r"keyframes/r\d+/(feed|story)-[\d.]+s\.png", name)
             or re.fullmatch(r"renders/(feed-1080x1350|story-1080x1920)\.mp4", name)):
         raise HTTPException(404, "File not found.")
     path = confined_file(job_path(job_id), name)
-    return FileResponse(path, filename=path.name if download else None)
+    return private_file(request, path, download=download)
 
 
 @app.get("/preview/{job_id}/{name:path}")
 async def preview(request: Request, job_id: str, name: str):
+    root = job_path(job_id)
+    # Keep executable previews inside the editor's frame-src boundary, including direct links.
+    if request.headers.get('sec-fetch-dest') == 'document':
+        return RedirectResponse(f'/jobs/{job_id}', status_code=303)
+    prefix = f'/preview/{job_id}/'
+    if name.startswith('_/'):
+        _, token, name = name.split('/', 2)
+        prefix += f'_/{token}/'
     allowed = (name in {"index.html", "theme.css", "composition/composition.css", "composition/composition.js",
                         "harness/harness.css", "harness/harness.js", "harness/design.js", "harness/gsap.min.js"}
                or name.startswith("assets/") and Path(name).suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".svg", ".woff", ".woff2", ".ttf", ".otf"})
@@ -405,18 +540,29 @@ async def preview(request: Request, job_id: str, name: str):
     if name in {"harness/harness.js", "harness/design.js"}:
         path = HERE.parent / name
     elif re.fullmatch(r"assets/user/[a-f0-9]{32}\.png", name):
-        path = confined_file(job_path(job_id) / "review-assets", Path(name).name)
+        path = confined_file(root / "review-assets", Path(name).name)
     else:
-        path = confined_file(job_path(job_id) / "site", name)
-    source = f"{str(request.base_url).rstrip('/')}/preview/{job_id}/"
-    return FileResponse(path, headers={
+        path = confined_file(root / "site", name)
+    source = f"{str(request.base_url).rstrip('/')}{prefix}"
+    headers = {
         "Access-Control-Allow-Origin": "*",  # fonts loaded from the iframe's opaque origin
         "Content-Security-Policy": (
             f"sandbox allow-scripts; default-src 'none'; script-src {source}; "
             f"style-src {source} 'unsafe-inline'; img-src {source} data:; font-src {source} data:; "
             "connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; "
             "form-action 'none'; frame-ancestors 'self'"),
-    })
+    }
+    return private_file(request, path, headers=headers) if isinstance(path, vault.VaultPath) else FileResponse(path, headers=headers)
+
+
+@app.exception_handler(FileNotFoundError)
+async def missing_file(request: Request, exc):
+    return HTMLResponse('File or job not found.', status_code=404)
+
+
+@app.exception_handler(PermissionError)
+async def denied(request: Request, exc):
+    return HTMLResponse('Access denied.', status_code=403)
 
 
 @app.exception_handler(HTTPException)

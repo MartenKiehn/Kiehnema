@@ -11,6 +11,8 @@ The report is plain data so it can be shown in the UI and fed back to the model 
 
 from __future__ import annotations
 
+from app.security.workspace import browser_environment
+
 import io
 import logging
 from dataclasses import asdict, dataclass, field
@@ -216,7 +218,7 @@ async def check_site(site: Path, formats: tuple[str, ...] = ("feed", "story"), d
     registries: dict[str, dict] = {}
     with serve_directory(site) as base:
         async with async_playwright() as pw:
-            browser = await pw.chromium.launch()
+            browser = await pw.chromium.launch(env=browser_environment(), chromium_sandbox=True)
             try:
                 for name in formats:
                     fmt = FORMATS[name]

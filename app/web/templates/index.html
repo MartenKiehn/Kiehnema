@@ -9,10 +9,10 @@
   <section class="card new-job" aria-labelledby="new-title">
     <div class="section-heading"><h2 id="new-title">New video</h2><span class="badge">01 / THE BRIEF</span></div>
     {% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
-    <form action="/jobs" method="post">
+    <form action="/jobs" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}">
       <label for="website">Website URL</label>
       <input id="website" name="url" type="url" required maxlength="2048" placeholder="https://your-company.com" value="{{ values.get('url', '') }}" aria-describedby="url-help">
-      <p id="url-help" class="help">We’ll find your colours, fonts, imagery and the story behind your brand. Local websites on the computer running Kiehnema work too.</p>
+      <p id="url-help" class="help">We’ll find your colours, fonts, imagery and the story behind your brand. Use a publicly accessible website.</p>
       <details class="crawl-settings" {% if error %}open{% endif %}>
         <summary>Website scan settings</summary>
         <div class="field-row">

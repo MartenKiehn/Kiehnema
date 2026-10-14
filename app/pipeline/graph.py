@@ -10,6 +10,8 @@ The model client is injected via ``config["configurable"]["llm"]`` (BedrockLLM o
 
 from __future__ import annotations
 
+from app.security.workspace import browser_environment
+
 import json
 import logging
 import shutil
@@ -25,7 +27,6 @@ from playwright.async_api import async_playwright
 from app.brand.board import render_board
 from app.brand.extract import extract_brand
 from app.checks.runtime import check_site
-from app.config import settings
 from app.crawl.crawler import CrawlResult, crawl, site_markdown
 from app.crawl.guard import UrlGuard
 from app.harness.build import Theme, build_site
@@ -85,8 +86,8 @@ def _guard(config: RunnableConfig) -> UrlGuard | None:
 
 
 def _dir(state: JobState) -> Path:
-    # Resolve against the current workspace, including after a project-folder rename.
-    return settings.data_dir / "jobs" / state["job_id"]
+    from app.pipeline.runtime import jobs_dir
+    return jobs_dir() / state["job_id"]
 
 
 def _status(state: JobState, status: str, message: str, config: RunnableConfig | None = None, **extra: Any) -> dict:
@@ -329,7 +330,7 @@ async def n_keyframes(state: JobState, config: RunnableConfig) -> dict:
     times = _keyframe_times(concept)
     with serve_directory(site) as base:
         async with async_playwright() as pw:
-            browser = await pw.chromium.launch()
+            browser = await pw.chromium.launch(env=browser_environment(), chromium_sandbox=True)
             try:
                 for fmt in ("feed", "story"):
                     paths, _ = await render_stills(browser, base, "index.html", FORMATS[fmt], [t for _, t in times], out)
@@ -482,6 +483,9 @@ def _track(name: str, fn):
     """Record the current step in the graph state (status.json is written by the nodes themselves)."""
     async def node(state: JobState, config: RunnableConfig) -> dict:
         update = await fn(state, config) or {}
+        from app.security.workspace import publisher
+        if publish := publisher.get():
+            publish()
         if update.get("error"):
             _status(state, "failed", update["error"], config)
         if "status" not in update or update["status"] not in ("failed", "done"):

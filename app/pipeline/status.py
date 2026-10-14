@@ -13,3 +13,6 @@ def write_status(job: Path, status: str, message: str, **extra) -> None:
     temporary = path.with_suffix(".tmp")
     temporary.write_text(json.dumps(data, ensure_ascii=False, indent=1))
     temporary.replace(path)
+    from app.security.vault import active_job, VaultPath
+    if isinstance(job, Path) and (store := active_job.get()) is not None:
+        (VaultPath(store) / "status.json").write_text(json.dumps(data, ensure_ascii=False))

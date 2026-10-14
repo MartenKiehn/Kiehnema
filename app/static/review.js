@@ -174,7 +174,7 @@
     status('Saving…');
     try {
       const response = await fetch(`${root.dataset.url}/comments`, {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
+        method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content},
         body: JSON.stringify({revision: root.dataset.revision, ...data}),
       });
       if (!response.ok) throw new Error(response.status === 409 ? 'This preview has changed. Copy your draft, then reload the page.' : 'Could not save. Check the time and comment, then try again.');

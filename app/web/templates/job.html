@@ -11,7 +11,7 @@
 {% else %}
   {% if job.status == 'review' %}<div id="review-workspace" data-url="/jobs/{{ job.id }}" data-revision="{{ revision }}" data-duration="{{ preview_duration }}" data-comments='{{ comments|tojson }}'>{% endif %}
   {% if job.status == 'done' %}
-  <section class="card"><div class="section-heading result-heading"><div><h2>Your videos are ready.</h2><p class="muted">Two formats. Original music. All yours.</p></div><form action="/jobs/{{ job.id }}/reopen" method="post"><input type="hidden" name="revision" value="{{ revision }}"><button class="button" type="submit">Continue editing ↗</button></form></div>
+  <section class="card"><div class="section-heading result-heading"><div><h2>Your videos are ready.</h2><p class="muted">Two formats. Original music. All yours.</p></div><form action="/jobs/{{ job.id }}/reopen" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><input type="hidden" name="revision" value="{{ revision }}"><button class="button" type="submit">Continue editing ↗</button></form></div>
     <div class="video-grid">{% for fmt, label, dimensions in [('feed', '4:5 · Feed', '1080 × 1350'), ('story', '9:16 · Story', '1080 × 1920')] %}{% if job.outputs.get(fmt) %}<div><div class="section-heading"><h3>{{ label }}</h3><span class="muted">{{ dimensions }}</span></div><video class="result-video {{ fmt }}" controls playsinline preload="metadata" src="/jobs/{{ job.id }}/files/{{ job.outputs[fmt] }}"><a href="/jobs/{{ job.id }}/files/{{ job.outputs[fmt] }}?download=true">Download {{ label }}</a></video><a class="button secondary wide" href="/jobs/{{ job.id }}/files/{{ job.outputs[fmt] }}?download=true" download>Download {{ fmt }} MP4 ↓</a></div>{% endif %}{% endfor %}</div>
   </section>
   {% endif %}
@@ -20,7 +20,7 @@
   {% endif %}
   {% if board %}<details class="card brand-board"><summary>Your brand board <span class="muted">Colours, typography & imagery</span></summary><img src="/jobs/{{ job.id }}/files/brand/board.png" alt="Extracted brand colours, fonts, logo and website imagery" loading="lazy"></details>{% endif %}
   {% if job.status == 'review' %}
-  <form id="review-form" action="/jobs/{{ job.id }}/review" method="post">
+  <form id="review-form" action="/jobs/{{ job.id }}/review" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}">
     <input type="hidden" name="revision" value="{{ revision }}">
   <section class="card review-studio" aria-labelledby="studio-title">
     <div class="section-heading studio-heading"><div><p class="eyebrow">YOUR EDITING DESK</p><h2 id="studio-title">Fine-tune the details.</h2></div><span class="badge" id="edit-status" role="status">Preview up to date</span></div>
@@ -28,7 +28,7 @@
       <div class="studio-monitor">
       <div class="studio-preview">
         <p class="help">Select a scene below to edit it. Music is added in the final render.</p>
-        {% if preview %}<div class="preview-grid">{% for fmt, label in [('feed', '4:5 · Feed'), ('story', '9:16 · Story')] %}<div><h3>{{ label }}</h3><iframe class="preview {{ fmt }}" title="{{ label }} animation preview" sandbox="allow-scripts" src="/preview/{{ job.id }}/index.html?format={{ fmt }}"></iframe></div>{% endfor %}</div>{% else %}<p class="notice">The animated preview is unavailable. You can still edit your scenes below.</p>{% endif %}
+        {% if preview %}<div class="preview-grid">{% for fmt, label in [('feed', '4:5 · Feed'), ('story', '9:16 · Story')] %}<div><h3>{{ label }}</h3><iframe class="preview {{ fmt }}" title="{{ label }} animation preview" sandbox="allow-scripts" src="{{ preview_prefix }}/index.html?format={{ fmt }}"></iframe></div>{% endfor %}</div>{% else %}<p class="notice">The animated preview is unavailable. You can still edit your scenes below.</p>{% endif %}
       </div>
       {% include "partials/timeline.html" %}
       </div>
