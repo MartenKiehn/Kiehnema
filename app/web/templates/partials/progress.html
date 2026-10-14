@@ -19,7 +19,7 @@
                   "Review the frames for visual quality."),
     "qa": ("Taking a closer look", "Reviewing the images, visual consistency and story. A final correction may be needed.",
            "Your turn to review the preview, after any necessary corrections."),
-    "render": ("Making the final cut", "Rendering both videos and adding original music. The frame count below tracks the current format.",
+    "render": ("Making the final cut", "Rendering both videos and adding original music. Progress covers your feed and story exports together.",
                "Download your feed and story videos."),
     "working": ("Finishing this step", "Saving the latest results before opening the next view.",
                 "Your updated video workspace will open automatically."),
@@ -33,7 +33,23 @@
   <div id="progress-status">
   <div class="section-heading"><h2>{{ progress_copy[0] }}</h2>{% if current_index >= 0 %}<span class="badge">STEP {{ current_index + 1 }} / {{ steps|length }}</span>{% endif %}</div>
   <p class="progress-description">{{ progress_copy[1] }}</p>
+  {% if job.status == 'render' %}
+  {% set render = job.get('render_progress', {}) %}
+  {% set eta = render.get('eta_seconds') %}
+  <div class="render-progress">
+    <div class="render-progress-heading"><label for="render-completion">Overall progress</label><strong>{{ render.percent ~ '%' if render else 'Calculating…' }}</strong></div>
+    {% if render.get('format') %}<p class="render-current" role="status">Rendering video {{ '1 of 2 · Feed (4:5)' if render.format == 'feed' else '2 of 2 · Story (9:16)' }}</p>{% endif %}
+    <div class="render-progress-track">
+      <progress id="render-completion" max="100" aria-describedby="render-format-boundary" {% if render %}value="{{ render.percent }}"{% endif %}></progress>
+      <span class="render-midpoint" aria-hidden="true"></span>
+    </div>
+    <div class="render-format-labels"><span>Video 1 · Feed (4:5)</span><span id="render-format-boundary">Video 2 starts at 50%<small>Story (9:16)</small></span></div>
+    <p class="render-eta" role="status" aria-live="polite">{% if eta is not none %}Estimated time remaining: {% if eta < 60 %}less than a minute{% else %}about {{ (eta + 59) // 60 }} min{% endif %}{% elif render.get('percent', 0) >= 99 %}Finalizing videos…{% else %}Estimating remaining time…{% endif %}</p>
+    <p class="help">Approximate timing, updated as rendering progresses.</p>
+  </div>
+  {% else %}
   <p class="progress-message" role="status" aria-live="polite">{{ job.message }}</p>
+  {% endif %}
   {% include "partials/insights.html" %}
   <div class="progress-next"><span class="eyebrow">UP NEXT <span aria-hidden="true">↗</span></span><p>{{ progress_copy[2] }}</p></div>
   <ol class="steps" aria-label="Video production steps">{% for key, label in steps %}{% set complete = key in seen and loop.index0 < current_index %}<li class="{% if key == current_step %}current{% elif complete %}complete{% endif %}" {% if key == current_step %}aria-current="step"{% endif %}><span aria-hidden="true">{% if complete %}✓{% else %}{{ loop.index }}{% endif %}</span>{{ label }}</li>{% endfor %}</ol>

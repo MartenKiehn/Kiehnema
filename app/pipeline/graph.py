@@ -14,7 +14,9 @@ from app.security.workspace import browser_environment
 
 import json
 import logging
+import math
 import shutil
+from time import monotonic
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, TypedDict
@@ -461,15 +463,31 @@ def after_review(state: JobState) -> str:
 
 
 async def n_render(state: JobState, config: RunnableConfig) -> dict:
-    _status(state, "render", "Rendering 4:5 and 9:16 videos with music", config)
+    _status(state, "render", "Preparing video exports and music", config,
+            render_progress={"percent": 0, "eta_seconds": None})
     site = build_site(_dir(state) / "composition", _dir(state) / "site")
+    formats = ("feed", "story")
+    completed = dict.fromkeys(formats, 0.0)
+    started = None
 
     def progress(fmt: str, i: int, total: int) -> None:
-        _status(state, "render", f"Rendering {fmt}: {i}/{total} frames")
+        nonlocal started
+        now = monotonic()
+        if started is None:
+            started = now
+        completed[fmt] = min(1.0, max(0.0, i / total)) if total > 0 else 0.0
+        fraction = sum(completed.values()) / len(formats)
+        percent = min(99, int(fraction * 100))
+        eta = max(1, math.ceil((now - started) * (1 - fraction) / fraction)) if 0 < fraction < 1 else None
+        label = "4:5 feed" if fmt == "feed" else "9:16 story"
+        message = f"Rendering {label} video · {percent}% overall" if fraction < 1 else "Finalizing videos"
+        _status(state, "render", message, render_progress={"percent": percent, "eta_seconds": eta,
+                                                          "format": fmt if fraction < 1 else None})
 
-    result = await render_site(site, _dir(state) / "renders", progress=progress)
+    result = await render_site(site, _dir(state) / "renders", formats=formats, progress=progress)
     outputs = {k: str(v.relative_to(_dir(state))) for k, v in result.videos.items()}
-    _status(state, "done", "Videos ready", config, outputs=outputs)
+    _status(state, "done", "Videos ready", config, outputs=outputs,
+            render_progress={"percent": 100, "eta_seconds": 0})
     return {"outputs": outputs, "status": "done", **_usage(config)}
 
 

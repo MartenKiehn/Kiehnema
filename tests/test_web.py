@@ -184,6 +184,24 @@ def test_progress_explains_current_and_next_step(client, status, heading, next_t
         assert '<li class="" ><span aria-hidden="true">6</span>Checks' in html
 
 
+@pytest.mark.parametrize(('percent', 'eta', 'message'), [
+    (0, None, 'Estimating remaining time'),
+    (25, 121, 'about 3 min'),
+    (75, 30, 'less than a minute'),
+    (99, None, 'Finalizing videos'),
+])
+def test_render_progress_bar_and_eta(client, percent, eta, message):
+    job_id = jobs.create_job('https://example.com/', 30)
+    write_status(jobs.jobs_dir() / job_id, 'render', 'Rendering video',
+                 render_progress={'percent': percent, 'eta_seconds': eta, 'format': 'feed' if percent < 50 else 'story'})
+    html = client.get(f'/jobs/{job_id}/progress').text
+    assert f'value="{percent}"' in html and f'{percent}%</strong>' in html
+    assert message in html and '<label for="render-completion">' in html
+    assert 'Video 2 starts at 50%' in html and 'class="render-midpoint"' in html
+    assert ('Rendering video 1 of 2 · Feed (4:5)' if percent < 50 else 'Rendering video 2 of 2 · Story (9:16)') in html
+    assert ' frames' not in html and 'frame count' not in html and 'progress-message' not in html
+
+
 async def test_background_create_reload_queue_and_failure(workspace, monkeypatch):
     release = asyncio.Event()
     entered = asyncio.Event()
@@ -405,7 +423,7 @@ def test_restart_marks_unfinished_work_without_restarting_it(workspace):
 
 @pytest.mark.browser
 async def test_progress_insights_survive_polling_and_expand_as_results_arrive(review_job, tmp_path):
-    from playwright.async_api import async_playwright
+    from playwright.async_api import async_playwright, expect
 
     async with app.router.lifespan_context(app), async_playwright() as pw:
         (review_job / "profile.json").write_text(json.dumps({"facts": [
@@ -445,6 +463,28 @@ async def test_progress_insights_survive_polling_and_expand_as_results_arrive(re
                 await page.screenshot(path=str(tmp_path / "progress-mobile.png"), full_page=True)
                 await page.emulate_media(reduced_motion="reduce")
                 assert await page.locator(".live-dot").evaluate("el => getComputedStyle(el).animationName") == "none"
+                write_status(review_job, 'render', 'Rendering feed video',
+                             render_progress={'percent': 25, 'eta_seconds': 121, 'format': 'feed'})
+                await expect(page.locator('#render-completion')).to_have_attribute('value', '25')
+                assert 'about 3 min' in await page.locator('.render-eta').inner_text()
+                await expect(page.locator('.render-current')).to_have_text('Rendering video 1 of 2 · Feed (4:5)')
+                write_status(review_job, 'render', 'Rendering story video',
+                             render_progress={'percent': 75, 'eta_seconds': 30, 'format': 'story'})
+                await expect(page.locator('#render-completion')).to_have_attribute('value', '75')
+                assert '75%' in await page.locator('.render-progress-heading').inner_text()
+                assert 'less than a minute' in await page.locator('.render-eta').inner_text()
+                assert await page.get_by_role('progressbar', name='Overall progress').count() == 1
+                await expect(page.locator('.render-current')).to_have_text('Rendering video 2 of 2 · Story (9:16)')
+                await expect(page.locator('#render-format-boundary')).to_contain_text('Video 2 starts at 50%')
+                await page.reload()
+                assert await page.locator('#render-completion').get_attribute('value') == '75'
+                assert await page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+                bar = await page.locator('#render-completion').bounding_box()
+                marker = await page.locator('.render-midpoint').bounding_box()
+                assert abs(marker['x'] + marker['width'] / 2 - (bar['x'] + bar['width'] / 2)) < 1
+                await page.screenshot(path=str(tmp_path / 'render-progress-mobile.png'), full_page=True)
+                await page.set_viewport_size({'width': 1440, 'height': 1000})
+                await page.screenshot(path=str(tmp_path / 'render-progress-desktop.png'), full_page=True)
             finally:
                 await browser.close()
 

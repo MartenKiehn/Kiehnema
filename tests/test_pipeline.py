@@ -22,6 +22,35 @@ from app.pipeline.schemas import CompanyProfile, Concept, QAReport
 from app.pipeline.verify import QuoteIndex, lint_composition, validate_concept
 
 
+async def test_render_progress_combines_formats_and_estimates_remaining_time(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from app.pipeline import graph
+
+    monkeypatch.setattr(graph, '_dir', lambda state: tmp_path)
+    monkeypatch.setattr(graph, 'build_site', lambda composition, site: site)
+    clock = iter([0, 10, 20, 20, 35, 50])
+    monkeypatch.setattr(graph, 'monotonic', lambda: next(clock))
+    snapshots = []
+
+    async def render(site, out_dir, formats, progress):
+        snapshots.append(json.loads((tmp_path / 'status.json').read_text()))
+        assert formats == ('feed', 'story')
+        for fmt, count in [('feed', 0), ('feed', 50), ('feed', 100),
+                           ('story', 0), ('story', 50), ('story', 100)]:
+            progress(fmt, count, 100)
+            snapshots.append(json.loads((tmp_path / 'status.json').read_text()))
+        return SimpleNamespace(videos={fmt: out_dir / f'{fmt}.mp4' for fmt in formats})
+
+    monkeypatch.setattr(graph, 'render_site', render)
+    await graph.n_render({'job_id': 'example'}, {'configurable': {'llm': FakeLLM({})}})
+    assert [s['render_progress']['percent'] for s in snapshots] == [0, 0, 25, 50, 50, 75, 99]
+    assert [s['render_progress']['eta_seconds'] for s in snapshots] == [None, None, 30, 20, 20, 12, None]
+    assert [s['render_progress'].get('format') for s in snapshots] == [None, 'feed', 'feed', 'feed', 'story', 'story', None]
+    result = json.loads((tmp_path / 'status.json').read_text())
+    assert result['status'] == 'done' and result['render_progress']['percent'] == 100
+    assert all('frames' not in entry['message'] for entry in result['history'])
+
+
 def _profile(site: str) -> dict:
     return {
         "company_name": "Acme", "language": "en", "one_liner": "Acme builds robots.", "audience": "small factories",
