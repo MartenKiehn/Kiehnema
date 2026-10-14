@@ -16,7 +16,7 @@ import pytest
 
 from app.config import settings
 from app.crawl.guard import UrlGuard
-from app.pipeline.jobs import job_state, reopen_job, resume_job, start_job
+from app.pipeline.runtime import job_state, reopen_job, resume_job, start_job
 from app.pipeline.llm import FakeLLM
 from app.pipeline.schemas import CompanyProfile, Concept, QAReport
 from app.pipeline.verify import QuoteIndex, lint_composition, validate_concept
@@ -86,6 +86,7 @@ FIX_EDIT = ('<edit file="composition.html"><search>data-text-id="proof-title">Fi
 @pytest.fixture
 def data_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "data_dir", tmp_path / "data")
+    monkeypatch.setattr("app.pipeline.runtime.workspace_dir", lambda: settings.data_dir)
     return tmp_path / "data"
 
 
@@ -136,7 +137,7 @@ async def test_full_pipeline_with_fake_model(site, data_dir, monkeypatch):
     assert [c[0] for c in llm.calls] == ["distill", "concept", "compose", "fix", "qa", "fix"]
 
     exports = {name: (job / file).read_bytes() for name, file in result["outputs"].items()}
-    monkeypatch.setattr("app.pipeline.jobs._bedrock", lambda *args: FakeLLM({}, usage=llm.usage))
+    monkeypatch.setattr("app.pipeline.runtime._bedrock", lambda *args: FakeLLM({}, usage=llm.usage))
     reopened = await reopen_job(job_id)
     assert "__interrupt__" in reopened
     saved = await job_state(job_id)
@@ -205,7 +206,7 @@ def test_lint_flags_sandbox_violations():
 async def test_saved_scan_settings_reach_crawler(site, data_dir, monkeypatch, limits, expected_pages, expected_depth):
     from langgraph.graph import END, START, StateGraph
     from app.crawl.crawler import CrawlResult
-    from app.pipeline import jobs
+    from app.pipeline import runtime as jobs
     from app.pipeline.graph import JobState, n_crawl
 
     def crawl_graph(saver):
@@ -233,7 +234,7 @@ async def test_saved_scan_settings_reach_crawler(site, data_dir, monkeypatch, li
 async def test_saved_review_combines_edits_and_feedback_and_deletes_checkpoint(data_dir, monkeypatch):
     """A saved review survives moving the workspace, without a browser or model call."""
     from langgraph.graph import END, START, StateGraph
-    from app.pipeline import jobs
+    from app.pipeline import runtime as jobs
     from app.pipeline.graph import JobState, n_review
 
     def review_graph(saver):
@@ -272,7 +273,7 @@ async def test_saved_review_combines_edits_and_feedback_and_deletes_checkpoint(d
 
 
 async def test_review_retimes_scenes_and_preserves_comment_targets(data_dir, monkeypatch):
-    from app.pipeline import jobs
+    from app.pipeline import runtime as jobs
     from app.pipeline.graph import n_review
 
     job_id = jobs.create_job("https://example.com", 6)
@@ -304,7 +305,7 @@ async def test_review_retimes_scenes_and_preserves_comment_targets(data_dir, mon
 def test_composition_includes_all_offered_replacement_images(data_dir, allow_clients):
     from app.harness.build import build_site
     from PIL import Image
-    from app.pipeline import jobs
+    from app.pipeline import runtime as jobs
     from app.pipeline.graph import _save_files
 
     job_id = jobs.create_job("https://example.com", 6, allow_client_logos=allow_clients)
@@ -335,7 +336,7 @@ def test_composition_includes_all_offered_replacement_images(data_dir, allow_cli
 
 
 async def test_reviewer_image_request_survives_automatic_repair(data_dir, monkeypatch):
-    from app.pipeline import jobs
+    from app.pipeline import runtime as jobs
     from app.pipeline.graph import n_review, n_fix
 
     job_id = jobs.create_job('https://example.com', 6)
@@ -366,7 +367,7 @@ async def test_reviewer_image_request_survives_automatic_repair(data_dir, monkey
 
 async def test_advanced_ideas_reach_model_and_survive_repairs(data_dir, monkeypatch):
     from PIL import Image
-    from app.pipeline import jobs
+    from app.pipeline import runtime as jobs
     from app.pipeline.graph import n_review, n_fix
 
     job_id = jobs.create_job('https://example.com', 6)

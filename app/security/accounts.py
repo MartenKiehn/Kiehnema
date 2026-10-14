@@ -1,0 +1,303 @@
+"""Password-wrapped user keys; sessions hold unlocked keys only in process memory."""
+
+from __future__ import annotations
+
+import base64
+import hashlib
+import fcntl
+import os
+import re
+import secrets
+import sqlite3
+import threading
+import time
+from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass, field
+
+import pyotp
+from cryptography.exceptions import InvalidKey, InvalidTag
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
+
+from app.config import settings
+
+
+def seal(key: bytes, value: bytes, context: str) -> bytes:
+    nonce = secrets.token_bytes(12)
+    return nonce + AESGCM(key).encrypt(nonce, value, context.encode())
+
+
+def unseal(key: bytes, value: bytes, context: str) -> bytes:
+    return AESGCM(key).decrypt(value[:12], value[12:], context.encode())
+
+
+def kdf(salt: bytes) -> Argon2id:
+    return Argon2id(salt=salt, length=32, iterations=3, lanes=1, memory_cost=65536)
+
+
+def password_bytes(password: str) -> bytes:
+    if not 15 <= len(password) <= 256:
+        raise ValueError("Use a password of 15–256 characters.")
+    return password.encode()
+
+
+def username(value: str) -> str:
+    value = value.strip().lower()
+    if not re.fullmatch(r"[a-z0-9][a-z0-9_.-]{2,63}", value):
+        raise ValueError("Use 3–64 letters, numbers, dots, underscores or hyphens for the username.")
+    return value
+
+
+@contextmanager
+def database():
+    root = settings.data_dir / "secure"
+    root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if root.is_symlink():
+        raise ValueError("The secure data directory must not be a symlink.")
+    root.chmod(0o700)
+    path = root / "accounts.sqlite"
+    fd = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    os.close(fd)
+    path.chmod(0o600)
+    con = sqlite3.connect(path, timeout=15)
+    con.row_factory = sqlite3.Row
+    con.execute("PRAGMA foreign_keys=ON")
+    con.executescript("""
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL, admin INTEGER NOT NULL,
+            disabled INTEGER NOT NULL DEFAULT 0, password_hash TEXT NOT NULL,
+            salt BLOB NOT NULL, wrapped_key BLOB NOT NULL, recovery_key BLOB NOT NULL,
+            totp BLOB NOT NULL, last_totp INTEGER NOT NULL DEFAULT -1);
+        CREATE TABLE IF NOT EXISTS invites (
+            token TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL, expires REAL NOT NULL);
+        CREATE TABLE IF NOT EXISTS jobs (
+            id TEXT PRIMARY KEY, owner TEXT NOT NULL REFERENCES users(id), key BLOB NOT NULL,
+            active INTEGER NOT NULL DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS files (
+            job TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE, tag TEXT NOT NULL,
+            name BLOB NOT NULL, blob TEXT NOT NULL, size INTEGER NOT NULL,
+            PRIMARY KEY(job, tag));
+        CREATE TABLE IF NOT EXISTS failures (id TEXT PRIMARY KEY, count INTEGER NOT NULL, until REAL NOT NULL);
+    """)
+    try:
+        with con:
+            yield con
+    finally:
+        con.close()
+
+
+@contextmanager
+def service_lock():
+    with database():
+        pass
+    fd = os.open(settings.data_dir / 'secure' / '.service.lock', os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise ValueError('Another Kiehnema process is using this workspace. Stop it first.') from None
+        yield
+    finally:
+        os.close(fd)
+
+
+@dataclass
+class Identity:
+    id: str
+    username: str
+    admin: bool
+    key: bytes = field(repr=False)
+
+
+current_identity: ContextVar[Identity | None] = ContextVar("identity", default=None)
+
+
+def identity() -> Identity:
+    person = current_identity.get()
+    if person is None:
+        raise PermissionError("Sign in to unlock your workspace.")
+    with database() as con:
+        row = con.execute("SELECT disabled FROM users WHERE id=?", (person.id,)).fetchone()
+    if row is None or row["disabled"]:
+        raise PermissionError("Account unavailable.")
+    return person
+
+
+def initialized() -> bool:
+    with database() as con:
+        return con.execute("SELECT 1 FROM users LIMIT 1").fetchone() is not None
+
+
+def enrollment(name: str, password: str) -> dict:
+    return {"id": secrets.token_hex(16), "username": username(name), "password": password_bytes(password),
+            "key": secrets.token_bytes(32), "totp": pyotp.random_base32(), "recovery": secrets.token_bytes(32)}
+
+
+def finish_enrollment(draft: dict, code: str, *, setup: bool = False, invite: str = "") -> Identity:
+    if not pyotp.TOTP(draft["totp"]).verify(code):
+        raise ValueError("Enter the current code from your authenticator.")
+    uid, key, password = draft["id"], draft["key"], draft["password"]
+    salt = secrets.token_bytes(16)
+    values = (uid, draft["username"], int(setup), kdf(secrets.token_bytes(16)).derive_phc_encoded(password), salt,
+              seal(kdf(salt).derive(password), key, f"password:{uid}"),
+              seal(draft["recovery"], key, f"recovery:{uid}"), seal(key, draft["totp"].encode(), f"totp:{uid}"))
+    with database() as con:
+        con.execute("BEGIN IMMEDIATE")
+        if setup:
+            if con.execute("SELECT 1 FROM users LIMIT 1").fetchone():
+                raise ValueError("Administrator setup is already complete.")
+        else:
+            row = con.execute("SELECT * FROM invites WHERE token=? AND expires>?", (digest(invite), time.time())).fetchone()
+            if row is None or row["username"] != draft["username"]:
+                raise ValueError("This invitation is invalid or expired.")
+            con.execute("DELETE FROM invites WHERE token=?", (digest(invite),))
+        con.execute("INSERT INTO users(id,username,admin,password_hash,salt,wrapped_key,recovery_key,totp) VALUES(?,?,?,?,?,?,?,?)", values)
+    return Identity(uid, draft["username"], setup, key)
+
+
+def digest(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()
+
+
+def throttle(scope: str) -> None:
+    now = time.time()
+    with database() as con:
+        con.execute('BEGIN IMMEDIATE')
+        con.execute("DELETE FROM failures WHERE until<?", (now,))
+        row = con.execute("SELECT count FROM failures WHERE id=?", (digest(scope),)).fetchone()
+        if row and row[0] >= 10:
+            raise ValueError("Too many attempts. Try again in 15 minutes.")
+        con.execute("INSERT INTO failures VALUES(?,1,?) ON CONFLICT(id) DO UPDATE SET count=count+1",
+                    (digest(scope), now + 900))
+
+
+def authenticate(name: str, password: str, code: str) -> Identity:
+    name = username(name)
+    throttle("login:" + name)
+    with database() as con:
+        row = con.execute("SELECT * FROM users WHERE username=?", (name,)).fetchone()
+    try:
+        if row is None or row["disabled"]:
+            kdf(b"kiehnema-dummy-v1").derive(password[:256].encode())
+            raise ValueError("Invalid username, password or authenticator code.")
+        Argon2id.verify_phc_encoded(password[:256].encode(), row["password_hash"])
+        key = unseal(kdf(row["salt"]).derive(password.encode()), row["wrapped_key"], f"password:{row['id']}")
+        totp = pyotp.TOTP(unseal(key, row["totp"], f"totp:{row['id']}").decode())
+        step = int(time.time()) // 30
+        if not totp.verify(code):
+            raise ValueError("Invalid username, password or authenticator code.")
+        with database() as con:
+            changed = con.execute("UPDATE users SET last_totp=? WHERE id=? AND last_totp<? AND disabled=0",
+                                  (step, row["id"], step)).rowcount
+            if not changed:
+                raise ValueError("Wait for a new authenticator code before signing in again.")
+            con.execute("DELETE FROM failures WHERE id=?", (digest("login:" + name),))
+        return Identity(row["id"], name, bool(row["admin"]), key)
+    except (InvalidKey, InvalidTag):
+        raise ValueError("Invalid username, password or authenticator code.") from None
+
+
+@dataclass
+class Session:
+    person: Identity
+    csrf: str = field(default_factory=lambda: secrets.token_urlsafe(32))
+    created: float = field(default_factory=time.time)
+    used: float = field(default_factory=time.time)
+
+
+sessions: dict[str, Session] = {}
+session_lock = threading.RLock()
+
+
+def new_session(person: Identity) -> str:
+    token = secrets.token_urlsafe(32)
+    with session_lock:
+        sessions[digest(token)] = Session(person)
+    return token
+
+
+def get_session(token: str) -> Session | None:
+    with session_lock:
+        now = time.time()
+        for sid, item in list(sessions.items()):
+            if now - item.used > 1800 or now - item.created > 43200:
+                del sessions[sid]
+        item = sessions.get(digest(token))
+        if item:
+            with database() as con:
+                row = con.execute("SELECT disabled FROM users WHERE id=?", (item.person.id,)).fetchone()
+            if row is None or row[0]:
+                sessions.pop(digest(token), None)
+                return None
+            item.used = now
+        return item
+
+
+def revoke(uid: str) -> None:
+    with session_lock:
+        for sid, item in list(sessions.items()):
+            if item.person.id == uid:
+                del sessions[sid]
+
+
+def change_password(person: Identity, password: str) -> None:
+    password = password_bytes(password)
+    salt = secrets.token_bytes(16)
+    with database() as con:
+        con.execute("UPDATE users SET password_hash=?,salt=?,wrapped_key=? WHERE id=?",
+                    (kdf(secrets.token_bytes(16)).derive_phc_encoded(password), salt,
+                     seal(kdf(salt).derive(password), person.key, f"password:{person.id}"), person.id))
+    revoke(person.id)
+
+
+def recover(name: str, recovery: str, password: str) -> dict:
+    name = username(name)
+    throttle('recovery:' + name)
+    with database() as con:
+        row = con.execute('SELECT * FROM users WHERE username=? AND disabled=0', (name,)).fetchone()
+    try:
+        secret = base64.urlsafe_b64decode(recovery.strip() + '=' * (-len(recovery.strip()) % 4))
+        if row is None or len(secret) != 32:
+            raise ValueError('Invalid recovery credentials.')
+        key = unseal(secret, row['recovery_key'], f"recovery:{row['id']}")
+    except (ValueError, InvalidTag):
+        raise ValueError('Invalid recovery credentials.') from None
+    draft = enrollment(name, password)
+    draft.update(id=row['id'], key=key, admin=bool(row['admin']), previous_recovery=row['recovery_key'])
+    return draft
+
+
+def finish_recovery(draft: dict, code: str) -> Identity:
+    if not pyotp.TOTP(draft['totp']).verify(code):
+        raise ValueError('Enter the current code from your authenticator.')
+    salt = secrets.token_bytes(16)
+    uid, key, password = draft['id'], draft['key'], draft['password']
+    with database() as con:
+        changed = con.execute('''UPDATE users SET password_hash=?,salt=?,wrapped_key=?,recovery_key=?,totp=?,last_totp=-1
+            WHERE id=? AND disabled=0 AND recovery_key=?''',
+            (kdf(secrets.token_bytes(16)).derive_phc_encoded(password), salt,
+             seal(kdf(salt).derive(password), key, f'password:{uid}'),
+             seal(draft['recovery'], key, f'recovery:{uid}'), seal(key, draft['totp'].encode(), f'totp:{uid}'),
+             uid, draft['previous_recovery'])).rowcount
+        if not changed:
+            raise ValueError('Recovery has expired or was already used.')
+    revoke(uid)
+    return Identity(uid, draft['username'], draft['admin'], key)
+
+
+def recovery_text(draft: dict) -> str:
+    return base64.urlsafe_b64encode(draft["recovery"]).decode().rstrip("=")
+
+
+def invite_user(person: Identity, name: str) -> str:
+    if not person.admin:
+        raise PermissionError("Administrator access required.")
+    name = username(name)
+    token = secrets.token_urlsafe(32)
+    with database() as con:
+        if con.execute("SELECT 1 FROM users WHERE username=?", (name,)).fetchone():
+            raise ValueError("This username already exists.")
+        con.execute("DELETE FROM invites WHERE username=?", (name,))
+        con.execute("INSERT INTO invites VALUES(?,?,?)", (digest(token), name, time.time() + 86400))
+    return token

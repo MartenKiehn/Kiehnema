@@ -7,6 +7,8 @@ paused GSAP timeline at time ``t``. The page receives ``?render=1&format=<name>`
 
 from __future__ import annotations
 
+from app.security.workspace import browser_environment
+
 import asyncio
 import base64
 import logging
@@ -49,7 +51,8 @@ class PageDiagnostics:
 
 
 async def _open_page(browser: Browser, base_url: str, page_path: str, fmt: VideoFormat) -> tuple[Page, PageDiagnostics]:
-    context = await browser.new_context(viewport={"width": fmt.width, "height": fmt.height}, device_scale_factor=1)
+    context = await browser.new_context(viewport={"width": fmt.width, "height": fmt.height}, device_scale_factor=1,
+                                        service_workers='block', accept_downloads=False)
     page = await context.new_page()
     diag = PageDiagnostics(errors=[], blocked_requests=[])
     origin = urlsplit(base_url).netloc
@@ -194,7 +197,7 @@ async def _cli() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     with serve_directory(args.root) as base_url:
         async with async_playwright() as pw:
-            browser = await pw.chromium.launch()
+            browser = await pw.chromium.launch(env=browser_environment(), chromium_sandbox=True)
             try:
                 for name in args.format.split(","):
                     fmt = FORMATS[name]

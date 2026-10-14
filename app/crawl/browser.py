@@ -16,8 +16,8 @@ from urllib.parse import urljoin
 
 from playwright.async_api import Browser, BrowserContext, Route
 
-from app.crawl.fetch import MAX_REDIRECTS, USER_AGENT
-from app.crawl.guard import UrlGuard
+from app.crawl.fetch import USER_AGENT, fetch, make_client
+from app.crawl.guard import UrlGuard, BlockedURL
 
 log = logging.getLogger(__name__)
 
@@ -53,23 +53,20 @@ async def guarded_context(browser: Browser, guard: UrlGuard, *, width: int = 144
             await route.abort("blockedbyclient")
             return
         try:
-            resp = await route.fetch(max_redirects=0, timeout=20_000)
-            hops = 0
-            while 300 <= resp.status < 400 and "location" in resp.headers:
-                target = urljoin(url, resp.headers["location"])
-                if req.is_navigation_request() and req.frame == req.frame.page.main_frame:
-                    net.redirects[url] = target
-                    await route.abort("aborted")
-                    return
-                hops += 1
-                if hops > MAX_REDIRECTS or not guard.allowed(target):
-                    net.blocked.append(target)
-                    await route.abort("blockedbyclient")
-                    return
-                url = target
-                resp = await route.fetch(url=target, max_redirects=0, timeout=20_000)
-            await route.fulfill(response=resp)
+            if req.method != 'GET':
+                await route.abort('blockedbyclient')
+                return
+            async with make_client() as client:
+                resp = await fetch(client, url, guard)
+            if req.is_navigation_request() and resp.url != url:
+                net.redirects[url] = resp.url
+                await route.abort('aborted')
+                return
+            await route.fulfill(status=resp.status, body=resp.body,
+                                headers={'content-type': resp.content_type, 'access-control-allow-origin': '*'})
         except Exception as exc:  # network errors, timeouts, closed page
+            if isinstance(exc, BlockedURL):
+                net.blocked.append(str(exc))
             net.failed.append(f"{url}: {type(exc).__name__}")
             try:
                 await route.abort("failed")

@@ -432,3 +432,8 @@ main:has(#review-workspace) { max-width: 1360px; padding-top: 28px; }
   .advanced-mode #advanced-panel input, .advanced-mode #advanced-panel textarea, .advanced-mode #advanced-panel select { scroll-margin-top: calc(clamp(150px, 28dvh, 260px) + 95px); }
   .inspector-tabs { gap: 16px; }
 }
+.auth-card { max-width: 640px; margin: 40px auto; }
+.auth-card h1 { font-size: clamp(2rem, 5vw, 3rem); }
+.auth-card form { display: grid; gap: 12px; margin: 24px 0; }
+.recovery-key { overflow-wrap: anywhere; padding: 16px; border: 1px solid currentColor; }
+.top nav form { margin: 0; }

@@ -6,6 +6,7 @@
   <meta name="htmx-config" content='{"allowEval":false,"includeIndicatorStyles":false}'>
   <title>{% block title %}Kiehnema · Website to video{% endblock %}</title>
   <meta name="application-name" content="Kiehnema">
+  <meta name="csrf-token" content="{{ request.state.csrf }}">
   <link rel="icon" type="image/x-icon" href="{{ url_for('static', path='favicon.ico') }}" sizes="16x16 32x32 48x48">
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', path='kiehnema.svg') }}">
   <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
@@ -16,10 +17,10 @@
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="top">
     <a class="wordmark" href="/" aria-label="Kiehnema home"><img class="brand-icon" src="{{ url_for('static', path='kiehnema.svg') }}" width="44" height="44" alt=""> Kiehnema</a>
-    <nav aria-label="Main navigation"><a href="/#jobs">Your videos</a><a class="button small" href="/">+ New video</a></nav>
+    <nav aria-label="Main navigation">{% if request.state.user %}<a href="/#jobs">Your videos</a><a href="/account">{{ request.state.user.username }}</a>{% if request.state.user.admin %}<a href="/admin">Users</a>{% endif %}<form action="/logout" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><button class="button small secondary" type="submit">Sign out</button></form>{% else %}<a href="/login">Sign in</a>{% endif %}</nav>
   </header>
   <main id="main">{% block content %}{% endblock %}</main>
-  <footer class="footer"><span>Made from your website. Directed by you.</span><span class="local"><i aria-hidden="true"></i> Local workspace</span></footer>
+  <footer class="footer"><span>Made from your website. Directed by you.</span><span class="local"><i aria-hidden="true"></i> Private workspace</span></footer>
 {% block scripts %}{% endblock %}
 </body>
 </html>

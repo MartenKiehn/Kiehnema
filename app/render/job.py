@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from app.security.workspace import browser_environment
+
 import asyncio
 import logging
 from dataclasses import dataclass, field
@@ -48,7 +50,7 @@ async def render_site(
     out_dir.mkdir(parents=True, exist_ok=True)
     with serve_directory(site) as base:
         async with async_playwright() as pw:
-            browser = await pw.chromium.launch()
+            browser = await pw.chromium.launch(env=browser_environment(), chromium_sandbox=True)
             try:
                 plan = music_plan(manifest, await read_registry(browser, base))
                 music = out_dir / "music.wav"

@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     data_dir: Path = ROOT / "data"
     host: str = "127.0.0.1"
     port: int = 8000
+    public_origin: str = "http://127.0.0.1:8000"
+    # Plaintext processing requires a verified RAM filesystem; never fall back to /tmp.
+    work_dir: Path = Path("/dev/shm/kiehnema")
+    job_timeout_s: int = 7200
 
 
 settings = Settings()

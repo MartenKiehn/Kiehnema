@@ -25,7 +25,38 @@ CONCEPT = {"title": "A test video", "scenes": [{"id": "s-hook", "purpose": "hook
 @pytest.fixture
 def workspace(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "data_dir", tmp_path)
-    return tmp_path
+    monkeypatch.setattr('app.web.main.memory_policy', lambda: None)
+    from app.security import accounts as a
+    import pyotp
+    draft = a.enrollment('admin', 'test password with fifteen characters')
+    person = a.finish_enrollment(draft, pyotp.TOTP(draft['totp']).now(), setup=True)
+    identity_token = a.current_identity.set(person)
+    session_token = a.new_session(person)
+    session = a.get_session(session_token)
+    for cls in (TestClient, httpx.AsyncClient):
+        original = cls.__init__
+        def initialize(self, *args, _original=original, **kwargs):
+            kwargs['headers'] = {'X-CSRF-Token': session.csrf, **kwargs.get('headers', {})}
+            kwargs['cookies'] = {'kiehnema-local': session_token, **kwargs.get('cookies', {})}
+            _original(self, *args, **kwargs)
+        monkeypatch.setattr(cls, '__init__', initialize)
+    from playwright.async_api import BrowserContext, Browser
+    original_page = BrowserContext.new_page
+    async def authenticated_page(context, *args, **kwargs):
+        await context.add_cookies([{'name': 'kiehnema-local', 'value': session_token,
+                                   'domain': '127.0.0.1', 'path': '/', 'httpOnly': True, 'sameSite': 'Strict'}])
+        return await original_page(context, *args, **kwargs)
+    monkeypatch.setattr(BrowserContext, 'new_page', authenticated_page)
+    original_browser_page = Browser.new_page
+    async def authenticated_browser_page(browser, *args, **kwargs):
+        page = await original_browser_page(browser, *args, **kwargs)
+        await page.context.add_cookies([{'name': 'kiehnema-local', 'value': session_token,
+                                       'domain': '127.0.0.1', 'path': '/', 'httpOnly': True, 'sameSite': 'Strict'}])
+        return page
+    monkeypatch.setattr(Browser, 'new_page', authenticated_browser_page)
+    yield tmp_path
+    a.current_identity.reset(identity_token)
+    a.sessions.clear()
 
 
 @pytest.fixture
@@ -35,14 +66,18 @@ def review_job(workspace, monkeypatch):
     (path / "concept.json").write_text(json.dumps(CONCEPT))
     (path / "check.json").write_text(json.dumps({"ok": True, "issues": []}))
     (path / "profile.json").write_text(json.dumps({"facts": [{"id": "f1", "text": "Robots that work.", "quote": "Robots that work.", "source_url": "https://example.com/about"}]}))
-    build_site(Path("examples/they"), path / "site")
+    build_site(Path("examples/they"), workspace / "fixture" / "site")
+    path.job.import_tree(workspace / "fixture")
     frames = []
     for fmt in ("feed", "story"):
         file = f"keyframes/r0/{fmt}-001.00s.png"
         target = path / file
         target.parent.mkdir(parents=True, exist_ok=True)
         from PIL import Image
-        Image.new("RGB", (8, 10), "green").save(target)
+        import io
+        image = io.BytesIO()
+        Image.new("RGB", (8, 10), "green").save(image, "PNG")
+        target.write_bytes(image.getvalue())
         frames.append({"scene": "s-hook", "format": fmt, "file": file, "t": 1})
     state = {"values": {"check": {"ok": True}, "keyframes": frames}, "next": ["review"], "interrupts": [{}]}
     monkeypatch.setattr(jobs, "job_state", AsyncMock(return_value=state))
@@ -81,14 +116,12 @@ def test_index_validation_and_static_assets(client):
 
 
 @pytest.mark.parametrize("url", ["http://127.0.0.1:8000/", "http://localhost:3000/", "http://[::1]:8000/"])
-def test_create_job_accepts_local_website(client, monkeypatch, url):
+def test_create_job_rejects_local_website(client, monkeypatch, url):
     queued = []
     monkeypatch.setattr("app.web.main.enqueue", queued.append)
     response = client.post("/jobs", data={"url": url}, follow_redirects=False)
-    assert response.status_code == 303
-    assert len(queued) == 1
-    request = json.loads((jobs.jobs_dir() / queued[0] / "request.json").read_text())
-    assert request["url"] == url
+    assert response.status_code == 422
+    assert queued == []
 
 
 @pytest.mark.parametrize("field,value", [
@@ -339,7 +372,7 @@ def test_preview_headers_files_origin_and_traversal(review_job, client, workspac
     outside = workspace / "secret.js"
     outside.write_text("private")
     (review_job / "site/composition/composition.js").unlink()
-    (review_job / "site/composition/composition.js").symlink_to(outside)
+    # Encrypted objects expose no filesystem symlink operation.
     assert client.get(f"/preview/{JOB}/composition/composition.js").status_code == 404
     for origin in ("null", "https://evil.example", ""):
         assert client.post("/jobs", headers={"Origin": origin}, data={"url": "https://example.com"}).status_code == 403
@@ -352,7 +385,8 @@ def test_delete_removes_files_and_checkpoint(review_job, client, monkeypatch):
     monkeypatch.setattr(AsyncSqliteSaver, "adelete_thread", deleted)
     assert "Delete this video?" in client.get(f"/jobs/{JOB}/delete").text
     assert client.post(f"/jobs/{JOB}/delete", follow_redirects=False).status_code == 303
-    deleted.assert_awaited_once_with(JOB)
+    with __import__("app.security.accounts", fromlist=["database"]).database() as con:
+        assert con.execute("SELECT 1 FROM files WHERE job=?", (JOB,)).fetchone() is None
     assert not review_job.exists()
 
 
@@ -360,6 +394,9 @@ def test_restart_marks_unfinished_work_without_restarting_it(workspace):
     job_id = jobs.create_job("https://example.com", 30)
     path = jobs.jobs_dir() / job_id
     write_status(path, "compose", "Writing code")
+    from app.security.accounts import database
+    with database() as con:
+        con.execute("UPDATE jobs SET active=1 WHERE id=?", (job_id,))
     with TestClient(app, base_url=ORIGIN) as client:
         assert "app stopped" in client.get(f"/jobs/{job_id}").text
         assert not app.state.tasks
@@ -425,9 +462,10 @@ async def test_browser_form_review_preview_and_results(review_job, monkeypatch, 
     async def fake_run(job_id):
         path = jobs.jobs_dir() / job_id
         for name in ("concept.json", "check.json", "profile.json"):
-            shutil.copy(review_job / name, path / name)
+            (path / name).write_bytes((review_job / name).read_bytes())
         for name in ("site", "keyframes"):
-            shutil.copytree(review_job / name, path / name)
+            for entry in (review_job / name).glob("**"):
+                (path / entry.relative).write_bytes(entry.read_bytes())
         write_status(path, "compose", "Writing the composition code")
         await ready_for_review.wait()
         write_status(path, "review", "Waiting for your review")

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from app.security.workspace import browser_environment
+
 import asyncio
 import html
 import json
@@ -73,7 +75,7 @@ async def render_board(brand_dir: Path) -> Path:
     out = brand_dir / "board.png"
     with serve_directory(brand_dir) as base:
         async with async_playwright() as pw:
-            browser = await pw.chromium.launch()
+            browser = await pw.chromium.launch(env=browser_environment(), chromium_sandbox=True)
             page = await browser.new_page(viewport={"width": 1400, "height": 900})
             await page.goto(f"{base}/board.html")
             await page.wait_for_load_state("networkidle")

@@ -40,21 +40,30 @@ def main() -> None:
     st = sub.add_parser("status")
     st.add_argument("job_id")
     a = p.parse_args()
+    from app.security.__main__ import unlock
+    from app.security.accounts import current_identity
+    token = current_identity.set(unlock())
+    from contextlib import nullcontext
+    from app.security.accounts import service_lock
 
-    if a.cmd == "start":
-        job_id, result = asyncio.run(start_job(a.url, a.duration, a.description, allow_client_logos=a.clients))
-        print(_summary({"job_id": job_id, **result}))
-    elif a.cmd == "resume":
-        if a.approve:
-            decision = {"action": "approve"}
-        elif a.feedback:
-            decision = {"action": "feedback", "text": a.feedback}
-        else:
-            decision = {"action": "edit", "texts": dict(e.split("=", 1) for e in a.edit)}
-        print(_summary({"job_id": a.job_id, **asyncio.run(resume_job(a.job_id, decision))}))
-    else:
-        st = asyncio.run(job_state(a.job_id))
-        print(json.dumps({"next": st["next"], **{k: st["values"].get(k) for k in ("status", "error", "check", "qa", "outputs", "cost_usd")}}, indent=1))
+    try:
+        with service_lock() if a.cmd != "status" else nullcontext():
+            if a.cmd == "start":
+                job_id, result = asyncio.run(start_job(a.url, a.duration, a.description, allow_client_logos=a.clients))
+                print(_summary({"job_id": job_id, **result}))
+            elif a.cmd == "resume":
+                if a.approve:
+                    decision = {"action": "approve"}
+                elif a.feedback:
+                    decision = {"action": "feedback", "text": a.feedback}
+                else:
+                    decision = {"action": "edit", "texts": dict(e.split("=", 1) for e in a.edit)}
+                print(_summary({"job_id": a.job_id, **asyncio.run(resume_job(a.job_id, decision))}))
+            else:
+                st = asyncio.run(job_state(a.job_id))
+                print(json.dumps({"next": st["next"], **{k: st["values"].get(k) for k in ("status", "error", "check", "qa", "outputs", "cost_usd")}}, indent=1))
+    finally:
+        current_identity.reset(token)
 
 
 if __name__ == "__main__":

@@ -72,12 +72,14 @@ async def test_site_guard_blocks_redirects_to_other_local_services(source, targe
     requested = []
     def redirect(request):
         requested.append(str(request.url))
+        assert request.headers['host'] == httpx.URL(source).netloc.decode()
+        assert request.extensions['sni_hostname'] == httpx.URL(source).host
         return httpx.Response(302, headers={"Location": target})
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(redirect)) as client:
         with pytest.raises(BlockedURL):
             await fetch(client, source, guard)
-    assert requested == [source]
+    assert requested == [source.replace('example.com', '93.184.216.34')]
 
 
 def test_normalize_drops_fragments_and_tracking():
@@ -172,3 +174,15 @@ def test_data_url_logos_are_decoded_locally():
     res = decode_data_url("data:image/png;base64," + b64.b64encode(b"\x89PNG\r\n").decode())
     assert res and res.body.startswith(b"\x89PNG")
     assert decode_data_url("data:text/html,<script>") is not None  # decoded, but only image types reach the logo path
+
+
+async def test_pinned_idn_request_keeps_certificate_hostname():
+    guard = UrlGuard(resolver=lambda host, port: ['93.184.216.34'])
+    def respond(request):
+        assert request.url.host == '93.184.216.34'
+        assert request.headers['host'] == 'xn--bcher-kva.example'
+        assert request.extensions['sni_hostname'] == 'xn--bcher-kva.example'
+        return httpx.Response(200, text='public content')
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
+        result = await fetch(client, 'https://bücher.example/', guard)
+    assert result.body == b'public content'

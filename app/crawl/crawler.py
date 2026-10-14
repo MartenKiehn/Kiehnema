@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from app.security.workspace import browser_environment
+
 import asyncio
 import json
 import logging
@@ -155,7 +157,7 @@ async def crawl(
     queue: list[tuple[int, str]] = [(0, start)]
     seen = {start}
     async with async_playwright() as pw:
-        browser = await pw.chromium.launch()
+        browser = await pw.chromium.launch(env=browser_environment(), chromium_sandbox=True)
         try:
             ctx, net = await guarded_context(browser, guard)
             page = await ctx.new_page()

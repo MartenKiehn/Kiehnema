@@ -7,8 +7,7 @@ This blocks loopback, private (RFC 1918), link-local (incl. the cloud metadata e
 
 Every hop must be checked: browsers and HTTP clients follow redirects on their own, so callers
 fetch with redirects disabled and validate each ``Location`` (see app/crawl/fetch.py, crawler.py).
-Residual risk: DNS rebinding between this check and the actual connection (acceptable for a
-local single-user tool; documented in docs/phase2-crawl.md).
+Downloads pin a validated numeric address and retain the original Host and TLS server name.
 """
 
 from __future__ import annotations
@@ -94,3 +93,15 @@ class UrlGuard:
             return True
         except BlockedURL:
             return False
+
+    def pinned(self, url: str) -> tuple[str, str]:
+        """Validate and return one numeric destination, avoiding a second DNS lookup."""
+        self.check(url)
+        parts = urlsplit(url)
+        host = parts.hostname
+        port = parts.port or (443 if parts.scheme == 'https' else 80)
+        addresses = list(self.resolver(host, port))
+        exempt = host in self.allow_hosts or (parts.scheme, host, port) == self.local_origin
+        if not addresses or (not exempt and not all(_is_public(ip) for ip in addresses)):
+            raise BlockedURL('Destination is not public')
+        return addresses[0], host

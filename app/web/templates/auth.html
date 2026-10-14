@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card auth-card">
+{% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
+{% if mode == 'login' %}
+<h1>Sign in</h1><p>Your videos and feedback stay in your private workspace.</p>
+{% if not ready %}<p class="notice">Administrator setup is required on the server before anyone can sign in.</p>{% else %}
+<form action="/login" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}">
+<label for="username">Username</label><input id="username" name="username" required autocomplete="username" maxlength="64">
+<label for="password">Password</label><input id="password" name="password" type="password" required autocomplete="current-password" maxlength="256">
+<label for="code">Authenticator code</label><input id="code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code">
+<button class="button" type="submit">Unlock workspace</button></form>
+<p class="help"><a href="/recover">Recover your account</a> using your personal recovery key.</p>
+<a href="/activate">Accept an invitation</a>{% endif %}
+{% elif mode == 'recover' %}
+<h1>Recover your account</h1><p>Your recovery key restores your encrypted workspace and replaces your password and authenticator.</p>
+<form action="/recover" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}">
+<label for="username">Username</label><input id="username" name="username" required maxlength="64" autocomplete="username">
+<label for="recovery">Personal recovery key</label><input id="recovery" name="recovery" type="password" required maxlength="100" autocomplete="off">
+<label for="password">New password</label><input id="password" name="password" type="password" required minlength="15" maxlength="256" autocomplete="new-password">
+<button class="button" type="submit">Restore workspace</button></form>
+{% elif mode == 'activate' %}
+<h1>Your private workspace</h1><form action="/activate" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}">
+<label for="invitation">Invitation code</label><input id="invitation" name="invitation" required autocomplete="off" maxlength="100">
+<label for="password">Choose a password</label><input id="password" name="password" type="password" required minlength="15" maxlength="256" autocomplete="new-password">
+<p class="help">Use at least 15 characters. A password manager can create and remember a strong password.</p>
+<button class="button" type="submit">Continue</button></form>
+{% elif mode == 'enroll' %}
+<h1>Protect your account</h1><p>Add this setup key to your authenticator app as a time-based account named Kiehnema.</p>
+<p><code>{{ secret }}</code></p><p>Save your personal recovery key in your password manager. It is shown only during setup. Without your password or this key, your existing videos cannot be recovered.</p>
+<p class="recovery-key"><code>{{ recovery }}</code></p>
+<form action="/activate" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><input type="hidden" name="proof" value="{{ proof }}">
+<label for="code">Authenticator code</label><input id="code" name="code" inputmode="numeric" pattern="[0-9]{6}" required autocomplete="one-time-code">
+<label class="checkbox"><input type="checkbox" required><span>I saved my recovery key.</span></label>
+<button class="button" type="submit">{{ 'Restore access' if recovering else 'Create account' }}</button></form>
+{% elif mode == 'account' %}
+<h1>Your account</h1><p>Changing your password preserves your videos and signs out your existing sessions. Started jobs keep running.</p>
+<form action="/account/password" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}">
+<label for="old-password">Current password</label><input id="old-password" name="old_password" type="password" required autocomplete="current-password" maxlength="256">
+<label for="password">New password</label><input id="password" name="password" type="password" required minlength="15" maxlength="256" autocomplete="new-password">
+<label for="code">Authenticator code</label><input id="code" name="code" inputmode="numeric" pattern="[0-9]{6}" required autocomplete="one-time-code">
+<button class="button" type="submit">Change password</button></form>
+{% elif mode == 'admin' %}
+<h1>Users</h1><p>Manage accounts. Each person's videos and feedback remain private.</p>
+{% if invitation %}<p>Share this invitation code privately. It expires in 24 hours and can be used once at <a href="/activate">Accept an invitation</a>.</p><p class="recovery-key"><code>{{ invitation }}</code></p>{% endif %}
+<form action="/admin/invite" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}">
+<label for="username">New username</label><input id="username" name="username" required minlength="3" maxlength="64"><button class="button" type="submit">Create invitation</button></form>
+<ul>{% for user in users %}<li>{{ user.username }} · {{ 'Admin' if user.admin else 'User' }} · {{ 'Disabled' if user.disabled else 'Active' }}
+{% if user.id != request.state.user.id %}<form action="/admin/disable" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><input type="hidden" name="user_id" value="{{ user.id }}"><input type="hidden" name="disabled" value="{{ '0' if user.disabled else '1' }}"><button class="button small secondary" type="submit">{{ 'Enable' if user.disabled else 'Disable' }}</button></form>{% endif %}</li>{% endfor %}</ul>
+{% endif %}
+</section>
+{% endblock %}
