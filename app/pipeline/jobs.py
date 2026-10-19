@@ -42,8 +42,8 @@ async def execute(job_id: str, action: str, decision: dict | None = None) -> dic
     process = None
     try:
         with tempfile.TemporaryDirectory(prefix="job-", dir=root) as folder:
-            env = {**os.environ, "PYTHONPATH": str(ROOT), "TMPDIR": folder,
-                   "MG_DATA_DIR": str(settings.data_dir.resolve())}
+            env = {key: value for key, value in os.environ.items() if not key.upper().startswith("MG_ADMIN_")}
+            env.update(PYTHONPATH=str(ROOT), TMPDIR=folder, MG_DATA_DIR=str(settings.data_dir.resolve()))
             process = await asyncio.create_subprocess_exec(sys.executable, "-m", "app.pipeline.worker",
                 cwd=folder, env=env, stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL, start_new_session=True)

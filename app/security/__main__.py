@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+import base64
 import getpass
 import json
 import sqlite3
@@ -10,6 +11,7 @@ from pathlib import Path
 
 import pyotp
 
+from app.config import AdminSetupSettings
 from app.security import accounts as a, vault
 from app.security.checkpoints import checkpoint
 
@@ -19,8 +21,31 @@ def setup_admin():
     memory_policy()
     if a.initialized():
         raise ValueError('Administrator setup is already complete.')
+    config = AdminSetupSettings()
+    credentials = (config.username, config.password, config.totp_secret, config.recovery_key)
+    if any(value is not None for value in credentials):
+        if not all(credentials):
+            raise ValueError('Set all four MG_ADMIN_USERNAME, MG_ADMIN_PASSWORD, MG_ADMIN_TOTP_SECRET and MG_ADMIN_RECOVERY_KEY for unattended setup.')
+        draft = a.enrollment(config.username, config.password.get_secret_value())
+        totp = pyotp.TOTP(config.totp_secret.get_secret_value().strip())
+        try:
+            if len(totp.byte_secret()) < 20:
+                raise ValueError
+        except ValueError:
+            raise ValueError('MG_ADMIN_TOTP_SECRET must be a Base32 key containing at least 20 bytes (160 bits).') from None
+        recovery = config.recovery_key.get_secret_value().strip()
+        try:
+            recovery = base64.b64decode(recovery + '=' * (-len(recovery) % 4), altchars=b'-_', validate=True)
+            if len(recovery) != 32:
+                raise ValueError
+        except ValueError:
+            raise ValueError('MG_ADMIN_RECOVERY_KEY must be a URL-safe Base64 key containing exactly 32 bytes.') from None
+        draft.update(totp=totp.secret, recovery=recovery)
+        a.finish_enrollment(draft, totp.now(), setup=True)
+        print('Administrator created from deployment configuration.')
+        return
     if not sys.stdin.isatty():
-        raise ValueError('Run uv run python -m app.security setup in a terminal to create the first administrator.')
+        raise ValueError('Set MG_ADMIN_USERNAME, MG_ADMIN_PASSWORD, MG_ADMIN_TOTP_SECRET and MG_ADMIN_RECOVERY_KEY, or run uv run python -m app.security setup in a terminal.')
     while True:
         try:
             name = a.username(input('Administrator username [admin]: ').strip() or 'admin')

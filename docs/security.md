@@ -16,8 +16,8 @@ uv run python -m app.security setup
 uv run python -m app
 ```
 
-`python -m app` also runs setup on its first interactive start. Headless deployments must
-run the setup command in a terminal first. There is no default password or public admin
+`python -m app` also runs setup on its first start. Without deployment credentials, setup
+requires an interactive terminal. There is no default password or public admin
 registration. Choose a password of at least 15 characters, enroll the displayed TOTP key
 in an authenticator, and save the personal recovery key outside the server. Setup can only
 create the first administrator. Do not record the setup terminal in shared logs.
@@ -28,6 +28,48 @@ an account revokes its sessions and cancels its jobs. `/recover` requires the us
 personal recovery key, preserves existing content and rotates the password, authenticator
 and recovery key. Without a password or recovery key, the old content cannot be recovered.
 An administrator has no decryption override.
+
+### Unattended first-admin setup
+
+For automated deployments, supply all four variables through your deployment's secret
+store (for example, GitHub Actions secrets) to the application process:
+
+| Variable | Value |
+| --- | --- |
+| `MG_ADMIN_USERNAME` | Username, using the same rules as interactive setup. |
+| `MG_ADMIN_PASSWORD` | A unique password of 15–256 characters. |
+| `MG_ADMIN_TOTP_SECRET` | Base32 authenticator key containing at least 20 random bytes (160 bits). |
+| `MG_ADMIN_RECOVERY_KEY` | URL-safe Base64 encoding of exactly 32 random bytes, with optional padding. |
+
+Generate the two keys **once, locally in a private terminal**, and store them in your
+password manager and deployment secret store. Do not run this command in CI logs:
+
+```sh
+uv run python - <<'PY'
+import secrets
+import pyotp
+print('MG_ADMIN_TOTP_SECRET=' + pyotp.random_base32())
+print('MG_ADMIN_RECOVERY_KEY=' + secrets.token_urlsafe(32))
+PY
+```
+
+Add the TOTP key to your authenticator as a time-based account (SHA-1, six digits,
+30-second interval). Keep the recovery key outside the server. Supplying these keys
+replaces the interactive enrollment confirmation; subsequent logins still require
+the password and a current authenticator code.
+
+Start with `uv run python -m app`; an empty account database is initialized without
+prompts or secret output. Alternatively, run `uv run python -m app.security setup` once
+before starting the server directly through Uvicorn. Both commands also accept these
+variables from the local `.env` file. Missing or invalid values abort setup without
+creating a user. With none of the four set, interactive setup remains available.
+
+Subsequent `python -m app` starts preserve existing accounts and ignore these bootstrap
+values; changing them does not reset credentials. The explicit `setup` command still
+rejects an already initialized database. Persist `data/secure/` across deployments and
+remove the bootstrap secrets from the runtime environment after initialization. They
+are loaded only by setup and are excluded from video-worker environments. Keep real
+secrets out of Git, command arguments and logs.
 
 ## RAM processing workspace
 

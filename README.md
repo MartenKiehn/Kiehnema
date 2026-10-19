@@ -59,6 +59,8 @@ Beim ersten Start legst du im Terminal das Administratorkonto an: Benutzername, 
 mit 15–256 Zeichen und ein Authenticator-Code (TOTP). Bewahre den persönlichen
 Wiederherstellungsschlüssel außerhalb des Servers auf. Über **Users** lädt der Administrator
 weitere Nutzer ein; jedes Konto erhält ein eigenes Passwort und einen eigenen Authenticator.
+Für automatische Deployments kannst du das erste Administratorkonto über die vier
+`MG_ADMIN_*`-Variablen vorgeben; siehe [Setup ohne Terminal](docs/security.md#unattended-first-admin-setup).
 
 Öffne anschließend **http://127.0.0.1:8000** und melde dich an. Die Einstellungen stehen in
 [`.env.example`](.env.example); AWS-Anmeldedaten werden über die übliche AWS-Konfiguration bereitgestellt.
@@ -154,6 +156,8 @@ On the first start, create the administrator account in the terminal: choose a u
 a password of 15–256 characters and an authenticator code (TOTP). Keep the personal recovery
 key outside the server. The administrator invites additional users through **Users**;
 each account gets its own password and authenticator.
+For automated deployments, supply the first administrator through the four `MG_ADMIN_*`
+variables; see [unattended setup](docs/security.md#unattended-first-admin-setup).
 
 Then open **http://127.0.0.1:8000** and sign in. Settings are listed in
 [`.env.example`](.env.example); AWS credentials use the standard AWS configuration.

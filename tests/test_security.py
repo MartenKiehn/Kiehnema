@@ -1,9 +1,13 @@
 """Security boundaries with real cryptography and synthetic, non-billable jobs."""
 
 import asyncio
+import base64
 import io
 import json
+import os
 import re
+import runpy
+import secrets
 import sqlite3
 from pathlib import Path
 
@@ -15,7 +19,7 @@ from cryptography.exceptions import InvalidTag
 from fastapi.testclient import TestClient
 from langgraph.graph import StateGraph, START, END
 
-from app.config import settings
+from app.config import AdminSetupSettings, settings
 from app.pipeline import jobs
 from app.security import accounts as a, vault
 from app.security.checkpoints import checkpoint
@@ -52,17 +56,36 @@ def csrf(response):
     return re.search(r'name="csrf-token" content="([^"]+)"', response.text)[1]
 
 
-@pytest.mark.parametrize(('attempts', 'message'), [
-    (['x' * 14], 'Use a password of 15–256 characters.'),
-    (['x' * 257], 'Use a password of 15–256 characters.'),
-    ([PASSWORD, 'different password'], 'Passwords do not match.'),
-])
-def test_admin_setup_retries_invalid_input(tmp_path, monkeypatch, capsys, attempts, message):
+@pytest.fixture
+def admin_setup(tmp_path, monkeypatch):
     from app.security import __main__ as cli
 
     monkeypatch.setattr(settings, 'data_dir', tmp_path)
     monkeypatch.setattr('app.security.workspace.memory_policy', lambda: None)
     monkeypatch.setattr(cli.sys, 'stdin', io.StringIO())
+    monkeypatch.setattr(cli, 'AdminSetupSettings', lambda: AdminSetupSettings(_env_file=None))
+    for key in list(os.environ):
+        if key.upper().startswith('MG_ADMIN_'):
+            monkeypatch.delenv(key)
+    return cli
+
+
+@pytest.fixture
+def admin_env(admin_setup, monkeypatch):
+    values = {'MG_ADMIN_USERNAME': 'marten', 'MG_ADMIN_PASSWORD': PASSWORD,
+              'MG_ADMIN_TOTP_SECRET': pyotp.random_base32(), 'MG_ADMIN_RECOVERY_KEY': secrets.token_urlsafe(32)}
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+    return values
+
+
+@pytest.mark.parametrize(('attempts', 'message'), [
+    (['x' * 14], 'Use a password of 15–256 characters.'),
+    (['x' * 257], 'Use a password of 15–256 characters.'),
+    ([PASSWORD, 'different password'], 'Passwords do not match.'),
+])
+def test_admin_setup_retries_invalid_input(admin_setup, monkeypatch, capsys, attempts, message):
+    cli = admin_setup
     monkeypatch.setattr(cli.sys.stdin, 'isatty', lambda: True)
     passwords = iter([*attempts, PASSWORD, PASSWORD])
     monkeypatch.setattr(cli.getpass, 'getpass', lambda prompt: next(passwords))
@@ -91,6 +114,70 @@ def test_admin_setup_retries_invalid_input(tmp_path, monkeypatch, capsys, attemp
         users = con.execute('SELECT * FROM users').fetchall()
     assert len(users) == 1 and users[0]['username'] == 'marten' and users[0]['admin']
     a.Argon2id.verify_phc_encoded(PASSWORD.encode(), users[0]['password_hash'])
+
+
+@pytest.mark.parametrize('source', ['environment', 'dotenv'])
+def test_unattended_admin_startup_and_restart(admin_setup, admin_env, tmp_path, monkeypatch, capsys, source):
+    if source == 'dotenv':
+        dotenv = tmp_path / '.env'
+        dotenv.write_text('\n'.join(f'{key}={value}' for key, value in admin_env.items()))
+        for key in admin_env:
+            monkeypatch.delenv(key)
+        monkeypatch.setattr(admin_setup, 'AdminSetupSettings', lambda: AdminSetupSettings(_env_file=dotenv))
+    calls = []
+    monkeypatch.setattr('uvicorn.run', lambda *args, **kwargs: calls.append(a.initialized()))
+    runpy.run_module('app', run_name='__main__')
+    person = a.authenticate('marten', PASSWORD, pyotp.TOTP(admin_env['MG_ADMIN_TOTP_SECRET']).now())
+    assert person.admin
+    recovered = a.recover('marten', admin_env['MG_ADMIN_RECOVERY_KEY'], PASSWORD + ' recovered')
+    assert recovered['key'] == person.key
+    with a.database() as con:
+        before = dict(con.execute('SELECT * FROM users').fetchone())
+    monkeypatch.setenv('MG_ADMIN_PASSWORD', 'invalid on purpose')
+    runpy.run_module('app', run_name='__main__')
+    with a.database() as con:
+        assert [dict(row) for row in con.execute('SELECT * FROM users')] == [before]
+    assert calls == [True, True]
+    with pytest.raises(ValueError, match='already complete'):
+        admin_setup.setup_admin()
+    output = capsys.readouterr()
+    for secret in (PASSWORD, admin_env['MG_ADMIN_TOTP_SECRET'], admin_env['MG_ADMIN_RECOVERY_KEY']):
+        assert secret not in output.out + output.err
+
+
+@pytest.mark.parametrize(('key', 'value', 'message'), [
+    ('MG_ADMIN_USERNAME', None, 'all four'),
+    ('MG_ADMIN_PASSWORD', None, 'all four'),
+    ('MG_ADMIN_TOTP_SECRET', None, 'all four'),
+    ('MG_ADMIN_RECOVERY_KEY', None, 'all four'),
+    ('MG_ADMIN_PASSWORD', '', 'all four'),
+    ('MG_ADMIN_USERNAME', 'invalid user', 'username'),
+    ('MG_ADMIN_PASSWORD', 'short', '15–256'),
+    ('MG_ADMIN_PASSWORD', 'x' * 257, '15–256'),
+    ('MG_ADMIN_TOTP_SECRET', 'INVALID!SECRET', 'MG_ADMIN_TOTP_SECRET'),
+    ('MG_ADMIN_TOTP_SECRET', 'é' * 32, 'MG_ADMIN_TOTP_SECRET'),
+    ('MG_ADMIN_TOTP_SECRET', 'A' * 16, 'MG_ADMIN_TOTP_SECRET'),
+    ('MG_ADMIN_RECOVERY_KEY', '!' * 43, 'MG_ADMIN_RECOVERY_KEY'),
+    ('MG_ADMIN_RECOVERY_KEY', 'é' * 43, 'MG_ADMIN_RECOVERY_KEY'),
+    ('MG_ADMIN_RECOVERY_KEY', base64.urlsafe_b64encode(b'x' * 31).decode(), 'MG_ADMIN_RECOVERY_KEY'),
+])
+def test_unattended_admin_rejects_invalid_configuration(admin_setup, admin_env, monkeypatch, capsys, key, value, message):
+    if value is None:
+        monkeypatch.delenv(key)
+    else:
+        monkeypatch.setenv(key, value)
+    with pytest.raises(ValueError, match=message) as error:
+        admin_setup.setup_admin()
+    assert not a.initialized()
+    output = capsys.readouterr()
+    for secret in (PASSWORD, admin_env['MG_ADMIN_TOTP_SECRET'], admin_env['MG_ADMIN_RECOVERY_KEY']):
+        assert secret not in output.out + output.err + str(error.value)
+
+
+def test_headless_admin_setup_requires_configuration(admin_setup):
+    with pytest.raises(ValueError, match='MG_ADMIN_USERNAME'):
+        admin_setup.setup_admin()
+    assert not a.initialized()
 
 
 def test_setup_and_invitation_cannot_be_reused(people):
@@ -290,6 +377,15 @@ async def test_real_worker_reopens_encrypted_checkpoint_and_removes_workspace(pe
     scratch.mkdir()
     # Synthetic fixture data only: exercise the real subprocess without mounting host filesystems.
     monkeypatch.setattr('app.pipeline.jobs.ram_root', lambda: scratch)
+    monkeypatch.setenv('MG_ADMIN_PASSWORD', PASSWORD)
+    monkeypatch.setenv('mg_admin_totp_secret', pyotp.random_base32())
+    spawn = asyncio.create_subprocess_exec
+
+    async def check_environment(*args, **kwargs):
+        assert not any(key.upper().startswith('MG_ADMIN_') for key in kwargs['env'])
+        return await spawn(*args, **kwargs)
+
+    monkeypatch.setattr(asyncio, 'create_subprocess_exec', check_environment)
     result = await jobs.reopen_job(jid)
     assert '__interrupt__' in result
     assert (await jobs.job_state(jid))['next'] == ['review']

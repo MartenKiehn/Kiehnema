@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,6 +31,15 @@ class Settings(BaseSettings):
     # Plaintext processing requires a verified RAM filesystem; never fall back to /tmp.
     work_dir: Path = Path("/dev/shm/kiehnema")
     job_timeout_s: int = 7200
+
+
+class AdminSetupSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=ROOT / ".env", env_prefix="MG_ADMIN_", extra="ignore")
+
+    username: str | None = None
+    password: SecretStr | None = None
+    totp_secret: SecretStr | None = None
+    recovery_key: SecretStr | None = None
 
 
 settings = Settings()
