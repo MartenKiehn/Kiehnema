@@ -108,6 +108,27 @@ uv run pytest                                   # ohne Live-Bedrock-Aufrufe
 uv run pytest tests/test_web.py -m browser -q    # UI-Prüfungen mit Chromium
 ```
 
+### Nach GitLab und GitHub pushen
+
+Nach dem Commit pusht dieses Skript den aktuellen Branch nach
+`git@git.timeglass.de:mkiehn/kiehnema.git` und
+`git@github.com:MartenKiehn/Kiehnema.git`:
+
+```bash
+python3 scripts/push.py
+```
+
+Voraussetzung ist SSH-Schreibzugriff auf beide Repositories. Das Skript verwendet feste
+Zieladressen; zusätzliche Git-Remotes sind nicht nötig. Es erstellt keine Commits und
+überträgt keine uncommitteten Änderungen, anderen Branches oder Tags. Für jeden weiteren
+Branch diesen auschecken und das Skript erneut ausführen. Release-Tags werden separat gepusht.
+
+Beide Ziele werden ohne Force-Push versucht. Schlägt ein Push fehl, endet das Skript mit
+Fehlerstatus; das andere Repository kann bereits aktualisiert sein. Nach Beheben der Ursache
+erneut ausführen. Änderungen und Merges direkt auf GitLab oder GitHub werden nicht automatisch
+synchronisiert: den betroffenen Branch zuerst lokal aktualisieren und dann das Skript starten.
+Bei einem öffentlichen GitHub-Ziel werden die gepushten Commits samt ihrer Historie öffentlich.
+
 - [Bedienung, CLI und Entwicklung](docs/usage.md)
 - [Weboberfläche und Review-Ablauf](docs/phase4-ui.md)
 - [Kompositionsvertrag](docs/harness-contract.md) und [Pipeline](docs/phase3-pipeline.md)
@@ -209,6 +230,27 @@ AWS Bedrock. HTML/CSS and GSAP provide the animation, while Playwright and FFmpe
 uv run pytest                                   # no live Bedrock calls
 uv run pytest tests/test_web.py -m browser -q    # Chromium UI checks
 ```
+
+### Push to GitLab and GitHub
+
+After committing, push the current branch to
+`git@git.timeglass.de:mkiehn/kiehnema.git` and
+`git@github.com:MartenKiehn/Kiehnema.git`:
+
+```bash
+python3 scripts/push.py
+```
+
+SSH write access to both repositories is required. The script uses fixed destination URLs;
+no additional Git remotes are needed. It does not create commits or push uncommitted changes,
+other branches or tags. Check out each additional branch and run the script again to publish
+it. Release tags are pushed separately.
+
+Both destinations are attempted without force-pushing. Any failed push produces a nonzero
+exit status; the other repository may already be updated. Resolve the error and rerun.
+Changes and merges made directly on GitLab or GitHub are not synchronized automatically:
+update the affected local branch first, then run the script. Pushing to a public GitHub
+repository publishes the commits and their history.
 
 - [Usage, CLI and development](docs/usage.md)
 - [Web interface and review workflow](docs/phase4-ui.md)

@@ -27,6 +27,8 @@ Use pytest and pytest-asyncio; name files `test_*.py` and functions `test_*`. Re
 
 ## Commit & Pull Request Guidelines
 
+For requested branch pushes, use `python3 scripts/push.py` to push the current branch to both GitLab and GitHub. Check its exit status and report partial failures; never force-push to resolve divergence. The script does not push release tags.
+
 Recent commits mostly use `feat:` and `chore:` prefixes with imperative summaries. Follow that pattern. PRs should explain the behavior change, include validation commands/results, link relevant issues, and provide screenshots for UI changes.
 
 ## Security & Configuration
