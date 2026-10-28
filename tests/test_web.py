@@ -364,7 +364,9 @@ async def test_reopen_button_returns_to_editor_in_browser(review_job, live_web, 
         await page.set_viewport_size({"width": 390, "height": 844})
         assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
         await page.screenshot(path=str(tmp_path / "reopen-mobile.png"))
-        await page.get_by_role("button", name="Continue editing").click()
+        # The redirected editor's deferred scripts must be ready before clicking its tabs.
+        async with page.expect_event("domcontentloaded"):
+            await page.get_by_role("button", name="Continue editing").click()
         await expect(page.get_by_role("tab", name="Scene", exact=True)).to_be_visible()
         await page.get_by_role("tab", name="Advanced", exact=True).click()
         await expect(page.locator("#advanced-panel")).to_be_visible()
