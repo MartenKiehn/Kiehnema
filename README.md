@@ -110,6 +110,12 @@ uv run pytest tests/test_web.py -m browser -q    # UI-Prüfungen mit Chromium
 
 ### Nach GitLab und GitHub pushen
 
+CI läuft ausschließlich unter **GitHub → Actions**: Tests und Container-Updateproben
+auf AMD64 und ARM64 bei Pushes und Pull Requests. GitLab-Pipelines sind deaktiviert;
+bereits wartende Jobs können dort abgebrochen werden. Release-Tags starten nach erfolgreichen
+Tests die Veröffentlichung nach GitLab. Die dafür benötigten GitHub-Secrets und Variablen
+stehen in der [Release-Einrichtung](docs/updates.md#github-actions-und-gitlab-einmal-vorbereiten).
+
 Nach dem Commit pusht dieses Skript den aktuellen Branch nach
 `git@git.timeglass.de:mkiehn/kiehnema.git` und
 `git@github.com:MartenKiehn/Kiehnema.git`:
@@ -232,6 +238,12 @@ uv run pytest tests/test_web.py -m browser -q    # Chromium UI checks
 ```
 
 ### Push to GitLab and GitHub
+
+CI runs exclusively in **GitHub → Actions**: tests and container update probes on AMD64
+and ARM64 for pushes and pull requests. GitLab pipelines are disabled; existing queued
+jobs can be cancelled there. Release tags publish to GitLab after successful tests.
+Required GitHub secrets and variables are documented in the
+[release setup guide](docs/updates.md#github-actions-und-gitlab-einmal-vorbereiten).
 
 After committing, push the current branch to
 `git@git.timeglass.de:mkiehn/kiehnema.git` and

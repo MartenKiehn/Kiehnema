@@ -23,6 +23,8 @@ Follow surrounding code: four-space Python indentation, `snake_case` functions a
 
 ## Testing Guidelines
 
+CI runs only in GitHub Actions (`.github/workflows/ci.yml`); GitLab pipelines are disabled. Keep GitLab as the release/package/image destination and use `docs/updates.md` for release credentials and tag publication.
+
 Use pytest and pytest-asyncio; name files `test_*.py` and functions `test_*`. Reuse fixtures in `tests/conftest.py` and temporary directories for generated files. Add regression tests for behavior changes. No coverage threshold is configured. Enable `MG_LIVE_BEDROCK=1` only intentionally: it makes real, potentially billable model calls.
 
 ## Commit & Pull Request Guidelines

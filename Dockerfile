@@ -16,6 +16,7 @@ CMD ["python", "-m", "app"]
 
 FROM runtime AS test
 USER root
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 RUN uv sync --frozen --no-install-project
 COPY tests ./tests
 COPY examples ./examples

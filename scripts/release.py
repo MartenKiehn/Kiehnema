@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import re
+from urllib.parse import quote, urlsplit
 
 import httpx
 from cryptography.hazmat.primitives import serialization
@@ -36,16 +37,34 @@ def create_keys(private_path, public_path, key_id):
     print('Key files created. Keep the private key secret; distribute the public key independently.')
 
 
-def publish(app_metadata, gateway_metadata, notes):
+def release_context():
     env = os.environ
-    if env.get('CI_COMMIT_REF_PROTECTED') != 'true' or env.get('CI_COMMIT_TAG') != 'v' + VERSION:
-        raise ValueError('Publish only from a protected tag matching pyproject.toml.')
-    repo = env['CI_REGISTRY_IMAGE']
+    if (env.get('GITHUB_EVENT_NAME') != 'push' or env.get('GITHUB_REF_TYPE') != 'tag'
+            or env.get('GITHUB_REF_NAME') != 'v' + VERSION):
+        raise ValueError('Publish only from a GitHub tag push matching pyproject.toml.')
+    api = env['GITLAB_API_URL'].rstrip('/')
+    parsed = urlsplit(api)
+    if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.query or parsed.fragment:
+        raise ValueError('Release publication requires a GitLab HTTPS API URL.')
+    project = api + '/projects/' + quote(env['GITLAB_PROJECT_ID'], safe='')
+    with httpx.Client(headers={'PRIVATE-TOKEN': env['GITLAB_TOKEN']}, timeout=60, follow_redirects=False, trust_env=False) as client:
+        response = client.get(project + '/repository/tags/' + quote(env['GITHUB_REF_NAME'], safe=''))
+        response.raise_for_status()
+        tag = response.json()
+    if tag.get('protected') is not True or tag['commit']['id'] != env['GITHUB_SHA']:
+        raise ValueError('The GitLab tag must be protected and point to the same commit as GitHub.')
+    return project, tag
+
+
+def publish(app_metadata, gateway_metadata, notes):
+    project, tag = release_context()
+    env = os.environ
+    repo = env['GITLAB_REGISTRY_IMAGE']
     app_image = repo + '@' + json.loads(app_metadata.read_text())['containerimage.digest']
     gateway_image = repo + '/gateway@' + json.loads(gateway_metadata.read_text())['containerimage.digest']
     policy = json.loads(Path('deploy/release.json').read_text())
-    manifest = Release(**policy, version=VERSION, data_schema=DATA_SCHEMA, commit=env['CI_COMMIT_SHA'],
-                       published_at=env['CI_PIPELINE_CREATED_AT'], notes=notes.read_text(),
+    manifest = Release(**policy, version=VERSION, data_schema=DATA_SCHEMA, commit=env['GITHUB_SHA'],
+                       published_at=tag.get('created_at') or tag['commit']['committed_date'], notes=notes.read_text(),
                        images={'app': app_image, 'updater': app_image, 'gateway': gateway_image})
     key = serialization.load_pem_private_key(Path(env['KIEHNEMA_SIGNING_KEY']).read_bytes(), password=None)
     if not isinstance(key, Ed25519PrivateKey):
@@ -53,12 +72,8 @@ def publish(app_metadata, gateway_metadata, notes):
     key_id = env['KIEHNEMA_SIGNING_KEY_ID']
     envelope = signed_manifest(manifest, key_id, key)
     verify(envelope, {key_id: base64.b64encode(key.public_key().public_bytes_raw()).decode()}, repo)
-    api = env['CI_API_V4_URL'].rstrip('/')
-    if not api.startswith('https://'):
-        raise ValueError('Release publication requires HTTPS.')
-    project = api + '/projects/' + env['CI_PROJECT_ID']
     asset = project + '/packages/generic/kiehnema/' + VERSION + '/update.json'
-    with httpx.Client(headers={'JOB-TOKEN': env['CI_JOB_TOKEN']}, timeout=60, follow_redirects=False, trust_env=False) as client:
+    with httpx.Client(headers={'PRIVATE-TOKEN': env['GITLAB_TOKEN']}, timeout=60, follow_redirects=False, trust_env=False) as client:
         existing = client.get(asset)
         if existing.status_code == 200:
             if existing.content != envelope:
@@ -80,6 +95,7 @@ def main():
     keygen.add_argument('--private', required=True, type=Path)
     keygen.add_argument('--public', required=True, type=Path)
     keygen.add_argument('--key-id', required=True)
+    commands.add_parser('check', help='Verify that the GitHub release tag matches a protected GitLab tag')
     release = commands.add_parser('publish')
     release.add_argument('--app-metadata', required=True, type=Path)
     release.add_argument('--gateway-metadata', required=True, type=Path)
@@ -87,6 +103,9 @@ def main():
     args = parser.parse_args()
     if args.command == 'keygen':
         create_keys(args.private, args.public, args.key_id)
+    elif args.command == 'check':
+        release_context()
+        print('Matching protected release tag verified.')
     else:
         publish(args.app_metadata, args.gateway_metadata, args.notes)
 

@@ -1,57 +1,10 @@
-stages: [test, build, release]
-
-variables:
-  DOCKER_HOST: tcp://docker:2376
-  DOCKER_TLS_CERTDIR: /certs
-  DOCKER_TLS_VERIFY: "1"
-  DOCKER_CERT_PATH: /certs/client
-
-default:
-  image: docker:29.8.2-cli
-  services:
-    - name: docker:29.8.2-dind
-      alias: docker
-  before_script:
-    - docker info
-
-test:
-  stage: test
-  parallel:
-    matrix:
-      - ARCH: [amd64, arm64]
-  tags: ["linux-$ARCH"]
-  script:
-    - export DOCKER_DEFAULT_PLATFORM="linux/$ARCH"
-    - docker build --target test -t kiehnema-tests .
-    - docker run --rm --cap-drop ALL --security-opt no-new-privileges --security-opt seccomp=deploy/chromium-seccomp.json kiehnema-tests python -m pytest -q -o cache_dir=/tmp/pytest-cache
-    - docker build --target runtime -t kiehnema-update-dev:0.1.0 .
-    - docker build --target gateway -t kiehnema-update-gateway .
-    - docker build --target integration -t kiehnema-update-integration .
-    - docker run --rm --network host -e DOCKER_DEFAULT_PLATFORM -v /var/run/docker.sock:/var/run/docker.sock kiehnema-update-integration
-
-build:
-  stage: build
+# CI runs in GitHub Actions; keep GitLab from creating runner jobs.
+workflow:
   rules:
-    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/ && $CI_COMMIT_REF_PROTECTED == "true"'
-  script:
-    - printf '%s' "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
-    - docker buildx create --use
-    - docker buildx build --platform linux/amd64,linux/arm64 --target runtime --metadata-file app-image.json --tag "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG" --push .
-    - docker buildx build --platform linux/amd64,linux/arm64 --target gateway --metadata-file gateway-image.json --tag "$CI_REGISTRY_IMAGE/gateway:$CI_COMMIT_TAG" --push .
-  artifacts:
-    paths: [app-image.json, gateway-image.json]
-    expire_in: 7 days
+    - when: never
 
-release:
-  stage: release
-  image: python:3.13-slim-bookworm@sha256:a1165e272e578941b84abc79e4ab38a0305cd12803a5c4247979ac7655f4d641
-  services: []
-  before_script:
-    - pip install uv==0.12.1
-    - uv sync --frozen --no-dev
-  needs: [build]
-  resource_group: release-publication
+# GitLab validates that a visible job exists before evaluating workflow rules.
+ci-disabled:
+  script: 'true'
   rules:
-    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/ && $CI_COMMIT_REF_PROTECTED == "true"'
-  script:
-    - uv run --no-sync python -m scripts.release publish --app-metadata app-image.json --gateway-metadata gateway-image.json --notes deploy/release-notes.md
+    - when: never

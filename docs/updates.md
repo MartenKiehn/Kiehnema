@@ -33,15 +33,21 @@ Bestehende Installationen müssen **einmal** übernommen werden; ein bisher nich
 Updater kann sich nicht selbst nachinstallieren. Danach benötigen reguläre App-Updates
 keinen Terminalzugriff. Betriebssystem, Docker und Host-Konfiguration bleiben Betreiberaufgaben.
 
-## GitLab einmal vorbereiten
+## GitHub Actions und GitLab einmal vorbereiten
+
+Tests, Image-Builds und Veröffentlichung laufen ausschließlich in GitHub Actions
+(`.github/workflows/ci.yml`). `.gitlab-ci.yml` verhindert neue GitLab-Pipelines; bereits
+wartende Pipelines können in GitLab abgebrochen werden. GitLab bleibt die Quelle für
+Container, signierte Pakete und Releases. GitLab-Runner sind nicht erforderlich.
 
 1. Container Registry und Generic Package Registry für das Projekt aktivieren. Der Standard
    des Installers ist `https://git.timeglass.de`, Projekt `mkiehn/kiehnema`.
-2. `v*`-Tags schützen und nur vertrauenswürdigen Release-Verantwortlichen erlauben.
-   Isolierte, für Docker-in-Docker geeignete native Runner ohne Host-Swap mit Tags
-   `linux-amd64` und `linux-arm64` bereitstellen; die Testmatrix verwendet beide.
-   Für den Mehrplattform-Build braucht dessen BuildKit native Builder für beide Architekturen
-   oder funktionierendes QEMU/binfmt. Nicht erst beim produktiven Release einrichten.
+2. `v*`-Tags in GitLab und GitHub schützen und nur vertrauenswürdigen Release-Verantwortlichen
+   erlauben. In GitHub Actions aktivieren und das Environment **release** anlegen, auf `v*`-Tags
+   begrenzen und eine Freigabe durch einen Release-Verantwortlichen konfigurieren.
+   Tests laufen nativ auf `ubuntu-24.04` (amd64) und `ubuntu-24.04-arm` (arm64).
+   Der Workflow deaktiviert Swap auf diesen temporären VMs und erlaubt Chromiums
+   User-Namespace-Sandbox. Für den Mehrplattform-Build richtet er QEMU und Buildx ein.
 3. Den privaten Ed25519-Schlüssel außerhalb des Repositories erzeugen:
 
    ```bash
@@ -50,9 +56,10 @@ keinen Terminalzugriff. Betriebssystem, Docker und Host-Konfiguration bleiben Be
      --public /sicherer/pfad/release-keys.json --key-id release-1
    ```
 
-   `KIEHNEMA_SIGNING_KEY` als **geschützte File-CI-Variable** mit dem PEM-Inhalt hinterlegen;
-   `KIEHNEMA_SIGNING_KEY_ID=release-1` als geschützte Variable. PEM-Inhalte nicht in Logs
-   ausgeben. Den öffentlichen Schlüssel über einen unabhängig vertrauenswürdigen Weg
+   Den PEM-Inhalt als GitHub-Environment-Secret `KIEHNEMA_SIGNING_KEY_PEM` unter **release**
+   hinterlegen; `KIEHNEMA_SIGNING_KEY_ID=release-1` als Environment-Variable. Der Workflow
+   schreibt den Schlüssel nur für die Signierung in eine private temporäre Datei und entfernt
+   sie anschließend. PEM-Inhalte nicht in Logs ausgeben. Den öffentlichen Schlüssel über einen unabhängig vertrauenswürdigen Weg
    an Installationsbetreiber geben. Ein Schlüssel aus demselben ungeprüften Download ist
    kein Vertrauensanker.
 4. Für private Auslieferung je Installation einen widerrufbaren Projekt-Zugriffstoken mit
@@ -65,9 +72,27 @@ keinen Terminalzugriff. Betriebssystem, Docker und Host-Konfiguration bleiben Be
    Die `update.json`-URL muss ohne Umleitung auf einen anderen Ursprung direkt von GitLab
    abrufbar sein. Bei ausgelagertem Object Storage dessen Download-Proxy passend einrichten.
 
-Die Pipeline testet zunächst und baut danach beide Image-Plattformen. Erst zuletzt wird das
-signierte Manifest als Paket und GitLab-Release veröffentlicht. CI-Job-Tokens sind nur für
-die Veröffentlichung vorgesehen; sie werden nicht an Installationen verteilt.
+Zusätzlich im GitHub-Environment **release** hinterlegen:
+
+| Name | Typ | Inhalt |
+| --- | --- | --- |
+| `GITLAB_TOKEN` | Secret | GitLab-Projektzugriffstoken mit Maintainer-Rolle und `api`, `read_registry`, `write_registry` |
+| `GITLAB_REGISTRY_USER` | Secret | Zugehöriger GitLab-Bot-Benutzername |
+| `GITLAB_REGISTRY_IMAGE` | Variable | Vollständiger Image-Repositorypfad aus der GitLab Container Registry, ohne Tag und ohne `https://` |
+| `KIEHNEMA_SIGNING_KEY_PEM` | Secret | Privater Ed25519-PEM-Schlüssel aus Schritt 3 |
+| `KIEHNEMA_SIGNING_KEY_ID` | Variable | `release-1` bzw. die beim Erzeugen gewählte Schlüssel-ID |
+
+Der Veröffentlichungstoken ist getrennt von den Lesetokens der Installationen; er wird
+nicht an Installationen verteilt. Ablaufdatum überwachen. Normale Branch- und PR-Tests
+verwenden keine dieser Secrets. Die GitHub-Pipeline testet zunächst beide Plattformen und
+prüft vor dem Image-Push über die GitLab-API, dass der gleichnamige GitLab-Tag geschützt ist
+und auf denselben Commit zeigt. Erst danach werden Images, signiertes Paket und Release
+veröffentlicht. Der Manifestzeitpunkt stammt aus dem GitLab-Tag (bei Lightweight-Tags aus
+dem Commit), damit erneute Versuche dieselben signierten Bytes erzeugen können.
+
+GitHub-Testergebnisse erscheinen nicht automatisch als GitLab-Merge-Request-Prüfung.
+Vor einem Merge den passenden Commit unter **GitHub → Actions** prüfen. Die beiden
+Repositorykopien werden über `python3 scripts/push.py` aktualisiert; Tags separat pushen.
 
 ## Erste Installation oder Übernahme
 
@@ -123,9 +148,20 @@ lediglich eine lokale, authentifizierte Steuerverbindung.
    `uv lock` ausführen. Änderungen in `deploy/release-notes.md` beschreiben.
 2. `deploy/release.json` prüfen: älteste unterstützte App-/Updater-Version,
    Ausgangs-Datenschemata und Plattformen müssen tatsächlich getestet sein.
-3. Tests und Upgradeprobe durchführen, Änderungen committen und pushen.
-4. Den passenden geschützten Tag veröffentlichen, beispielsweise `v0.2.0` für `0.2.0`.
-   Die Pipeline erzeugt dann Images, Signatur, Paket und GitLab-Release.
+3. Tests und Upgradeprobe durchführen, Änderungen committen und mit
+   `python3 scripts/push.py` nach GitLab und GitHub pushen.
+4. Den passenden geschützten Tag zuerst nach GitLab und anschließend nach GitHub pushen,
+   beispielsweise für Version `0.2.0`:
+
+   ```bash
+   git tag -a v0.2.0 -m 'Release 0.2.0'
+   git push git@git.timeglass.de:mkiehn/kiehnema.git refs/tags/v0.2.0
+   git push git@github.com:MartenKiehn/Kiehnema.git refs/tags/v0.2.0
+   ```
+
+   Der GitHub-Tag-Push startet Tests und anschließend den Releasejob. Nach der Environment-
+   Freigabe erzeugt dieser Images, Signatur, Paket und GitLab-Release. Fehlen die oben
+   genannten Einstellungen, kann die Veröffentlichung noch nicht erfolgreich laufen.
 
 Releaseversionen nie wiederverwenden, Tags nicht verschieben und signierte Manifeste nicht
 nachträglich verändern. Eine fehlgeschlagene Veröffentlichung mit abweichenden Bytes
