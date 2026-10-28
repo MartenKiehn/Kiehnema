@@ -43,6 +43,10 @@ abgebrochen werden. GitLab-Runner, GitLab-Registry und GitLab-Zugangstokens sind
 
 1. GitHub Actions für `MartenKiehn/Kiehnema` aktivieren. Der Workflow startet bei Pushes
    auf `main` und bei Release-Tags (`v*`), nicht bei Feature-Branch-Pushes oder Pull Requests.
+   Eine gemeinsame Concurrency-Gruppe lässt nur einen Workflow-Lauf aktiv: Ein neuer Lauf
+   bricht den bisherigen ab, auch bei Release-Tags. Die beiden Architektur-Jobs innerhalb
+   dieses Laufs dürfen parallel arbeiten. Während einer gewünschten Veröffentlichung keine
+   weiteren Pushes auslösen; nach einem Abbruch gegebenenfalls den Releaseentwurf prüfen.
    Tests laufen nativ auf
    `ubuntu-24.04` (amd64) und `ubuntu-24.04-arm` (arm64). Der Workflow deaktiviert Swap
    auf diesen temporären VMs und erlaubt Chromiums User-Namespace-Sandbox. Für den

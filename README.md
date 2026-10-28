@@ -126,7 +126,8 @@ uv run pytest tests/test_web.py -m browser -q    # Chromium UI checks
 
 CI runs exclusively in **GitHub → Actions**: tests and container update probes on AMD64
 and ARM64 for pushes to `main` and release tags (`v*`). Feature branch pushes and pull
-requests do not trigger CI. GitLab pipelines are disabled; existing queued
+requests do not trigger CI. Only the newest workflow run is kept; a new run cancels the
+previous one, including a release run. GitLab pipelines are disabled; existing queued
 jobs can be cancelled there. Release tags publish GitHub Releases and GHCR images after successful tests. GitLab is only a code backup.
 Required GitHub secrets and variables are documented in the
 [release setup guide](docs/updates.md#github-einmal-vorbereiten).
@@ -272,7 +273,8 @@ uv run pytest tests/test_web.py -m browser -q    # UI-Prüfungen mit Chromium
 
 CI läuft ausschließlich unter **GitHub → Actions**: Tests und Container-Updateproben
 auf AMD64 und ARM64 bei Pushes auf `main` und Release-Tags (`v*`). Feature-Branch-Pushes
-und Pull Requests starten keine CI. GitLab-Pipelines sind deaktiviert;
+und Pull Requests starten keine CI. Nur der neueste Workflow-Lauf bleibt aktiv; ein neuer
+Lauf bricht den vorherigen ab, auch einen Release-Lauf. GitLab-Pipelines sind deaktiviert;
 bereits wartende Jobs können dort abgebrochen werden. Release-Tags starten nach erfolgreichen
 Tests die Veröffentlichung als GitHub Release mit Images in GHCR. GitLab dient nur als Code-Sicherung. Die dafür benötigten GitHub-Secrets und Variablen
 stehen in der [Release-Einrichtung](docs/updates.md#github-einmal-vorbereiten).

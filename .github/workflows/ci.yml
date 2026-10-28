@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: kiehnema-ci
+  cancel-in-progress: true
+
 jobs:
   test:
     name: Test (${{ matrix.arch }})
@@ -57,9 +61,6 @@ jobs:
     permissions:
       contents: write
       packages: write
-    concurrency:
-      group: release-publication
-      cancel-in-progress: false
     env:
       IMAGE_REPOSITORY: ghcr.io/martenkiehn/kiehnema
     steps:
