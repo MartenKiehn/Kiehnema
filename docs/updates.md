@@ -41,7 +41,9 @@ in der GitHub Container Registry (`ghcr.io`). GitLab ist ausschließlich eine zw
 des Git-Repositories. `.gitlab-ci.yml` verhindert neue Pipelines; alte wartende Jobs können
 abgebrochen werden. GitLab-Runner, GitLab-Registry und GitLab-Zugangstokens sind nicht nötig.
 
-1. GitHub Actions für `MartenKiehn/Kiehnema` aktivieren. Tests laufen nativ auf
+1. GitHub Actions für `MartenKiehn/Kiehnema` aktivieren. Der Workflow startet bei Pushes
+   auf `main` und bei Release-Tags (`v*`), nicht bei Feature-Branch-Pushes oder Pull Requests.
+   Tests laufen nativ auf
    `ubuntu-24.04` (amd64) und `ubuntu-24.04-arm` (arm64). Der Workflow deaktiviert Swap
    auf diesen temporären VMs und erlaubt Chromiums User-Namespace-Sandbox. Für den
    Mehrplattform-Build richtet er QEMU und Buildx ein.
