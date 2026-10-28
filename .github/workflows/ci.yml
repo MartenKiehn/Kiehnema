@@ -4,6 +4,16 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'New version (MAJOR.MINOR.PATCH, no v). Current version is shown at the top of README.'
+        required: true
+        type: string
+      notes:
+        description: 'Release notes'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -13,8 +23,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  prepare:
+    name: Prepare release on main
+    if: github.repository == 'MartenKiehn/Kiehnema' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: release
+    permissions:
+      contents: write
+    outputs:
+      commit: ${{ steps.prepare.outputs.commit }}
+      tag: ${{ steps.prepare.outputs.tag }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.13'
+      - name: Install the lockfile tool
+        run: python -m pip install uv==0.12.1
+      - name: Commit version and notes, then create the tag
+        id: prepare
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_NOTES: ${{ inputs.notes }}
+        run: python -m scripts.prepare_release
+
   test:
     name: Test (${{ matrix.arch }})
+    needs: prepare
+    if: ${{ !cancelled() && (needs.prepare.result == 'success' || (needs.prepare.result == 'skipped' && github.event_name == 'push')) }}
     strategy:
       fail-fast: false
       matrix:
@@ -30,6 +67,7 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          ref: ${{ needs.prepare.outputs.commit || github.sha }}
           persist-credentials: false
       - name: Prepare the disposable Linux host
         run: |
@@ -53,8 +91,8 @@ jobs:
 
   release:
     name: Publish signed GitHub release
-    needs: test
-    if: github.repository == 'MartenKiehn/Kiehnema' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [prepare, test]
+    if: ${{ !cancelled() && needs.test.result == 'success' && github.repository == 'MartenKiehn/Kiehnema' && (needs.prepare.result == 'success' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     environment: release
@@ -63,9 +101,12 @@ jobs:
       packages: write
     env:
       IMAGE_REPOSITORY: ghcr.io/martenkiehn/kiehnema
+      KIEHNEMA_RELEASE_COMMIT: ${{ needs.prepare.outputs.commit || github.sha }}
+      KIEHNEMA_RELEASE_TAG: ${{ needs.prepare.outputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          ref: ${{ needs.prepare.outputs.commit || github.sha }}
           persist-credentials: false
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
@@ -74,7 +115,7 @@ jobs:
         run: |
           python -m pip install uv==0.12.1
           uv sync --frozen --no-dev
-      - name: Verify the protected GitHub tag
+      - name: Verify the release ref and tested commit
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: uv run --no-sync python -m scripts.release check
@@ -86,8 +127,8 @@ jobs:
         run: |
           printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           trap 'docker logout ghcr.io' EXIT
-          docker buildx build --platform linux/amd64,linux/arm64 --target runtime --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" --metadata-file app-image.json --tag "$IMAGE_REPOSITORY:$GITHUB_REF_NAME" --push .
-          docker buildx build --platform linux/amd64,linux/arm64 --target gateway --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" --metadata-file gateway-image.json --tag "$IMAGE_REPOSITORY/gateway:$GITHUB_REF_NAME" --push .
+          docker buildx build --platform linux/amd64,linux/arm64 --target runtime --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" --metadata-file app-image.json --tag "$IMAGE_REPOSITORY:$KIEHNEMA_RELEASE_TAG" --push .
+          docker buildx build --platform linux/amd64,linux/arm64 --target gateway --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" --metadata-file gateway-image.json --tag "$IMAGE_REPOSITORY/gateway:$KIEHNEMA_RELEASE_TAG" --push .
       - name: Sign and publish the release manifest and server installer
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

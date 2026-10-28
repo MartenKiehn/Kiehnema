@@ -42,7 +42,8 @@ des Git-Repositories. `.gitlab-ci.yml` verhindert neue Pipelines; alte wartende 
 abgebrochen werden. GitLab-Runner, GitLab-Registry und GitLab-Zugangstokens sind nicht nötig.
 
 1. GitHub Actions für `MartenKiehn/Kiehnema` aktivieren. Der Workflow startet bei Pushes
-   auf `main` und bei Release-Tags (`v*`), nicht bei Feature-Branch-Pushes oder Pull Requests.
+   auf `main`, bei Release-Tags (`v*`) und manuell über **Actions → CI → Run workflow** auf
+   `main`, nicht bei Feature-Branch-Pushes oder Pull Requests.
    Eine gemeinsame Concurrency-Gruppe lässt nur einen Workflow-Lauf aktiv: Ein neuer Lauf
    bricht den bisherigen ab, auch bei Release-Tags. Die beiden Architektur-Jobs innerhalb
    dieses Laufs dürfen parallel arbeiten. Während einer gewünschten Veröffentlichung keine
@@ -51,11 +52,21 @@ abgebrochen werden. GitLab-Runner, GitLab-Registry und GitLab-Zugangstokens sind
    `ubuntu-24.04` (amd64) und `ubuntu-24.04-arm` (arm64). Der Workflow deaktiviert Swap
    auf diesen temporären VMs und erlaubt Chromiums User-Namespace-Sandbox. Für den
    Mehrplattform-Build richtet er QEMU und Buildx ein.
-2. In GitHub eine aktive Tag-Ruleset für `v*` anlegen, die Erstellung auf vertrauenswürdige
-   Release-Verantwortliche begrenzt und Änderungen/Löschung verhindert. Der Releasejob
-   verlangt `GITHUB_REF_PROTECTED=true` und prüft, dass der Tag noch auf den getesteten
-   Commit zeigt. Das Environment **release** anlegen, auf `v*`-Tags begrenzen und eine
-   Freigabe durch einen Release-Verantwortlichen konfigurieren.
+2. Aktive Regeln für `main` und `v*`-Tags einrichten. Nur vertrauenswürdige Verantwortliche
+   sollen Code veröffentlichen dürfen; Änderungen/Löschung veröffentlichter Tags verhindern.
+   Die Regeln müssen den vorgesehenen direkten Release-Commit auf `main` und die Erstellung
+   eines neuen Tags durch den Workflow erlauben. Der Workflow umgeht keine Regeln und
+   pusht niemals mit Force. Bei widersprechenden Regeln schlägt die Vorbereitung fehl.
+   Der Releasejob verlangt `GITHUB_REF_PROTECTED=true` für die auslösende Referenz:
+   `main` beim manuellen Start, den Tag beim Tag-Push. Er prüft, dass der Release-Tag auf
+   den getesteten Commit zeigt; beim manuellen Start muss dieser weiterhin auf `main` liegen.
+   Das Environment **release** anlegen und Deployments von `main` sowie `v*`-Tags erlauben.
+   Falls der Tarif es unterstützt, eine Freigabe durch einen Release-Verantwortlichen
+   konfigurieren. Vorbereitung und Veröffentlichung verwenden beide dieses Environment.
+   Für private Repositories benötigen Rulesets und Environments GitHub Pro/Team/Enterprise;
+   zusätzliche Reviewer-Regeln sind tarifabhängig. Ein manuell startbarer Workflow umgeht
+   diese Voraussetzungen nicht. Siehe [Rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets)
+   und [Environments](https://docs.github.com/en/rest/deployments/environments).
 3. Den privaten Ed25519-Schlüssel außerhalb des Repositories erzeugen:
 
    ```bash
@@ -235,8 +246,47 @@ lediglich eine lokale, authentifizierte Steuerverbindung.
 
 ## Neue Version veröffentlichen
 
-1. Version in `pyproject.toml` auf eine neue stabile `MAJOR.MINOR.PATCH` erhöhen und
-   `uv lock` ausführen. Änderungen in `deploy/release-notes.md` beschreiben.
+### Über GitHub Actions
+
+1. Die aktuelle **Projektversion** steht ganz oben in der README; Quelle ist
+   `pyproject.toml`. Der manuelle Release-Workflow aktualisiert beide zusammen. Die
+   Projektversion ist nicht zwingend schon veröffentlicht, etwa nach fehlgeschlagenen Tests.
+2. **Actions → CI → Run workflow**, Branch **main**, öffnen. Unter `version` die gewünschte
+   stabile Version ohne `v` eingeben, beispielsweise `0.2.0`; unter `notes` die Release Notes.
+   Versionen kleiner als die aktuelle Projektversion und vorhandene Tags werden abgelehnt.
+   Für den ersten Release darf die vorhandene Projektversion verwendet werden, solange ihr
+   Tag noch nicht existiert. Auch `deploy/release.json` muss vorab zum Release passen.
+3. **Run workflow** starten und gegebenenfalls das Environment freigeben. Die Vorbereitung
+   zeigt in den Logs und der Lauf-Zusammenfassung **aktuelle Version → gewünschte Version**.
+   GitHub kann die Version aus `pyproject.toml` nicht dynamisch in den Eingabedialog laden;
+   dessen Beschreibung verweist deshalb auf die Anzeige in der README.
+4. Der Workflow ändert Version, README-Anzeige und Release Notes, führt `uv lock` aus,
+   erstellt einen Release-Commit auf `main` und einen annotierten `vVERSION`-Tag. Beide
+   Referenzen werden gemeinsam atomar nach GitHub gepusht. Hat jemand inzwischen `main`
+   geändert, wird der Push abgelehnt, ohne nur eine der beiden Referenzen zu veröffentlichen.
+5. Im **selben Workflow-Lauf** werden genau dieser Commit auf AMD64/ARM64 getestet,
+   seine Images gebaut und der signierte Release samt Installer veröffentlicht.
+   Der automatische `GITHUB_TOKEN` erzeugt bei seinen Commit-/Tag-Pushes keine zusätzlichen
+   Push-Workflows. Es wird dafür kein weiterer persönlicher Token benötigt.
+
+Scheitern Tests oder die Veröffentlichung, bleiben der vorbereitete Commit und Tag bestehen.
+Ein erneuter Lauf nur der fehlgeschlagenen Jobs kann denselben Commit weiterverwenden,
+solange `main` unverändert ist und noch kein Releaseentwurf oder Release existiert.
+Bei vorhandenem Entwurf zuerst die Ursache und den Entwurf prüfen. Nach Änderungen am
+Code eine neue Version vorbereiten; Tags werden niemals verschoben oder überschrieben.
+Wie bei allen CI-Läufen bricht ein neuer Push oder manueller Start den bisherigen Lauf ab.
+
+Die Vorbereitung schreibt ausschließlich nach GitHub. Anschließend die neue `main`-Version
+lokal per Fast-forward von GitHub holen und `python3 scripts/push.py` für die GitLab-Sicherung
+ausführen; den Tag zusätzlich nach GitLab pushen. GitLab-Zugangsdaten werden nicht in GitHub
+hinterlegt. Der herunterladbare Installer setzt weiterhin öffentlich erreichbare Release-
+Anhänge und Packages voraus; private Auslieferung benötigt eine gesonderte Authentifizierung.
+
+### Alternativ: Version lokal vorbereiten und Tag pushen
+
+1. Version in `pyproject.toml` und die Anzeige oben in `README.md` auf eine neue stabile
+   `MAJOR.MINOR.PATCH` erhöhen und `uv lock` ausführen. Änderungen in
+   `deploy/release-notes.md` beschreiben.
 2. `deploy/release.json` prüfen: älteste unterstützte App-/Updater-Version,
    Ausgangs-Datenschemata und Plattformen müssen tatsächlich getestet sein.
 3. Tests und Upgradeprobe durchführen, Änderungen committen und mit

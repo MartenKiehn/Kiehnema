@@ -2,6 +2,8 @@
 
 **Your website. Your brand. Your video.**
 
+Current version / Aktuelle Version: **0.1.0**
+
 [English](#english) · [Deutsch](#deutsch)
 
 ![Kiehnema demo / Kiehnema-Demo](assets/readme/kiehnema-preview.mp4){width=432}
@@ -131,6 +133,14 @@ previous one, including a release run. GitLab pipelines are disabled; existing q
 jobs can be cancelled there. Release tags publish GitHub Releases and GHCR images after successful tests. GitLab is only a code backup.
 Required GitHub secrets and variables are documented in the
 [release setup guide](docs/updates.md#github-einmal-vorbereiten).
+
+To prepare a release in GitHub, open **Actions → CI → Run workflow**, select **main**,
+and enter the new version and release notes. The current project version is shown at the
+top of this README; the workflow updates that display alongside the version, creates a
+commit and tag, then tests and publishes that exact commit. Required protections and
+signing secrets must be configured first. See the [release workflow](docs/updates.md#über-github-actions).
+Afterwards, pull the new GitHub commit locally and use the push script below to back it
+up to GitLab; back up the release tag separately.
 
 After committing, push the current branch to
 `git@git.timeglass.de:mkiehn/kiehnema.git` and
@@ -278,6 +288,14 @@ Lauf bricht den vorherigen ab, auch einen Release-Lauf. GitLab-Pipelines sind de
 bereits wartende Jobs können dort abgebrochen werden. Release-Tags starten nach erfolgreichen
 Tests die Veröffentlichung als GitHub Release mit Images in GHCR. GitLab dient nur als Code-Sicherung. Die dafür benötigten GitHub-Secrets und Variablen
 stehen in der [Release-Einrichtung](docs/updates.md#github-einmal-vorbereiten).
+
+Für einen Release **Actions → CI → Run workflow** öffnen, **main** auswählen und neue
+Version sowie Release Notes eingeben. Die aktuelle Projektversion steht oben in dieser
+README. Der Workflow aktualisiert diese Anzeige mit der Versionsnummer, erstellt Commit
+und Tag und testet und veröffentlicht genau diesen Commit. Schutzregeln und Signierschlüssel
+müssen vorher eingerichtet sein. Details im [Release-Ablauf](docs/updates.md#über-github-actions).
+Danach den neuen GitHub-Commit lokal holen und über das folgende Skript nach GitLab sichern;
+den Release-Tag separat sichern.
 
 Nach dem Commit pusht dieses Skript den aktuellen Branch nach
 `git@git.timeglass.de:mkiehn/kiehnema.git` und

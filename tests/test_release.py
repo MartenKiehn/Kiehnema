@@ -25,6 +25,8 @@ def publication(tmp_path, monkeypatch):
         requests.append(request)
         assert request.headers['Authorization'] == 'Bearer test-token'
         assert request.url.host in {'api.github.com', 'uploads.github.com'}
+        if request.url.path.endswith('/commits/main'):
+            return httpx.Response(200, json={'sha': state.get('main_sha', state['sha'])})
         if '/commits/' in request.url.path:
             return httpx.Response(200, json={'sha': state['sha'],
                 'commit': {'committer': {'date': '2026-01-01T00:00:00Z'}}})
@@ -97,3 +99,46 @@ def test_moved_github_tag_prevents_publication(publication):
     with pytest.raises(ValueError, match='tested commit'):
         publish(root)
     assert len(requests) == 1 and requests[0].method == 'GET'
+
+
+def manual_release(monkeypatch):
+    monkeypatch.setenv('GITHUB_EVENT_NAME', 'workflow_dispatch')
+    monkeypatch.setenv('GITHUB_REF_TYPE', 'branch')
+    monkeypatch.setenv('GITHUB_REF_NAME', 'main')
+    monkeypatch.setenv('GITHUB_SHA', 'c' * 40)
+    monkeypatch.setenv('KIEHNEMA_RELEASE_TAG', 'v' + release.VERSION)
+    monkeypatch.setenv('KIEHNEMA_RELEASE_COMMIT', 'a' * 40)
+
+
+def test_manual_release_publishes_prepared_and_tested_commit(publication, monkeypatch):
+    root, _, requests = publication
+    manual_release(monkeypatch)
+    publish(root)
+    assert requests[0].url.path.endswith('/commits/v' + release.VERSION)
+    assert requests[1].url.path.endswith('/commits/main')
+    assert json.loads(requests[3].content)['target_commitish'] == 'a' * 40
+    manifest = verify(requests[4].content, json.loads((root / 'keys.json').read_text()), 'ghcr.io/team/app')
+    assert manifest.commit == 'a' * 40
+
+
+@pytest.mark.parametrize('name,value', [
+    ('GITHUB_REF_NAME', 'feature/example'), ('GITHUB_REF_TYPE', 'tag'),
+    ('GITHUB_REF_PROTECTED', 'false'), ('KIEHNEMA_RELEASE_TAG', 'v99.0.0'),
+    ('KIEHNEMA_RELEASE_COMMIT', ''),
+])
+def test_invalid_manual_release_never_contacts_github(publication, monkeypatch, name, value):
+    _, _, requests = publication
+    manual_release(monkeypatch)
+    monkeypatch.setenv(name, value)
+    with pytest.raises(ValueError):
+        release.release_context()
+    assert requests == []
+
+
+def test_main_advancing_after_manual_preparation_prevents_publication(publication, monkeypatch):
+    root, state, requests = publication
+    manual_release(monkeypatch)
+    state['main_sha'] = 'b' * 40
+    with pytest.raises(ValueError, match='Main advanced'):
+        publish(root)
+    assert all(request.method == 'GET' for request in requests)

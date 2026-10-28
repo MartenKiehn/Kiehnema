@@ -39,19 +39,31 @@ def create_keys(private_path, public_path, key_id):
 
 def release_context():
     env = os.environ
-    if (env.get('GITHUB_EVENT_NAME') != 'push' or env.get('GITHUB_REF_TYPE') != 'tag'
-            or env.get('GITHUB_REF_NAME') != 'v' + VERSION or env.get('GITHUB_REF_PROTECTED') != 'true'):
-        raise ValueError('Publish only from a protected GitHub tag push matching pyproject.toml.')
+    manual = env.get('GITHUB_EVENT_NAME') == 'workflow_dispatch'
+    if manual:
+        valid_ref = env.get('GITHUB_REF_TYPE') == 'branch' and env.get('GITHUB_REF_NAME') == 'main'
+        tag, sha = env.get('KIEHNEMA_RELEASE_TAG', ''), env.get('KIEHNEMA_RELEASE_COMMIT', '')
+    else:
+        valid_ref = env.get('GITHUB_EVENT_NAME') == 'push' and env.get('GITHUB_REF_TYPE') == 'tag'
+        tag, sha = env.get('GITHUB_REF_NAME', ''), env.get('GITHUB_SHA', '')
+    if (not valid_ref or tag != 'v' + VERSION or env.get('GITHUB_REF_PROTECTED') != 'true'
+            or not re.fullmatch(r'[a-f0-9]{40}', sha)):
+        raise ValueError('Publish from a protected matching tag push or a manual release on protected main.')
     repository = env['GITHUB_REPOSITORY']
     if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', repository):
         raise ValueError('Invalid GitHub repository.')
     project = 'https://api.github.com/repos/' + repository
     with httpx.Client(headers={'Authorization': 'Bearer ' + env['GITHUB_TOKEN']},
                       timeout=60, follow_redirects=False, trust_env=False) as client:
-        response = client.get(project + '/commits/' + quote(env['GITHUB_REF_NAME'], safe=''))
+        response = client.get(project + '/commits/' + quote(tag, safe=''))
         response.raise_for_status()
         commit = response.json()
-    if commit['sha'] != env['GITHUB_SHA']:
+        if manual:
+            current = client.get(project + '/commits/main')
+            current.raise_for_status()
+            if current.json()['sha'] != sha:
+                raise ValueError('Main advanced after release preparation. Restart with a new release version.')
+    if commit['sha'] != sha:
         raise ValueError('The GitHub tag no longer points to the tested commit.')
     return project, commit
 
@@ -74,7 +86,7 @@ def publish(app_metadata, gateway_metadata, notes):
     app_image = repo + '@' + json.loads(app_metadata.read_text())['containerimage.digest']
     gateway_image = repo + '/gateway@' + json.loads(gateway_metadata.read_text())['containerimage.digest']
     policy = json.loads(Path('deploy/release.json').read_text())
-    manifest = Release(**policy, version=VERSION, data_schema=DATA_SCHEMA, commit=env['GITHUB_SHA'],
+    manifest = Release(**policy, version=VERSION, data_schema=DATA_SCHEMA, commit=commit['sha'],
                        published_at=commit['commit']['committer']['date'], notes=notes.read_text(),
                        images={'app': app_image, 'updater': app_image, 'gateway': gateway_image})
     key = serialization.load_pem_private_key(Path(env['KIEHNEMA_SIGNING_KEY']).read_bytes(), password=None)
@@ -93,7 +105,7 @@ def publish(app_metadata, gateway_metadata, notes):
         if existing.status_code != 404:
             existing.raise_for_status()
         response = client.post(project + '/releases', json={'name': 'Kiehnema ' + VERSION,
-            'tag_name': 'v' + VERSION, 'target_commitish': env['GITHUB_SHA'], 'body': manifest.notes,
+            'tag_name': 'v' + VERSION, 'target_commitish': commit['sha'], 'body': manifest.notes,
             'draft': True, 'prerelease': False})
         response.raise_for_status()
         release_id = int(response.json()['id'])
@@ -113,7 +125,7 @@ def main():
     keygen.add_argument('--private', required=True, type=Path)
     keygen.add_argument('--public', required=True, type=Path)
     keygen.add_argument('--key-id', required=True)
-    commands.add_parser('check', help='Verify the protected GitHub release tag and tested commit')
+    commands.add_parser('check', help='Verify the protected release source and tested commit')
     release = commands.add_parser('publish')
     release.add_argument('--app-metadata', required=True, type=Path)
     release.add_argument('--gateway-metadata', required=True, type=Path)
@@ -123,7 +135,7 @@ def main():
         create_keys(args.private, args.public, args.key_id)
     elif args.command == 'check':
         release_context()
-        print('Matching protected release tag verified.')
+        print('Protected release source and matching tested commit verified.')
     else:
         publish(args.app_metadata, args.gateway_metadata, args.notes)
 
