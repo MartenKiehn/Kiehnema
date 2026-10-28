@@ -22,6 +22,13 @@ CONCEPT = {"title": "A test video", "scenes": [{"id": "s-hook", "purpose": "hook
            "duration": 15, "texts": [{"id": "hook-title", "role": "headline", "text": "Robots that work.", "fact_ids": ["f1"]}]}]}
 
 
+async def preview_ready(frame):
+    # Playwright's in-page polling uses eval, which the preview's CSP intentionally rejects.
+    async with asyncio.timeout(30):
+        while not await frame.evaluate("window.__ready === true"):
+            await asyncio.sleep(0.05)
+
+
 @pytest.fixture
 def workspace(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "data_dir", tmp_path)
@@ -567,7 +574,7 @@ async def test_browser_form_review_preview_and_results(review_job, monkeypatch, 
             await page.locator("iframe.preview.feed").scroll_into_view_if_needed()
             await expect(frame.locator("#mg-controls")).to_be_hidden()
             preview_frame = next(f for f in page.frames if "/preview/" in f.url and "format=feed" in f.url)
-            await preview_frame.wait_for_function("window.__ready === true")
+            await preview_ready(preview_frame)
             await page.locator("#timeline-play").click()
             await expect(page.locator("#timeline-play")).to_have_text("Pause both previews")
             assert await preview_frame.evaluate("document.fonts.status") == "loaded"
@@ -658,7 +665,7 @@ async def test_timeline_browser_on_running_server(review_job, monkeypatch, tmp_p
         page.on("pageerror", lambda error: errors.append(str(error)))
         await page.goto(f"{base}/jobs/{JOB}")
         for frame in page.frames[1:]:
-            await frame.wait_for_function("window.__ready === true")
+            await preview_ready(frame)
         await page.locator('#duration-s-hook').fill('16')
         await expect(page.locator('.timeline-frame[data-scene="s-hook"] .frame-edit')).to_be_visible()
         await page.locator('#duration-s-hook').fill('15.0')
@@ -755,7 +762,7 @@ async def test_comment_editor_keeps_preview_and_scrubber_visible(review_job, liv
             await page.set_viewport_size({"width": width, "height": height})
             await page.goto(f"{live_web}/jobs/{JOB}")
             for frame in page.frames[1:]:
-                await frame.wait_for_function("window.__ready === true")
+                await preview_ready(frame)
             await page.locator('#comment-here').click()
             await page.locator('#comment-text').fill('Keep this draft while finding the frame')
             await page.locator('#timeline-position').fill('7.2')
