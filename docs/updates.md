@@ -80,7 +80,11 @@ abgebrochen werden. GitLab-Runner, GitLab-Registry und GitLab-Zugangstokens sind
    Container-Repository.
 
 Nach erfolgreichen Tests und Builds erstellt der Job zunächst einen Releaseentwurf,
-lädt die signierte `update.json` hoch und veröffentlicht erst danach den Release.
+lädt die signierte `update.json` und den fertigen Server-Installer `install.sh` hoch und
+veröffentlicht erst danach den Release. Der Installer enthält den Installationscode aus
+dem getesteten Commit, genau dieses signierte Manifest und den zugehörigen öffentlichen
+Prüfschlüssel; keine privaten Schlüssel oder GitHub-Tokens. Die Vorlage `scripts/install.sh`
+im Repository ist allein nicht ausführbar und verweist auf den Release-Download.
 Bei einem Uploadfehler bleibt der Entwurf unveröffentlicht; den Fehler beheben und den
 Entwurf prüfen, bevor ein neuer Versuch erfolgt. Veröffentlichte Releases werden nicht
 überschrieben. Der Manifestzeitpunkt stammt aus dem getesteten Commit; die Sichtbarkeit
@@ -90,6 +94,90 @@ Code, Reviews, CI und Releases werden auf GitHub gepflegt. Nach einem GitHub-Mer
 aktualisieren und `python3 scripts/push.py` ausführen, um den Branch auch nach GitLab zu
 sichern. Das Skript überträgt nur den aktuellen Branch; Tags separat sichern. Issues,
 PR-Kommentare, Release-Anhänge, Images und Secrets sind nicht Teil dieser Git-Codekopie.
+
+## Serverinstallation mit einem Befehl
+
+Dieser Weg richtet eine **frische, dedizierte Ubuntu-24.04-EC2-Instanz** ein. Unterstützt
+werden amd64 und arm64, mindestens 16 GiB RAM und 30 GiB freier Speicher unter `/opt`.
+Für einen gemeinsam genutzten Server, andere Linux-Versionen, private Packages oder den
+Import vorhandener Daten den manuellen Installer im nächsten Abschnitt verwenden.
+
+### Einmal in AWS vorbereiten
+
+1. Ubuntu 24.04 starten, ausreichend Speicher zuweisen und SSH-/sudo-Zugang bereitstellen.
+   Eine öffentliche, möglichst beständige IP und eine Domain wie `video.example.com`
+   verwenden. A-/gegebenenfalls AAAA-Einträge müssen auf diese Instanz zeigen; keine
+   veralteten IPv6-Einträge stehen lassen.
+2. In der Security Group TCP 80 und 443 für Webzugriff freigeben. SSH 22 nur für den
+   eigenen Verwaltungszugang erlauben. Ausgehend werden DNS und HTTPS zu GitHub, GHCR,
+   Ubuntu-/Docker-Paketquellen, dem Zertifikatsanbieter und AWS benötigt. Das Skript
+   verändert keine AWS-Security-Groups oder DNS-Einträge.
+3. Eine IAM-Rolle mit den benötigten Bedrock-Berechtigungen und Zugriff auf das gewählte
+   Modell/Inference Profile an die Instanz hängen. In den Metadatenoptionen **IMDS aktiviert,
+   IMDSv2 erforderlich und Response Hop Limit 2** einstellen, damit die Container die
+   Rollen-Credentials beziehen können. Es werden keine langlebigen AWS-Schlüssel abgefragt
+   oder gespeichert. Modellzugang und Berechtigungen für die verwendete Region bleiben
+   Betreiberaufgaben.
+4. Auf Herausgeberseite müssen ein signierter GitHub-Release mit `install.sh` und beide
+   öffentlichen GHCR-Packages vorhanden sein. Der Download-Link funktioniert davor nicht.
+
+AWS beschreibt die [Webserver-Security-Group-Regeln](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/security-group-rules-reference.html)
+und die [Metadatenoptionen für Container](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-options.html).
+
+### Installieren
+
+Per SSH anmelden und im eigenen Home-Verzeichnis ausführen:
+
+```bash
+curl -fsSL --proto '=https' https://github.com/MartenKiehn/Kiehnema/releases/latest/download/install.sh -o kiehnema-install.sh && sudo bash ./kiehnema-install.sh
+```
+
+Für eine festgelegte Version `latest/download` durch `download/vMAJOR.MINOR.PATCH` ersetzen.
+Der Befehl lädt die Datei zunächst vollständig herunter und startet sie nur bei erfolgreichem
+Download. Wer sie vorher prüfen möchte, führt Download und `sudo bash ./kiehnema-install.sh`
+getrennt aus. `bash ./kiehnema-install.sh --help` benötigt keine Root-Rechte.
+
+Das Skript prüft Betriebssystem, Architektur, Ressourcen, vorhandene Docker-Container,
+das Zielverzeichnis und freie Ports. Es fragt Domain (ohne `https://`), AWS-Region und
+Bedrock-Modell-/Inference-Profile-ID ab. Nach Eingabe von `INSTALL` führt es aus:
+
+- Docker Engine und Compose aus dem offiziellen Docker-APT-Repository installieren,
+  sofern Docker noch fehlt; vorhandene Versionen auf Kompatibilität prüfen.
+- Docker für den Systemstart aktivieren. Host-Swap abschalten, Swap-Zeilen in `/etc/fstab`
+  auskommentieren (Original: `/etc/fstab.kiehnema-before-install`) und `swap.target` maskieren.
+- Ubuntus zusätzliche User-Namespace-Einschränkung über
+  `/etc/sysctl.d/90-kiehnema.conf` mit `kernel.apparmor_restrict_unprivileged_userns=0`
+  für Chromiums Sandbox anpassen. **Diese Einstellung gilt hostweit**; deshalb nur einen
+  dedizierten Server verwenden. AppArmor bleibt aktiviert; Container behalten Seccomp,
+  Chromium-Sandbox, entfernte Capabilities und `no-new-privileges`.
+- Die Release-Signatur vor dem Ausführen von Container-Code prüfen, Images anhand ihrer
+  Digests laden und die Verfügbarkeit der IAM-Rollen-Credentials aus einem Container testen.
+- Unter `/opt/kiehnema` App, Updater, Gateway und private Konfiguration einrichten.
+  Der bestehende Installer fragt Admin-Benutzername und Passwort interaktiv ab und zeigt
+  den persönlichen Recovery-Key. Diesen unabhängig vom Server sichern. 2FA lässt sich
+  anschließend unter **Users** aktivieren.
+- Container starten, die interne Betriebsbereitschaft prüfen und HTTPS `/login` aufrufen.
+  Caddy richtet das Zertifikat ein. Docker startet die Container auch nach Serverneustarts.
+
+Es wird kein kostenpflichtiger Modellaufruf als Installationstest ausgeführt. Der IAM-Test
+bestätigt die Credential-Erreichbarkeit, nicht sämtliche Bedrock-Modellberechtigungen.
+Der bestehende Installer prüft außerdem Chromium und FFmpeg in der Laufzeitumgebung.
+
+Der initial heruntergeladene Installer ist die Vertrauensbasis: GitHub-Repository,
+Release-Veröffentlichung und HTTPS-Download müssen vertrauenswürdig sein. Ein mitgelieferter
+öffentlicher Schlüssel schützt nicht vor einem vollständig ausgetauschten Installer.
+Der private Signierschlüssel bleibt beim Herausgeber und wird niemals auf EC2 benötigt.
+
+### Fehler und erneuter Aufruf
+
+Ein vorhandenes `/opt/kiehnema` oder fremde Docker-Container werden nicht überschrieben.
+Bei einem Fehler bleiben angelegte Installationsdaten und bereits vorgenommene Host-Änderungen
+zur Diagnose erhalten; es erfolgt kein automatisches Entfernen von Paketen oder Daten.
+Scheitert nur die abschließende HTTPS-Prüfung, laufen die Container weiter: DNS, Ports und
+Zertifikatsausstellung prüfen. Das Zielverzeichnis nicht zum Erzwingen eines erneuten Laufs
+löschen. Bei erfolgreicher Installation spätere Releases ausschließlich über **Updates**
+einspielen; der Ein-Befehl-Installer ist kein Updatekommando. Für Änderungen am Betriebssystem
+und Docker bleibt der Betreiber verantwortlich.
 
 ## Erste Installation oder Übernahme
 

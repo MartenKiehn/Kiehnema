@@ -88,7 +88,7 @@ jobs:
           trap 'docker logout ghcr.io' EXIT
           docker buildx build --platform linux/amd64,linux/arm64 --target runtime --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" --metadata-file app-image.json --tag "$IMAGE_REPOSITORY:$GITHUB_REF_NAME" --push .
           docker buildx build --platform linux/amd64,linux/arm64 --target gateway --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" --metadata-file gateway-image.json --tag "$IMAGE_REPOSITORY/gateway:$GITHUB_REF_NAME" --push .
-      - name: Sign and publish the release manifest
+      - name: Sign and publish the release manifest and server installer
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           KIEHNEMA_SIGNING_KEY_PEM: ${{ secrets.KIEHNEMA_SIGNING_KEY_PEM }}

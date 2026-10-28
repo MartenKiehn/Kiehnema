@@ -56,6 +56,17 @@ def release_context():
     return project, commit
 
 
+def installer(envelope, keys, repository):
+    root = Path(__file__).resolve().parent
+    files = {name: (root / name).read_bytes() for name in ('install.py', 'setup_server.py')}
+    files.update({'update.json': envelope, 'keys.json': json.dumps(keys).encode(),
+                  'repository.json': json.dumps(repository).encode()})
+    payload = '\n'.join(f"base64 --decode > \"$stage/{name}\" <<'KIEHNEMA_PAYLOAD'\n"
+                        + base64.b64encode(content).decode() + '\nKIEHNEMA_PAYLOAD'
+                        for name, content in files.items())
+    return (root / 'install.sh').read_text().replace('# RELEASE_PAYLOAD', payload).encode()
+
+
 def publish(app_metadata, gateway_metadata, notes):
     project, commit = release_context()
     env = os.environ
@@ -71,7 +82,9 @@ def publish(app_metadata, gateway_metadata, notes):
         raise ValueError('The release key must be Ed25519.')
     key_id = env['KIEHNEMA_SIGNING_KEY_ID']
     envelope = signed_manifest(manifest, key_id, key)
-    verify(envelope, {key_id: base64.b64encode(key.public_key().public_bytes_raw()).decode()}, repo)
+    keys = {key_id: base64.b64encode(key.public_key().public_bytes_raw()).decode()}
+    verify(envelope, keys, repo)
+    setup = installer(envelope, keys, env['GITHUB_REPOSITORY'])
     with httpx.Client(headers={'Authorization': 'Bearer ' + env['GITHUB_TOKEN']},
                       timeout=60, follow_redirects=False, trust_env=False) as client:
         existing = client.get(project + '/releases/tags/' + quote('v' + VERSION, safe=''))
@@ -87,6 +100,8 @@ def publish(app_metadata, gateway_metadata, notes):
         upload = 'https://uploads.github.com/repos/' + env['GITHUB_REPOSITORY'] + f'/releases/{release_id}/assets'
         client.post(upload, params={'name': 'update.json'}, content=envelope,
                     headers={'Content-Type': 'application/json'}).raise_for_status()
+        client.post(upload, params={'name': 'install.sh'}, content=setup,
+                    headers={'Content-Type': 'application/x-sh'}).raise_for_status()
         client.patch(project + f'/releases/{release_id}', json={'draft': False}).raise_for_status()
     print('Published signed GitHub release ' + VERSION)
 

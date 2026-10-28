@@ -18,7 +18,7 @@ def publication(tmp_path, monkeypatch):
     for name, value in values.items():
         monkeypatch.setenv(name, value)
     release.create_keys(tmp_path / 'key.pem', tmp_path / 'keys.json', 'test')
-    state = {'sha': 'a' * 40, 'upload_status': 201, 'existing': False}
+    state = {'sha': 'a' * 40, 'upload_status': 201, 'existing': False, 'installer_status': 201}
     requests = []
 
     def respond(request):
@@ -31,8 +31,9 @@ def publication(tmp_path, monkeypatch):
         if '/releases/tags/' in request.url.path:
             return httpx.Response(200 if state['existing'] else 404, json={})
         if request.url.host == 'uploads.github.com':
-            assert request.url.params['name'] == 'update.json'
-            return httpx.Response(state['upload_status'], json={})
+            assert request.url.params['name'] in {'update.json', 'install.sh'}
+            return httpx.Response(state['upload_status'] if request.url.params['name'] == 'update.json'
+                                  else state['installer_status'], json={})
         return httpx.Response(201, json={'id': 42})
 
     client = httpx.Client
@@ -50,17 +51,20 @@ def publish(root):
 def test_github_release_is_published_only_after_signed_asset_upload(publication):
     root, _, requests = publication
     publish(root)
-    assert [r.method for r in requests] == ['GET', 'GET', 'POST', 'POST', 'PATCH']
+    assert [r.method for r in requests] == ['GET', 'GET', 'POST', 'POST', 'POST', 'PATCH']
     assert json.loads(requests[2].content)['draft'] is True
     manifest = verify(requests[3].content, json.loads((root / 'keys.json').read_text()), 'ghcr.io/team/app')
     assert manifest.commit == 'a' * 40
     assert manifest.published_at == '2026-01-01T00:00:00Z'
-    assert json.loads(requests[4].content) == {'draft': False}
+    assert requests[4].url.params['name'] == 'install.sh'
+    assert b'PRIVATE KEY' not in requests[4].content
+    assert json.loads(requests[5].content) == {'draft': False}
 
 
-def test_failed_upload_leaves_release_unpublished(publication):
+@pytest.mark.parametrize('failure', ['upload_status', 'installer_status'])
+def test_failed_upload_leaves_release_unpublished(publication, failure):
     root, state, requests = publication
-    state['upload_status'] = 500
+    state[failure] = 500
     with pytest.raises(httpx.HTTPStatusError):
         publish(root)
     assert not any(r.method == 'PATCH' for r in requests)
