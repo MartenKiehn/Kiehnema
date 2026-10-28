@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Updates · Kiehnema{% endblock %}
+{% block content %}
+<section class="card updates-card">
+  <p class="eyebrow">ADMINISTRATION</p>
+  <h1>Updates</h1>
+  <p>Installed version <strong>{{ version }}</strong></p>
+  {% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
+  {% if not managed %}
+    <p>Updates through this page require the managed Linux installation. An operator needs to set it up once; future application updates can then be installed here.</p>
+  {% elif status %}
+    <p class="help">Last successful check: {{ checked }}. Updates are checked automatically about every six hours.</p>
+    {% if status.checking %}<p data-update-checking role="status">Checking for updates…</p>{% endif %}
+    {% if status.error %}<p class="notice error" role="alert">{{ status.error }}</p>{% endif %}
+    {% if status.operation.error %}<p class="notice error" role="alert">{{ status.operation.error }} Active version: {{ status.version }}.</p>{% endif %}
+    {% if status.busy %}
+      <div data-update-progress>
+        <h2>Updating Kiehnema</h2>
+        <p data-update-message role="status" aria-live="polite">{{ status.progress.message }}</p>
+        <progress data-update-bar aria-label="Update progress"></progress>
+        <p class="help">You can close this page. The update will continue.</p>
+        <a data-update-return class="button" href="/login" hidden>Sign in again</a>
+      </div>
+      {% if status.operation.phase in ['queued', 'checking', 'downloading', 'draining'] %}
+        <form action="/admin/updates/cancel" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><button class="button secondary" type="submit">Cancel update</button></form>
+      {% endif %}
+    {% else %}
+      {% if status.available %}
+        <h2>Version {{ status.available[-1].version }} is available</h2>
+        {% for release in status.available %}<details class="release-notes" open><summary>Changes in {{ release.version }}</summary><p>{{ release.notes or 'No release notes provided.' }}</p></details>{% endfor %}
+        <p>Current work will finish first. Kiehnema will save a backup, install the update and check that it starts correctly. Everyone will need to sign in again.</p>
+        <form action="/admin/updates/install" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><input type="hidden" name="version" value="{{ status.available[-1].version }}"><button class="button" type="submit" {% if status.error %}disabled{% endif %}>Install update</button></form>
+      {% elif not status.error %}<p>No newer compatible release is available.</p>{% endif %}
+      <form action="/admin/updates/check" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><button class="button secondary" type="submit">Check for updates</button></form>
+      <details class="release-notes"><summary>Update access</summary>
+        <p>Use the read-only GitLab credentials supplied for this installation. Existing credentials are never displayed.</p>
+        <form action="/admin/updates/credentials" method="post">
+          <input type="hidden" name="csrf" value="{{ request.state.csrf }}">
+          <label for="update-username">Registry username</label><input id="update-username" name="username" autocomplete="off" maxlength="256" required>
+          <label for="update-token">Access token</label><input id="update-token" name="token" type="password" autocomplete="new-password" maxlength="8192" required>
+          <button class="button secondary" type="submit">Check and save access</button>
+        </form>
+      </details>
+    {% endif %}
+  {% endif %}
+</section>
+{% endblock %}
+{% block scripts %}<script src="/static/update-progress.js" defer></script>{% endblock %}

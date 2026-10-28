@@ -35,10 +35,10 @@ def people(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, 'data_dir', tmp_path)
     monkeypatch.setattr('app.web.main.memory_policy', lambda: None)
     a.sessions.clear()
-    draft = a.enrollment('admin', PASSWORD)
+    draft = a.enrollment('admin', PASSWORD, two_factor=True)
     admin = a.finish_enrollment(draft, pyotp.TOTP(draft['totp']).now(), setup=True)
     invitation = a.invite_user(admin, 'alice')
-    other_draft = a.enrollment('alice', PASSWORD)
+    other_draft = a.enrollment('alice', PASSWORD, two_factor=True)
     alice = a.finish_enrollment(other_draft, pyotp.TOTP(other_draft['totp']).now(), invite=invitation)
     token = a.current_identity.set(alice)
     yield admin, alice, draft, other_draft
@@ -90,30 +90,23 @@ def test_admin_setup_retries_invalid_input(admin_setup, monkeypatch, capsys, att
     passwords = iter([*attempts, PASSWORD, PASSWORD])
     monkeypatch.setattr(cli.getpass, 'getpass', lambda prompt: next(passwords))
     names = iter(['invalid name', 'marten'])
-    enrollment = a.enrollment
-    draft = {}
-
-    def remember_enrollment(name, password):
-        draft.update(enrollment(name, password))
-        return draft
-
     def answer(prompt):
-        if prompt.startswith('Administrator username'):
-            return next(names)
-        assert not a.initialized()
-        return pyotp.TOTP(draft['totp']).now()
+        assert prompt.startswith('Administrator username')
+        return next(names)
 
-    monkeypatch.setattr(a, 'enrollment', remember_enrollment)
     monkeypatch.setattr('builtins.input', answer)
     cli.setup_admin()
     output = capsys.readouterr().out
     assert message in output
     assert 'Use 3–64 letters' in output
     assert PASSWORD not in output
+    assert 'time-based setup key' not in output
     with a.database() as con:
         users = con.execute('SELECT * FROM users').fetchall()
     assert len(users) == 1 and users[0]['username'] == 'marten' and users[0]['admin']
     a.Argon2id.verify_phc_encoded(PASSWORD.encode(), users[0]['password_hash'])
+    assert not users[0]['totp']
+    assert a.authenticate('marten', PASSWORD).admin
 
 
 @pytest.mark.parametrize('source', ['environment', 'dotenv'])
@@ -146,11 +139,11 @@ def test_unattended_admin_startup_and_restart(admin_setup, admin_env, tmp_path, 
 
 
 @pytest.mark.parametrize(('key', 'value', 'message'), [
-    ('MG_ADMIN_USERNAME', None, 'all four'),
-    ('MG_ADMIN_PASSWORD', None, 'all four'),
-    ('MG_ADMIN_TOTP_SECRET', None, 'all four'),
-    ('MG_ADMIN_RECOVERY_KEY', None, 'all four'),
-    ('MG_ADMIN_PASSWORD', '', 'all four'),
+    ('MG_ADMIN_USERNAME', None, 'together'),
+    ('MG_ADMIN_PASSWORD', None, 'together'),
+    ('MG_ADMIN_RECOVERY_KEY', None, 'together'),
+    ('MG_ADMIN_PASSWORD', '', 'together'),
+    ('MG_ADMIN_TOTP_SECRET', '', 'MG_ADMIN_TOTP_SECRET'),
     ('MG_ADMIN_USERNAME', 'invalid user', 'username'),
     ('MG_ADMIN_PASSWORD', 'short', '15–256'),
     ('MG_ADMIN_PASSWORD', 'x' * 257, '15–256'),
@@ -185,7 +178,7 @@ def test_setup_and_invitation_cannot_be_reused(people):
     with pytest.raises(ValueError, match='already complete'):
         a.finish_enrollment(draft, pyotp.TOTP(draft['totp']).now(), setup=True)
     invitation = a.invite_user(admin, 'bob')
-    new = a.enrollment('bob', PASSWORD)
+    new = a.enrollment('bob', PASSWORD, two_factor=True)
     a.finish_enrollment(new, pyotp.TOTP(new['totp']).now(), invite=invitation)
     with pytest.raises(ValueError, match='invitation'):
         a.finish_enrollment(new, pyotp.TOTP(new['totp']).now(), invite=invitation)
@@ -492,6 +485,8 @@ async def test_account_onboarding_and_recovery_in_chromium(people, tmp_path, mon
                 await admin_page.get_by_label('Authenticator code').fill(pyotp.TOTP(people[2]['totp']).now())
                 await admin_page.get_by_role('button', name='Unlock workspace').click()
                 await admin_page.get_by_role('link', name='Users', exact=True).click()
+                await admin_page.get_by_label('Require two-factor authentication for all users', exact=True).check()
+                await admin_page.get_by_role('button', name='Save policy', exact=True).click()
                 await admin_page.get_by_label('New username').fill('new-user')
                 await admin_page.get_by_role('button', name='Create invitation').click()
                 invitation = await admin_page.locator('.recovery-key code').inner_text()
@@ -531,6 +526,7 @@ async def test_account_onboarding_and_recovery_in_chromium(people, tmp_path, mon
                 finally:
                     a.current_identity.reset(principal)
                 await page.get_by_role('button', name='Sign out').click()
+                await page.wait_for_url(base + '/login')
                 assert await page.evaluate('document.documentElement.scrollWidth <= innerWidth')
                 await page.screenshot(path=str(tmp_path / 'login-mobile.png'), full_page=True)
                 await page.set_viewport_size({'width': 1440, 'height': 1000})

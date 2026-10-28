@@ -1,0 +1,47 @@
+{
+    admin off
+}
+
+:8081 {
+    respond /healthz "ok"
+}
+
+{$KIEHNEMA_ADDRESS} {
+    header {
+        X-Content-Type-Options nosniff
+        ?Referrer-Policy same-origin
+        Cache-Control no-store
+        ?Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+    }
+    route {
+        respond /_internal/* 404
+        handle /_update/status {
+            root * /srv/update
+            rewrite * /status.json
+            file_server
+        }
+        handle_path /_update/assets/* {
+            root * /srv/maintenance
+            file_server
+        }
+        @maintenance file {
+            root /srv/update
+            try_files maintenance
+        }
+        handle @maintenance {
+            root * /srv/maintenance
+            rewrite * /index.html
+            file_server {
+                status 503
+            }
+        }
+        handle {
+            reverse_proxy app:8000
+        }
+    }
+    handle_errors {
+        root * /srv/maintenance
+        rewrite * /index.html
+        file_server
+    }
+}

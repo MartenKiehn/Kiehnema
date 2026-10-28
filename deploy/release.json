@@ -1,0 +1,6 @@
+{
+  "minimum_app": "0.1.0",
+  "minimum_updater": "0.1.0",
+  "source_schemas": [1],
+  "platforms": ["linux/amd64", "linux/arm64"]
+}

@@ -1,0 +1,90 @@
+name: ${KIEHNEMA_INSTALLATION:-kiehnema}
+services:
+  app:
+    image: ${KIEHNEMA_APP_IMAGE:?Set a verified app image digest}
+    container_name: ${KIEHNEMA_INSTALLATION:-kiehnema}-app
+    labels:
+      org.kiehnema.installation: ${KIEHNEMA_INSTALLATION:-kiehnema}
+    user: "1000:1000"
+    init: true
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=${KIEHNEMA_HOME:?Set installation directory}/chromium-seccomp.json
+    env_file:
+      - path: ${KIEHNEMA_HOME}/app.env
+        format: raw
+    environment:
+      MG_HOST: 0.0.0.0
+      MG_PORT: "8000"
+      MG_PUBLIC_ORIGIN: ${KIEHNEMA_ORIGIN:?Set HTTPS origin}
+      MG_DATA_DIR: /data
+      MG_WORK_DIR: /work
+      MG_UPDATE_CONTROL_DIR: /run/kiehnema
+      MG_TRUSTED_PROXIES: "*"
+    volumes:
+      - ${KIEHNEMA_HOME}/data:/data
+      - ${KIEHNEMA_HOME}/updates/control:/run/kiehnema:ro
+    tmpfs:
+      - /work:size=4294967296,mode=0700,uid=1000,gid=1000
+      - /tmp:size=268435456,mode=1777
+    shm_size: 1gb
+    mem_limit: 8g
+    ulimits:
+      core: 0
+    logging:
+      driver: none
+    networks: [private]
+
+  updater:
+    image: ${KIEHNEMA_UPDATER_IMAGE:?Set a verified updater image digest}
+    container_name: ${KIEHNEMA_INSTALLATION:-kiehnema}-updater
+    labels:
+      org.kiehnema.installation: ${KIEHNEMA_INSTALLATION:-kiehnema}
+    user: "0:0"
+    init: true
+    command: [python, -m, app.updates, serve]
+    restart: unless-stopped
+    read_only: true
+    environment:
+      MG_DATA_DIR: /data
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${KIEHNEMA_HOME}/data:/data
+      - ${KIEHNEMA_HOME}/updates:/updates
+    tmpfs:
+      - /tmp:size=67108864,mode=1777
+    ulimits:
+      core: 0
+    healthcheck:
+      test: [CMD, python, -m, app.updates.health]
+      interval: 5s
+      timeout: 4s
+      start_period: 10s
+    logging:
+      driver: none
+    networks: [private]
+
+  gateway:
+    image: ${KIEHNEMA_GATEWAY_IMAGE:?Set a verified gateway image digest}
+    container_name: ${KIEHNEMA_INSTALLATION:-kiehnema}-gateway
+    labels:
+      org.kiehnema.installation: ${KIEHNEMA_INSTALLATION:-kiehnema}
+    restart: unless-stopped
+    environment:
+      KIEHNEMA_ADDRESS: ${KIEHNEMA_ADDRESS:?Set HTTPS hostname without a custom port}
+    ports:
+      - "${KIEHNEMA_HTTP_PORT:-80}:80"
+      - "${KIEHNEMA_HTTPS_PORT:-443}:443"
+    volumes:
+      - ${KIEHNEMA_HOME}/updates/public:/srv/update:ro
+      - ${KIEHNEMA_HOME}/tls:/data
+      - ${KIEHNEMA_HOME}/caddy-config:/config
+    logging:
+      driver: none
+    networks: [private]
+
+networks:
+  private:

@@ -1,4 +1,10 @@
 :root { --ink: #292b28; --muted: #606359; --paper: #f4f0e7; --line: #d9d5ca; --accent: #d5ad68; --white: #fffdf8; --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-synthesis: none; }
+.updates-card { max-width: 850px; margin-inline: auto; }
+.updates-card form { margin-block: 20px; }
+.updates-card progress { width: 100%; height: 18px; accent-color: var(--accent); }
+.release-notes { margin-block: 24px; }
+.release-notes p { white-space: pre-wrap; overflow-wrap: anywhere; }
+[hidden] { display: none !important; }
 * { box-sizing: border-box; }
 body { margin: 0; color: var(--ink); background: var(--paper); font: 1rem/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 a { color: inherit; text-underline-offset: 3px; }

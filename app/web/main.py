@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextvars
 import hashlib
+import hmac
 import json
 import logging
 import time
@@ -31,7 +32,10 @@ from app.web.review import CommentRequest, saved_comments, save_comments
 from app.config import settings
 from app.security import accounts, vault
 from app.web import auth
+from app.web.updates import router as updates_router
 from app.security.workspace import memory_policy
+from app.updates import DATA_SCHEMA, VERSION
+from app.updates.state import assert_start_allowed, writes_allowed
 
 HERE = Path(__file__).resolve().parent
 TERMINAL = {"review", "done", "failed", "interrupted"}
@@ -49,6 +53,8 @@ def read_json(path: Path, default=None):
 async def _lifespan(app: FastAPI):
     memory_policy()
     app.state.tasks = {}
+    app.state.mutations = 0
+    app.state.runtime_ready = False
     # ponytail: serialize whole jobs for local use; use a worker queue if concurrent generation is needed.
     app.state.worker_lock = asyncio.Lock()
     origin = urlsplit(settings.public_origin)
@@ -59,6 +65,10 @@ async def _lifespan(app: FastAPI):
     with accounts.database() as con:
         app.state.interrupted = {row[0] for row in con.execute('SELECT id FROM jobs WHERE active!=0')}
         con.execute("UPDATE jobs SET active=0")
+    if settings.update_control_dir is not None:
+        from app.updates.probe import runtime
+        await runtime()
+    app.state.runtime_ready = True
     async def expire_secrets():
         while True:
             await asyncio.sleep(30)
@@ -70,6 +80,7 @@ async def _lifespan(app: FastAPI):
     try:
         yield
     finally:
+        app.state.runtime_ready = False
         cleanup.cancel()
         await asyncio.gather(cleanup, return_exceptions=True)
         tasks = list(app.state.tasks.values())
@@ -84,6 +95,7 @@ async def _lifespan(app: FastAPI):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     with accounts.service_lock():
+        assert_start_allowed()
         async with _lifespan(app):
             yield
 
@@ -91,6 +103,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Kiehnema", lifespan=lifespan)
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=list({"127.0.0.1", "localhost", "[::1]", urlsplit(settings.public_origin).hostname}))
 app.include_router(auth.router)
+app.include_router(updates_router)
 app.middleware("http")(auth.guard)
 app.mount("/static", StaticFiles(directory=HERE.parent / "static"), name="static")
 templates = Jinja2Templates(directory=HERE / "templates")
@@ -117,7 +130,24 @@ async def local_boundary(request: Request, call_next):
         expected_origin = str(request.base_url).rstrip('/')
     if request.method not in {"GET", "HEAD", "OPTIONS"} and request.headers.get("origin") != expected_origin:
         return HTMLResponse("This action must be submitted from the local app.", status_code=403)
-    response = await call_next(request)
+    if request.url.path == '/_internal/update-ready':
+        root = settings.update_control_dir
+        if root is None or not hmac.compare_digest(request.headers.get('authorization', ''), 'Bearer ' + (root / 'token').read_text().strip()):
+            return Response(status_code=404)
+        return JSONResponse({'ready': app.state.runtime_ready, 'version': VERSION, 'schema': DATA_SCHEMA,
+                             'busy': bool(app.state.tasks) or app.state.mutations > 0},
+                            headers={'Cache-Control': 'no-store'})
+    mutation = request.method not in {'GET', 'HEAD', 'OPTIONS'}
+    if mutation and request.url.path != '/admin/updates/cancel' and not writes_allowed():
+        return HTMLResponse('An update is in progress. New changes are paused until it finishes.', status_code=503,
+                            headers={'Retry-After': '10'})
+    if mutation:
+        app.state.mutations += 1
+    try:
+        response = await call_next(request)
+    finally:
+        if mutation:
+            app.state.mutations -= 1
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Cache-Control"] = "no-store"

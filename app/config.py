@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     # Plaintext processing requires a verified RAM filesystem; never fall back to /tmp.
     work_dir: Path = Path("/dev/shm/kiehnema")
     job_timeout_s: int = 7200
+    update_control_dir: Path | None = None
+    trusted_proxies: str = '127.0.0.1'
 
 
 class AdminSetupSettings(BaseSettings):
