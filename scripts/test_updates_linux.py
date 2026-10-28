@@ -125,7 +125,7 @@ def main():
             (root / 'keys.json').write_text(json.dumps(keys))
             (root / 'config.json').write_text(json.dumps({'installation': name,
                 'public_origin': 'https://localhost', 'repository': repository,
-                'gitlab_url': 'https://unavailable.invalid', 'project_id': 'test'}))
+                'github_repository': 'kiehnema-integration-test/' + name}))
             run('seed', app1, '--rm', '--user', '0:0', '-v', name + '-bootstrap:/bootstrap',
                 command=['python', '-c', "import json,sys; from pathlib import Path; [Path('/bootstrap', k).write_text(v) for k,v in json.load(sys.stdin).items()]"],
                 stdin=json.dumps({p.name: p.read_text() for p in root.glob('*.json')}))

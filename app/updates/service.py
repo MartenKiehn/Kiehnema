@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 
 from app.updates.docker import Docker
 from app.updates.manifest import resolve
-from app.updates.releases import GitLab
+from app.updates.releases import GitHub
 from app.updates.state import atomic_bytes, atomic_json, boot_id, file_lock, read_json, sync_directory
 
 TERMINAL = {'succeeded', 'failed', 'cancelled'}
@@ -112,7 +112,7 @@ class Updater:
                 return
             credentials = credentials if credentials is not None else read_json(self.root / 'credentials.json', {})
             current = self.installed()
-            client = GitLab(self.config, credentials)
+            client = GitHub(self.config, credentials)
             self.checking = True
             try:
                 releases, envelopes = client.releases(current['keys'], self.config['repository'])
@@ -314,11 +314,11 @@ def create_app(updater):
         if set(data) != {'username', 'token'} or not all(isinstance(v, str) and len(v) <= 8192 for v in data.values()):
             raise ValueError('Invalid update credentials.')
         def test_access():
-            gitlab = GitLab(updater.config, data)
+            github = GitHub(updater.config, data)
             try:
-                gitlab.download(gitlab.api + '/releases?per_page=1', limit=1024 * 1024)
+                github.download(github.api + '/releases?per_page=1', limit=1024 * 1024)
             finally:
-                gitlab.close()
+                github.close()
         await asyncio.to_thread(test_access)
         atomic_json(updater.root / 'credentials.json', data)
         await check()

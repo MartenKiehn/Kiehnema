@@ -33,7 +33,7 @@
       {% elif not status.error %}<p>No newer compatible release is available.</p>{% endif %}
       <form action="/admin/updates/check" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><button class="button secondary" type="submit">Check for updates</button></form>
       <details class="release-notes"><summary>Update access</summary>
-        <p>Use the read-only GitLab credentials supplied for this installation. Existing credentials are never displayed.</p>
+        <p>Use the GitHub credentials with read access to releases and container packages supplied for this installation. Existing credentials are never displayed.</p>
         <form action="/admin/updates/credentials" method="post">
           <input type="hidden" name="csrf" value="{{ request.state.csrf }}">
           <label for="update-username">Registry username</label><input id="update-username" name="username" autocomplete="off" maxlength="256" required>

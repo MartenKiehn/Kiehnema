@@ -1,66 +1,82 @@
-"""Bounded, same-origin GitLab downloads. Credentials never follow asset redirects."""
+"""Bounded GitHub release downloads; credentials never reach the asset CDN."""
 
 from datetime import datetime, timezone
 import base64
-from urllib.parse import quote, urlsplit
+import re
+from urllib.parse import urlsplit
 
 import httpx
 
 from app.updates.manifest import MAX_MANIFEST, UnsupportedRelease, verify, version
 
 
-class GitLab:
+class GitHub:
     def __init__(self, config, credentials):
-        self.origin = config['gitlab_url'].rstrip('/')
-        parsed = urlsplit(self.origin)
-        if parsed.scheme != 'https' or not parsed.hostname or parsed.path or parsed.query or parsed.fragment or parsed.username:
-            raise ValueError('GitLab must be an HTTPS origin.')
-        self.api = self.origin + '/api/v4/projects/' + quote(str(config['project_id']), safe='')
-        self.client = httpx.Client(headers={'PRIVATE-TOKEN': credentials['token']} if credentials.get('token') else {},
-                                   timeout=30, follow_redirects=False, trust_env=False)
+        repository = config['github_repository']
+        if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', repository):
+            raise ValueError('GitHub repository must use owner/name.')
+        self.api = 'https://api.github.com/repos/' + repository
+        headers = {'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}
+        if credentials.get('token'):
+            headers['Authorization'] = 'Bearer ' + credentials['token']
+        self.client = httpx.Client(headers=headers, timeout=30, follow_redirects=False, trust_env=False)
 
     def close(self):
         self.client.close()
 
-    def download(self, url, limit=MAX_MANIFEST):
-        if urlsplit(url)[:2] != urlsplit(self.origin)[:2] or urlsplit(url).username:
-            raise ValueError('Release assets must be hosted on the configured GitLab origin.')
-        with self.client.stream('GET', url) as response:
-            response.raise_for_status()
-            data = bytearray()
-            for chunk in response.iter_bytes():
-                data.extend(chunk)
-                if len(data) > limit:
-                    raise ValueError('GitLab response exceeds the size limit.')
-            return bytes(data), response.headers
+    def download(self, url, limit=MAX_MANIFEST, *, asset=False):
+        if not url.startswith(self.api + '/') or urlsplit(url).username:
+            raise ValueError('Release URLs must belong to the configured GitHub repository.')
+        request = self.client.build_request('GET', url,
+            headers={'Accept': 'application/octet-stream'} if asset else {})
+        for attempt in range(4):
+            response = self.client.send(request, stream=True)
+            try:
+                if asset and response.status_code in (301, 302, 303, 307, 308):
+                    target = response.headers.get('location', '')
+                    parsed = urlsplit(target)
+                    if (parsed.scheme != 'https' or parsed.hostname not in
+                            {'release-assets.githubusercontent.com', 'objects.githubusercontent.com'}
+                            or parsed.username or parsed.port not in (None, 443)):
+                        raise ValueError('Unexpected GitHub asset redirect.')
+                    # A fresh request deliberately carries no API credentials or cookies to the CDN.
+                    request = httpx.Request('GET', target)
+                    continue
+                response.raise_for_status()
+                data = bytearray()
+                for chunk in response.iter_bytes():
+                    data.extend(chunk)
+                    if len(data) > limit:
+                        raise ValueError('GitHub response exceeds the size limit.')
+                return bytes(data), response.headers
+            finally:
+                response.close()
+        raise ValueError('Too many GitHub asset redirects.')
 
     def releases(self, keys, repository):
         import json
         found = []
         envelopes = {}
-        page = '1'
-        seen = set()
-        while page:
-            if not page.isdigit() or page in seen or len(seen) >= 100:
-                raise ValueError('Invalid or excessive release pagination.')
-            seen.add(page)
-            raw, headers = self.download(f'{self.api}/releases?per_page=100&page={page}', limit=4 * 1024 * 1024)
+        for page in range(1, 101):
+            raw, _ = self.download(f'{self.api}/releases?per_page=100&page={page}', limit=4 * 1024 * 1024)
             entries = json.loads(raw)
             if not isinstance(entries, list):
-                raise ValueError('Invalid GitLab release list.')
+                raise ValueError('Invalid GitHub release list.')
             for entry in entries:
+                if entry.get('draft') or entry.get('prerelease'):
+                    continue
                 tag = entry.get('tag_name', '')
                 try:
                     version(tag.removeprefix('v'))
-                    date = datetime.fromisoformat(entry['released_at'].replace('Z', '+00:00'))
+                    date = datetime.fromisoformat(entry['published_at'].replace('Z', '+00:00'))
                     if date.tzinfo is None or date > datetime.now(timezone.utc):
                         continue
                 except (ValueError, KeyError, TypeError):
                     continue
-                links = [link['url'] for link in entry.get('assets', {}).get('links', []) if link.get('name') == 'update.json']
+                links = [link['url'] for link in entry.get('assets', []) if link.get('name') == 'update.json']
                 if len(links) != 1:
                     continue
-                envelope, _ = self.download(links[0])
+                envelope, _ = self.download(links[0], asset=True)
                 signed = json.loads(envelope)
                 metadata = json.loads(base64.b64decode(signed['manifest'], validate=True))
                 if tag != 'v' + metadata['version']:
@@ -75,5 +91,8 @@ class GitLab:
                 except UnsupportedRelease:
                     continue
                 found.append(release)
-            page = headers.get('x-next-page', '')
+            if len(entries) < 100:
+                break
+        else:
+            raise ValueError('Excessive GitHub release pagination.')
         return found, envelopes

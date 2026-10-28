@@ -1,7 +1,7 @@
 # Linux-Installation und Updates
 
 Kiehnema prüft ungefähr alle sechs Stunden mit zufälligem Zeitversatz auf neue stabile
-GitLab-Releases. Administratoren sehen einen Hinweis und installieren unter **Updates**.
+GitHub-Releases. Administratoren sehen einen Hinweis und installieren unter **Updates**.
 Ein Release wird erst nach Tests, Image-Build und Signatur angeboten. Eine Änderung der
 Versionsnummer allein veröffentlicht noch kein Update.
 
@@ -23,7 +23,7 @@ Automatische Installation ohne Klick ist bewusst nicht enthalten.
 - Unprivilegierte User-Namespaces für Chromiums Sandbox müssen funktionieren. Das
   mitgelieferte Seccomp-Profil, UID 1000, `no-new-privileges` und entfernte Host-Capabilities
   gehören zur Installation. Die Bereitschaftsprüfung startet tatsächlich Chromium und FFmpeg.
-- Domain mit HTTPS, eingehende Ports 80/443 für Caddy und ausgehendes HTTPS zu GitLab,
+- Domain mit HTTPS, eingehende Ports 80/443 für Caddy und ausgehendes HTTPS zu GitHub,
   Registry und den bestehenden Anwendungsdiensten. Die App und der Updater haben keine
   veröffentlichten Verwaltungsports.
 
@@ -33,21 +33,23 @@ Bestehende Installationen müssen **einmal** übernommen werden; ein bisher nich
 Updater kann sich nicht selbst nachinstallieren. Danach benötigen reguläre App-Updates
 keinen Terminalzugriff. Betriebssystem, Docker und Host-Konfiguration bleiben Betreiberaufgaben.
 
-## GitHub Actions und GitLab einmal vorbereiten
+## GitHub einmal vorbereiten
 
-Tests, Image-Builds und Veröffentlichung laufen ausschließlich in GitHub Actions
-(`.github/workflows/ci.yml`). `.gitlab-ci.yml` verhindert neue GitLab-Pipelines; bereits
-wartende Pipelines können in GitLab abgebrochen werden. GitLab bleibt die Quelle für
-Container, signierte Pakete und Releases. GitLab-Runner sind nicht erforderlich.
+GitHub ist die Hauptplattform: Tests, Builds und Veröffentlichung laufen in GitHub Actions
+(`.github/workflows/ci.yml`), signierte Manifeste liegen als GitHub-Release-Anhang und Images
+in der GitHub Container Registry (`ghcr.io`). GitLab ist ausschließlich eine zweite Kopie
+des Git-Repositories. `.gitlab-ci.yml` verhindert neue Pipelines; alte wartende Jobs können
+abgebrochen werden. GitLab-Runner, GitLab-Registry und GitLab-Zugangstokens sind nicht nötig.
 
-1. Container Registry und Generic Package Registry für das Projekt aktivieren. Der Standard
-   des Installers ist `https://git.timeglass.de`, Projekt `mkiehn/kiehnema`.
-2. `v*`-Tags in GitLab und GitHub schützen und nur vertrauenswürdigen Release-Verantwortlichen
-   erlauben. In GitHub Actions aktivieren und das Environment **release** anlegen, auf `v*`-Tags
-   begrenzen und eine Freigabe durch einen Release-Verantwortlichen konfigurieren.
-   Tests laufen nativ auf `ubuntu-24.04` (amd64) und `ubuntu-24.04-arm` (arm64).
-   Der Workflow deaktiviert Swap auf diesen temporären VMs und erlaubt Chromiums
-   User-Namespace-Sandbox. Für den Mehrplattform-Build richtet er QEMU und Buildx ein.
+1. GitHub Actions für `MartenKiehn/Kiehnema` aktivieren. Tests laufen nativ auf
+   `ubuntu-24.04` (amd64) und `ubuntu-24.04-arm` (arm64). Der Workflow deaktiviert Swap
+   auf diesen temporären VMs und erlaubt Chromiums User-Namespace-Sandbox. Für den
+   Mehrplattform-Build richtet er QEMU und Buildx ein.
+2. In GitHub eine aktive Tag-Ruleset für `v*` anlegen, die Erstellung auf vertrauenswürdige
+   Release-Verantwortliche begrenzt und Änderungen/Löschung verhindert. Der Releasejob
+   verlangt `GITHUB_REF_PROTECTED=true` und prüft, dass der Tag noch auf den getesteten
+   Commit zeigt. Das Environment **release** anlegen, auf `v*`-Tags begrenzen und eine
+   Freigabe durch einen Release-Verantwortlichen konfigurieren.
 3. Den privaten Ed25519-Schlüssel außerhalb des Repositories erzeugen:
 
    ```bash
@@ -56,43 +58,38 @@ Container, signierte Pakete und Releases. GitLab-Runner sind nicht erforderlich.
      --public /sicherer/pfad/release-keys.json --key-id release-1
    ```
 
-   Den PEM-Inhalt als GitHub-Environment-Secret `KIEHNEMA_SIGNING_KEY_PEM` unter **release**
-   hinterlegen; `KIEHNEMA_SIGNING_KEY_ID=release-1` als Environment-Variable. Der Workflow
-   schreibt den Schlüssel nur für die Signierung in eine private temporäre Datei und entfernt
-   sie anschließend. PEM-Inhalte nicht in Logs ausgeben. Den öffentlichen Schlüssel über einen unabhängig vertrauenswürdigen Weg
-   an Installationsbetreiber geben. Ein Schlüssel aus demselben ungeprüften Download ist
-   kein Vertrauensanker.
-4. Für private Auslieferung je Installation einen widerrufbaren Projekt-Zugriffstoken mit
-   Reporter-Zugriff, `read_api` und `read_registry` bereitstellen. Die API verwendet
-   `PRIVATE-TOKEN`, die Registry den zugehörigen Bot-Benutzernamen. Ein reiner Deploy-Token
-   reicht für die Releases-API nicht. Ablaufdatum überwachen; Erneuerung geht unter
-   **Updates → Update access**. Die Oberfläche zeigt vorhandene Tokens niemals an.
-5. Benötigte Release-Manifeste und Image-Digests von Registry-/Paketbereinigung ausnehmen.
-   Das Manifest liegt dauerhaft als Generic Package, nicht als ablaufendes CI-Artefakt.
-   Die `update.json`-URL muss ohne Umleitung auf einen anderen Ursprung direkt von GitLab
-   abrufbar sein. Bei ausgelagertem Object Storage dessen Download-Proxy passend einrichten.
+   Im GitHub-Environment **release** unter Secrets den vollständigen PEM-Inhalt als
+   `KIEHNEMA_SIGNING_KEY_PEM` hinterlegen. Unter Variables `KIEHNEMA_SIGNING_KEY_ID=release-1`
+   setzen. Der Workflow schreibt den Schlüssel nur für die Signierung in eine private
+   temporäre Datei und entfernt sie anschließend. Den öffentlichen Schlüssel unabhängig
+   vertrauenswürdig an Installationsbetreiber verteilen und den privaten Schlüssel sichern.
+4. Der Releasejob verwendet GitHubs automatisch erzeugtes, zeitlich begrenztes `GITHUB_TOKEN`
+   mit `contents: write` und `packages: write`. Dafür keinen persönlichen Token hinterlegen.
+   Normale Testjobs haben nur Lesezugriff auf das Repository und keine Release-Secrets.
+5. Die erzeugten Packages `ghcr.io/martenkiehn/kiehnema` und
+   `ghcr.io/martenkiehn/kiehnema/gateway` mit dem Repository verknüpft lassen. Für anonyme
+   Installation müssen sowohl das Repository als auch **beide Container-Packages** öffentlich
+   sein; die Package-Sichtbarkeit separat prüfen. Für private Auslieferung benötigt die
+   Installation einen eigenen GitHub-PAT (classic) mit `read:packages` und, bei privatem
+   Repository, zusätzlich `repo`, sowie den zugehörigen GitHub-Benutzernamen.
+   Dieser Lesetoken ist unabhängig vom kurzlebigen CI-Token und vom Signierschlüssel.
+6. Release-Anhänge und Image-Digests nicht bereinigen, solange Installationen sie benötigen.
+   Die `update.json` liegt dauerhaft am Release, nicht als ablaufendes Actions-Artefakt.
+   Der Updater ruft sie über die GitHub-API ab und folgt erlaubten GitHub-CDN-Weiterleitungen
+   ohne Authentifizierungstoken. Er akzeptiert nur signierte Digests aus dem konfigurierten
+   Container-Repository.
 
-Zusätzlich im GitHub-Environment **release** hinterlegen:
+Nach erfolgreichen Tests und Builds erstellt der Job zunächst einen Releaseentwurf,
+lädt die signierte `update.json` hoch und veröffentlicht erst danach den Release.
+Bei einem Uploadfehler bleibt der Entwurf unveröffentlicht; den Fehler beheben und den
+Entwurf prüfen, bevor ein neuer Versuch erfolgt. Veröffentlichte Releases werden nicht
+überschrieben. Der Manifestzeitpunkt stammt aus dem getesteten Commit; die Sichtbarkeit
+in der Updatesuche richtet sich zusätzlich nach dem Veröffentlichungsdatum des Releases.
 
-| Name | Typ | Inhalt |
-| --- | --- | --- |
-| `GITLAB_TOKEN` | Secret | GitLab-Projektzugriffstoken mit Maintainer-Rolle und `api`, `read_registry`, `write_registry` |
-| `GITLAB_REGISTRY_USER` | Secret | Zugehöriger GitLab-Bot-Benutzername |
-| `GITLAB_REGISTRY_IMAGE` | Variable | Vollständiger Image-Repositorypfad aus der GitLab Container Registry, ohne Tag und ohne `https://` |
-| `KIEHNEMA_SIGNING_KEY_PEM` | Secret | Privater Ed25519-PEM-Schlüssel aus Schritt 3 |
-| `KIEHNEMA_SIGNING_KEY_ID` | Variable | `release-1` bzw. die beim Erzeugen gewählte Schlüssel-ID |
-
-Der Veröffentlichungstoken ist getrennt von den Lesetokens der Installationen; er wird
-nicht an Installationen verteilt. Ablaufdatum überwachen. Normale Branch- und PR-Tests
-verwenden keine dieser Secrets. Die GitHub-Pipeline testet zunächst beide Plattformen und
-prüft vor dem Image-Push über die GitLab-API, dass der gleichnamige GitLab-Tag geschützt ist
-und auf denselben Commit zeigt. Erst danach werden Images, signiertes Paket und Release
-veröffentlicht. Der Manifestzeitpunkt stammt aus dem GitLab-Tag (bei Lightweight-Tags aus
-dem Commit), damit erneute Versuche dieselben signierten Bytes erzeugen können.
-
-GitHub-Testergebnisse erscheinen nicht automatisch als GitLab-Merge-Request-Prüfung.
-Vor einem Merge den passenden Commit unter **GitHub → Actions** prüfen. Die beiden
-Repositorykopien werden über `python3 scripts/push.py` aktualisiert; Tags separat pushen.
+Code, Reviews, CI und Releases werden auf GitHub gepflegt. Nach einem GitHub-Merge lokal
+aktualisieren und `python3 scripts/push.py` ausführen, um den Branch auch nach GitLab zu
+sichern. Das Skript überträgt nur den aktuellen Branch; Tags separat sichern. Issues,
+PR-Kommentare, Release-Anhänge, Images und Secrets sind nicht Teil dieser Git-Codekopie.
 
 ## Erste Installation oder Übernahme
 
@@ -112,7 +109,7 @@ aus seiner Laufzeitkopie. Eigene Originaldateien entsprechend aufbewahren/entfer
 Optionales `update-credentials.json` für ein privates Projekt:
 
 ```json
-{"username":"project_BOT_USERNAME","token":"READ_ONLY_PROJECT_TOKEN"}
+{"username":"GITHUB_USERNAME","token":"GITHUB_READ_TOKEN"}
 ```
 
 ```bash
@@ -124,7 +121,7 @@ sudo python3 scripts/install.py \
   --origin https://video.example.com
 ```
 
-Bei einem öffentlichen Projekt `--credentials` weglassen. Mit `--gitlab`, `--project`,
+Bei öffentlichem Repository und öffentlichen GHCR-Packages `--credentials` weglassen. Mit `--repository`,
 `--directory` und `--name` können die Installationsangaben angepasst werden. Der Installer
 überschreibt kein bestehendes Zielverzeichnis. Er prüft die Signatur mit OpenSSL, bevor
 er Code aus dem Release ausführt. Bei einem Setupfehler bleibt das Ziel zur Diagnose
@@ -150,18 +147,18 @@ lediglich eine lokale, authentifizierte Steuerverbindung.
    Ausgangs-Datenschemata und Plattformen müssen tatsächlich getestet sein.
 3. Tests und Upgradeprobe durchführen, Änderungen committen und mit
    `python3 scripts/push.py` nach GitLab und GitHub pushen.
-4. Den passenden geschützten Tag zuerst nach GitLab und anschließend nach GitHub pushen,
-   beispielsweise für Version `0.2.0`:
+4. Den passenden geschützten Tag nach GitHub pushen, beispielsweise für Version `0.2.0`:
 
    ```bash
    git tag -a v0.2.0 -m 'Release 0.2.0'
-   git push git@git.timeglass.de:mkiehn/kiehnema.git refs/tags/v0.2.0
    git push git@github.com:MartenKiehn/Kiehnema.git refs/tags/v0.2.0
+   # Optionale Sicherung des Tags; löst in GitLab keinen Prozess aus:
+   git push git@git.timeglass.de:mkiehn/kiehnema.git refs/tags/v0.2.0
    ```
 
-   Der GitHub-Tag-Push startet Tests und anschließend den Releasejob. Nach der Environment-
-   Freigabe erzeugt dieser Images, Signatur, Paket und GitLab-Release. Fehlen die oben
-   genannten Einstellungen, kann die Veröffentlichung noch nicht erfolgreich laufen.
+   Der GitHub-Tag-Push startet Tests und danach den Releasejob. Nach der Environment-
+   Freigabe erzeugt dieser die GHCR-Images und den signierten GitHub-Release.
+   Ohne Signierschlüssel und geschützten Tag schlägt die Veröffentlichung geschlossen fehl.
 
 Releaseversionen nie wiederverwenden, Tags nicht verschieben und signierte Manifeste nicht
 nachträglich verändern. Eine fehlgeschlagene Veröffentlichung mit abweichenden Bytes
@@ -255,11 +252,11 @@ Auf Docker Desktop darf **nur für synthetische Testdaten** `--synthetic-no-swap
 damit wird `/proc/swaps` für die Testcontainer simuliert. Die Produktivprüfung wird nicht verändert.
 
 Vor Freigabe auf echte Installationen zusätzlich beide CPU-Plattformen auf der vorgesehenen
-Linux-Hostkonfiguration, Host-Neustart/Stromausfall, privaten GitLab-/Registry-Zugriff,
+Linux-Hostkonfiguration, Host-Neustart/Stromausfall, privaten GitHub-/Registry-Zugriff,
 Signierschlüssel und eine zweite unabhängige Installation abnehmen. Die lokale Dockerprobe
 ersetzt diese Infrastrukturabnahme nicht. Live-Bedrock-Aufrufe sind für die Updateprüfungen unnötig.
 
-Referenzen: [GitLab Releases API](https://docs.gitlab.com/api/releases/),
-[Generic Packages](https://docs.gitlab.com/user/packages/generic_packages/),
+Referenzen: [GitHub Releases API](https://docs.github.com/en/rest/releases/releases),
+[GitHub Container Registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry),
 [Compose env_file](https://docs.docker.com/compose/how-tos/environment-variables/set-environment-variables/),
 [Docker Mehrplattform-Builds](https://docs.docker.com/build/building/multi-platform/).

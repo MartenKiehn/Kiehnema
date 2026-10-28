@@ -9,7 +9,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from app.updates.manifest import Release, resolve, verify, version
-from app.updates.releases import GitLab
+from app.updates.releases import GitHub
 from app.updates.state import atomic_json, file_lock, read_json
 from app.updates.storage import backup, restore
 
@@ -77,32 +77,79 @@ def test_reject_incompatible_or_unbounded_manifest(signer, change):
         verify(sign(release_data(**change)), keys, REPOSITORY)
 
 
-def test_gitlab_pagination_and_no_redirect_credentials(signer):
+def test_github_pagination_skips_drafts_and_prereleases(signer):
     keys, sign = signer
     calls = []
+    api = 'https://api.github.com/repos/team/app'
     def handle(request):
         calls.append(request)
-        if '/packages/' in request.url.path:
+        if '/assets/' in request.url.path:
+            assert request.headers['accept'] == 'application/octet-stream'
             return httpx.Response(200, content=sign(release_data()))
         if request.url.params.get('page') == '1':
-            return httpx.Response(200, json=[], headers={'x-next-page': '2'})
-        return httpx.Response(200, json=[{'tag_name': 'v0.2.0', 'released_at': '2026-01-01T00:00:00Z',
-            'assets': {'links': [{'name': 'update.json', 'url': 'https://git.example.com/packages/update.json'}]}}])
-    client = GitLab({'gitlab_url': 'https://git.example.com', 'project_id': 'team/app'}, {'token': 'private'})
+            return httpx.Response(200, json=[{'draft': True}] * 99 + [{'prerelease': True}])
+        return httpx.Response(200, json=[{'tag_name': 'v0.2.0', 'published_at': '2026-01-01T00:00:00Z',
+            'assets': [{'name': 'update.json', 'url': api + '/releases/assets/1'}]}])
+    client = GitHub({'github_repository': 'team/app'}, {})
     client.client.close()
-    client.client = httpx.Client(transport=httpx.MockTransport(handle), headers={'PRIVATE-TOKEN': 'private'})
+    client.client = httpx.Client(transport=httpx.MockTransport(handle))
     try:
         releases, _ = client.releases(keys, REPOSITORY)
         assert [r.version for r in releases] == ['0.2.0']
         assert len(calls) == 3
-        with pytest.raises(ValueError, match='origin'):
+        with pytest.raises(ValueError, match='configured GitHub repository'):
             client.download('https://attacker.example/update.json')
         assert len(calls) == 3
-        client.client = httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(302, headers={'location': 'https://attacker.example'})))
-        with pytest.raises(httpx.HTTPStatusError):
-            client.download('https://git.example.com/update.json')
     finally:
         client.close()
+
+
+@pytest.mark.parametrize('location,allowed', [
+    ('https://release-assets.githubusercontent.com/asset?signature=test', True),
+    ('https://objects.githubusercontent.com/asset', True),
+    ('https://attacker.example/asset', False),
+    ('http://objects.githubusercontent.com/asset', False),
+    ('https://objects.githubusercontent.com.attacker.example/asset', False),
+])
+def test_github_asset_redirect_never_forwards_credentials(location, allowed):
+    calls = []
+    def handle(request):
+        calls.append(request)
+        if len(calls) == 1:
+            assert request.headers['Authorization'] == 'Bearer private'
+            return httpx.Response(302, headers={'Location': location})
+        assert 'Authorization' not in request.headers
+        assert 'Cookie' not in request.headers
+        return httpx.Response(200, content=b'signed bytes')
+    client = GitHub({'github_repository': 'team/app'}, {})
+    client.client.close()
+    client.client = httpx.Client(transport=httpx.MockTransport(handle),
+                                headers={'Authorization': 'Bearer private', 'Cookie': 'private=secret'})
+    try:
+        url = client.api + '/releases/assets/1'
+        if allowed:
+            assert client.download(url, asset=True)[0] == b'signed bytes'
+            assert len(calls) == 2
+        else:
+            with pytest.raises(ValueError, match='redirect'):
+                client.download(url, asset=True)
+            assert len(calls) == 1
+    finally:
+        client.close()
+
+
+def test_github_download_enforces_size_and_redirect_limits():
+    client = GitHub({'github_repository': 'team/app'}, {})
+    client.client.close()
+    client.client = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(200, content=b'12345')))
+    with pytest.raises(ValueError, match='size limit'):
+        client.download(client.api + '/releases/assets/1', limit=4, asset=True)
+    client.close()
+    client.client = httpx.Client(transport=httpx.MockTransport(lambda request:
+        httpx.Response(302, headers={'Location': 'https://objects.githubusercontent.com/asset'})))
+    with pytest.raises(ValueError, match='Too many'):
+        client.download(client.api + '/releases/assets/1', asset=True)
+    client.close()
 
 
 def test_key_rotation_requires_verified_transition(signer):

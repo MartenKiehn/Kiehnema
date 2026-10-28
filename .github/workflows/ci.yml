@@ -25,7 +25,7 @@ jobs:
     env:
       DOCKER_DEFAULT_PLATFORM: linux/${{ matrix.arch }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
       - name: Prepare the disposable Linux host
@@ -49,51 +49,48 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock kiehnema-update-integration
 
   release:
-    name: Publish signed GitLab release
+    name: Publish signed GitHub release
     needs: test
     if: github.repository == 'MartenKiehn/Kiehnema' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     environment: release
+    permissions:
+      contents: write
+      packages: write
     concurrency:
       group: release-publication
       cancel-in-progress: false
     env:
-      GITLAB_API_URL: https://git.timeglass.de/api/v4
-      GITLAB_PROJECT_ID: mkiehn/kiehnema
-      GITLAB_REGISTRY_IMAGE: ${{ vars.GITLAB_REGISTRY_IMAGE }}
+      IMAGE_REPOSITORY: ghcr.io/martenkiehn/kiehnema
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.13'
       - name: Install release dependencies
         run: |
           python -m pip install uv==0.12.1
           uv sync --frozen --no-dev
-      - name: Verify the matching protected tag on GitLab
+      - name: Verify the protected GitHub tag
         env:
-          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: uv run --no-sync python -m scripts.release check
       - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-      - name: Build and push both image platforms to GitLab
+      - name: Build and push both image platforms to GHCR
         env:
-          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
-          GITLAB_REGISTRY_USER: ${{ secrets.GITLAB_REGISTRY_USER }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          test -n "$GITLAB_REGISTRY_IMAGE"
-          test -n "$GITLAB_TOKEN"
-          test -n "$GITLAB_REGISTRY_USER"
-          printf '%s' "$GITLAB_TOKEN" | docker login "${GITLAB_REGISTRY_IMAGE%%/*}" -u "$GITLAB_REGISTRY_USER" --password-stdin
-          trap 'docker logout "${GITLAB_REGISTRY_IMAGE%%/*}"' EXIT
-          docker buildx build --platform linux/amd64,linux/arm64 --target runtime --metadata-file app-image.json --tag "$GITLAB_REGISTRY_IMAGE:$GITHUB_REF_NAME" --push .
-          docker buildx build --platform linux/amd64,linux/arm64 --target gateway --metadata-file gateway-image.json --tag "$GITLAB_REGISTRY_IMAGE/gateway:$GITHUB_REF_NAME" --push .
+          printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          trap 'docker logout ghcr.io' EXIT
+          docker buildx build --platform linux/amd64,linux/arm64 --target runtime --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" --metadata-file app-image.json --tag "$IMAGE_REPOSITORY:$GITHUB_REF_NAME" --push .
+          docker buildx build --platform linux/amd64,linux/arm64 --target gateway --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" --metadata-file gateway-image.json --tag "$IMAGE_REPOSITORY/gateway:$GITHUB_REF_NAME" --push .
       - name: Sign and publish the release manifest
         env:
-          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           KIEHNEMA_SIGNING_KEY_PEM: ${{ secrets.KIEHNEMA_SIGNING_KEY_PEM }}
           KIEHNEMA_SIGNING_KEY_ID: ${{ vars.KIEHNEMA_SIGNING_KEY_ID }}
         run: |

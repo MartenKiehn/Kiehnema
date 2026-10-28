@@ -1,4 +1,4 @@
-Managed Linux installations can now check for signed GitLab releases and install updates from the administrator's Updates page.
+Managed Linux installations can now check for signed GitHub releases and install updates from the administrator's Updates page.
 
 Updates wait for existing work, preserve encrypted data, keep a separate progress page available and restore the previous working version if installation fails.
 

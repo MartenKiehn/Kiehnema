@@ -1,4 +1,4 @@
-"""Create release signing keys locally, or publish verified CI images to GitLab."""
+"""Create release signing keys locally, or publish verified CI images to GitHub."""
 
 import argparse
 import base64
@@ -6,7 +6,7 @@ import json
 import os
 from pathlib import Path
 import re
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote
 
 import httpx
 from cryptography.hazmat.primitives import serialization
@@ -40,31 +40,31 @@ def create_keys(private_path, public_path, key_id):
 def release_context():
     env = os.environ
     if (env.get('GITHUB_EVENT_NAME') != 'push' or env.get('GITHUB_REF_TYPE') != 'tag'
-            or env.get('GITHUB_REF_NAME') != 'v' + VERSION):
-        raise ValueError('Publish only from a GitHub tag push matching pyproject.toml.')
-    api = env['GITLAB_API_URL'].rstrip('/')
-    parsed = urlsplit(api)
-    if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.query or parsed.fragment:
-        raise ValueError('Release publication requires a GitLab HTTPS API URL.')
-    project = api + '/projects/' + quote(env['GITLAB_PROJECT_ID'], safe='')
-    with httpx.Client(headers={'PRIVATE-TOKEN': env['GITLAB_TOKEN']}, timeout=60, follow_redirects=False, trust_env=False) as client:
-        response = client.get(project + '/repository/tags/' + quote(env['GITHUB_REF_NAME'], safe=''))
+            or env.get('GITHUB_REF_NAME') != 'v' + VERSION or env.get('GITHUB_REF_PROTECTED') != 'true'):
+        raise ValueError('Publish only from a protected GitHub tag push matching pyproject.toml.')
+    repository = env['GITHUB_REPOSITORY']
+    if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', repository):
+        raise ValueError('Invalid GitHub repository.')
+    project = 'https://api.github.com/repos/' + repository
+    with httpx.Client(headers={'Authorization': 'Bearer ' + env['GITHUB_TOKEN']},
+                      timeout=60, follow_redirects=False, trust_env=False) as client:
+        response = client.get(project + '/commits/' + quote(env['GITHUB_REF_NAME'], safe=''))
         response.raise_for_status()
-        tag = response.json()
-    if tag.get('protected') is not True or tag['commit']['id'] != env['GITHUB_SHA']:
-        raise ValueError('The GitLab tag must be protected and point to the same commit as GitHub.')
-    return project, tag
+        commit = response.json()
+    if commit['sha'] != env['GITHUB_SHA']:
+        raise ValueError('The GitHub tag no longer points to the tested commit.')
+    return project, commit
 
 
 def publish(app_metadata, gateway_metadata, notes):
-    project, tag = release_context()
+    project, commit = release_context()
     env = os.environ
-    repo = env['GITLAB_REGISTRY_IMAGE']
+    repo = 'ghcr.io/' + env['GITHUB_REPOSITORY'].lower()
     app_image = repo + '@' + json.loads(app_metadata.read_text())['containerimage.digest']
     gateway_image = repo + '/gateway@' + json.loads(gateway_metadata.read_text())['containerimage.digest']
     policy = json.loads(Path('deploy/release.json').read_text())
     manifest = Release(**policy, version=VERSION, data_schema=DATA_SCHEMA, commit=env['GITHUB_SHA'],
-                       published_at=tag.get('created_at') or tag['commit']['committed_date'], notes=notes.read_text(),
+                       published_at=commit['commit']['committer']['date'], notes=notes.read_text(),
                        images={'app': app_image, 'updater': app_image, 'gateway': gateway_image})
     key = serialization.load_pem_private_key(Path(env['KIEHNEMA_SIGNING_KEY']).read_bytes(), password=None)
     if not isinstance(key, Ed25519PrivateKey):
@@ -72,20 +72,23 @@ def publish(app_metadata, gateway_metadata, notes):
     key_id = env['KIEHNEMA_SIGNING_KEY_ID']
     envelope = signed_manifest(manifest, key_id, key)
     verify(envelope, {key_id: base64.b64encode(key.public_key().public_bytes_raw()).decode()}, repo)
-    asset = project + '/packages/generic/kiehnema/' + VERSION + '/update.json'
-    with httpx.Client(headers={'PRIVATE-TOKEN': env['GITLAB_TOKEN']}, timeout=60, follow_redirects=False, trust_env=False) as client:
-        existing = client.get(asset)
+    with httpx.Client(headers={'Authorization': 'Bearer ' + env['GITHUB_TOKEN']},
+                      timeout=60, follow_redirects=False, trust_env=False) as client:
+        existing = client.get(project + '/releases/tags/' + quote('v' + VERSION, safe=''))
         if existing.status_code == 200:
-            if existing.content != envelope:
-                raise ValueError('This version already contains different release bytes. Publish a new version.')
-        elif existing.status_code == 404:
-            client.put(asset, content=envelope, headers={'Content-Type': 'application/json'}).raise_for_status()
-        else:
+            raise ValueError('This release already exists. Do not overwrite published versions.')
+        if existing.status_code != 404:
             existing.raise_for_status()
-        release = client.post(project + '/releases', json={'name': 'Kiehnema ' + VERSION, 'tag_name': 'v' + VERSION,
-            'description': manifest.notes, 'assets': {'links': [{'name': 'update.json', 'url': asset, 'link_type': 'package'}]}})
-        release.raise_for_status()
-    print('Published signed Kiehnema release ' + VERSION)
+        response = client.post(project + '/releases', json={'name': 'Kiehnema ' + VERSION,
+            'tag_name': 'v' + VERSION, 'target_commitish': env['GITHUB_SHA'], 'body': manifest.notes,
+            'draft': True, 'prerelease': False})
+        response.raise_for_status()
+        release_id = int(response.json()['id'])
+        upload = 'https://uploads.github.com/repos/' + env['GITHUB_REPOSITORY'] + f'/releases/{release_id}/assets'
+        client.post(upload, params={'name': 'update.json'}, content=envelope,
+                    headers={'Content-Type': 'application/json'}).raise_for_status()
+        client.patch(project + f'/releases/{release_id}', json={'draft': False}).raise_for_status()
+    print('Published signed GitHub release ' + VERSION)
 
 
 def main():
@@ -95,7 +98,7 @@ def main():
     keygen.add_argument('--private', required=True, type=Path)
     keygen.add_argument('--public', required=True, type=Path)
     keygen.add_argument('--key-id', required=True)
-    commands.add_parser('check', help='Verify that the GitHub release tag matches a protected GitLab tag')
+    commands.add_parser('check', help='Verify the protected GitHub release tag and tested commit')
     release = commands.add_parser('publish')
     release.add_argument('--app-metadata', required=True, type=Path)
     release.add_argument('--gateway-metadata', required=True, type=Path)

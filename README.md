@@ -39,7 +39,7 @@ Beide Formate werden mit 30 fps, H.264 und AAC-Stereoton ausgegeben. Die Oberfl�
 ### Lokal starten
 
 Für Linux-Server gibt es eine [verwaltete Installation mit Updates über die Oberfläche](docs/updates.md).
-Sie prüft GitLab-Releases regelmäßig, zeigt während der Installation den Fortschritt und
+Sie prüft GitHub-Releases regelmäßig, zeigt während der Installation den Fortschritt und
 stellt bei fehlgeschlagenen Updates den vorherigen Stand wieder her.
 
 Du brauchst Python 3.13+, `uv`, Node.js/npm und AWS-Zugang mit Zugriff auf das konfigurierte
@@ -113,8 +113,8 @@ uv run pytest tests/test_web.py -m browser -q    # UI-Prüfungen mit Chromium
 CI läuft ausschließlich unter **GitHub → Actions**: Tests und Container-Updateproben
 auf AMD64 und ARM64 bei Pushes und Pull Requests. GitLab-Pipelines sind deaktiviert;
 bereits wartende Jobs können dort abgebrochen werden. Release-Tags starten nach erfolgreichen
-Tests die Veröffentlichung nach GitLab. Die dafür benötigten GitHub-Secrets und Variablen
-stehen in der [Release-Einrichtung](docs/updates.md#github-actions-und-gitlab-einmal-vorbereiten).
+Tests die Veröffentlichung als GitHub Release mit Images in GHCR. GitLab dient nur als Code-Sicherung. Die dafür benötigten GitHub-Secrets und Variablen
+stehen in der [Release-Einrichtung](docs/updates.md#github-einmal-vorbereiten).
 
 Nach dem Commit pusht dieses Skript den aktuellen Branch nach
 `git@git.timeglass.de:mkiehn/kiehnema.git` und
@@ -169,7 +169,7 @@ Both formats export at 30 fps with H.264 video and AAC stereo audio. The interfa
 ### Run locally
 
 Linux servers can use the [managed installation with updates through the UI](docs/updates.md).
-It checks GitLab releases regularly, shows installation progress, and restores the previous
+It checks GitHub releases regularly, shows installation progress, and restores the previous
 working version when an update fails.
 
 You need Python 3.13+, `uv`, Node.js/npm and AWS credentials with access to the configured
@@ -241,9 +241,9 @@ uv run pytest tests/test_web.py -m browser -q    # Chromium UI checks
 
 CI runs exclusively in **GitHub → Actions**: tests and container update probes on AMD64
 and ARM64 for pushes and pull requests. GitLab pipelines are disabled; existing queued
-jobs can be cancelled there. Release tags publish to GitLab after successful tests.
+jobs can be cancelled there. Release tags publish GitHub Releases and GHCR images after successful tests. GitLab is only a code backup.
 Required GitHub secrets and variables are documented in the
-[release setup guide](docs/updates.md#github-actions-und-gitlab-einmal-vorbereiten).
+[release setup guide](docs/updates.md#github-einmal-vorbereiten).
 
 After committing, push the current branch to
 `git@git.timeglass.de:mkiehn/kiehnema.git` and

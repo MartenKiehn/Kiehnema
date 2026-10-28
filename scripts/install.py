@@ -64,8 +64,7 @@ def main():
     p.add_argument('--app-env', required=True, type=Path, help='Private MG_/AWS_ configuration file')
     p.add_argument('--credentials', type=Path, help='Read-only registry username/token JSON, if private')
     p.add_argument('--origin', required=True, help='Public HTTPS origin')
-    p.add_argument('--gitlab', default='https://git.timeglass.de')
-    p.add_argument('--project', default='mkiehn/kiehnema')
+    p.add_argument('--repository', default='MartenKiehn/Kiehnema', help='GitHub owner/repository for releases')
     p.add_argument('--directory', default='/opt/kiehnema', type=Path)
     p.add_argument('--name', default='kiehnema')
     p.add_argument('--import-data', type=Path, help='Stopped existing data directory; originals are kept')
@@ -76,6 +75,8 @@ def main():
         p.error('Disable host swap before installing Kiehnema.')
     if not re.fullmatch(r'[a-z][a-z0-9_-]{0,40}', args.name):
         p.error('Choose a lowercase installation name containing letters, numbers, hyphens or underscores.')
+    if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', args.repository):
+        p.error('Use owner/name for the GitHub repository.')
     root = args.directory.absolute()
     if root.exists():
         p.error('Choose a new installation directory. Existing data is never overwritten.')
@@ -105,7 +106,7 @@ def main():
         if args.credentials:
             shutil.copyfile(args.credentials, bootstrap / 'credentials.json')
         (bootstrap / 'config.json').write_text(json.dumps({'installation': args.name, 'public_origin': args.origin,
-            'gitlab_url': args.gitlab, 'project_id': args.project, 'repository': repository}))
+            'github_repository': args.repository, 'repository': repository}))
         if args.import_data:
             from_source = args.import_data.resolve(strict=True)
             if not (from_source / 'secure/accounts.sqlite').is_file():

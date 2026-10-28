@@ -10,57 +10,76 @@ from scripts import release
 @pytest.fixture
 def publication(tmp_path, monkeypatch):
     values = {
-        'GITHUB_EVENT_NAME': 'push', 'GITHUB_REF_TYPE': 'tag',
+        'GITHUB_EVENT_NAME': 'push', 'GITHUB_REF_TYPE': 'tag', 'GITHUB_REF_PROTECTED': 'true',
         'GITHUB_REF_NAME': 'v' + release.VERSION, 'GITHUB_SHA': 'a' * 40,
-        'GITLAB_API_URL': 'https://git.example.com/api/v4', 'GITLAB_PROJECT_ID': 'team/app',
-        'GITLAB_TOKEN': 'test-token', 'GITLAB_REGISTRY_IMAGE': 'registry.example.com/team/app',
+        'GITHUB_REPOSITORY': 'Team/App', 'GITHUB_TOKEN': 'test-token',
         'KIEHNEMA_SIGNING_KEY': str(tmp_path / 'key.pem'), 'KIEHNEMA_SIGNING_KEY_ID': 'test',
     }
     for name, value in values.items():
         monkeypatch.setenv(name, value)
     release.create_keys(tmp_path / 'key.pem', tmp_path / 'keys.json', 'test')
-    tag = {'protected': True, 'created_at': '2026-01-02T00:00:00Z',
-           'commit': {'id': 'a' * 40, 'committed_date': '2026-01-01T00:00:00Z'}}
+    state = {'sha': 'a' * 40, 'upload_status': 201, 'existing': False}
     requests = []
 
     def respond(request):
         requests.append(request)
-        assert request.headers['PRIVATE-TOKEN'] == 'test-token'
-        assert 'JOB-TOKEN' not in request.headers
-        assert '/projects/team%2Fapp/' in str(request.url)
-        if '/repository/tags/' in str(request.url):
-            return httpx.Response(200, json=tag)
-        if request.method == 'GET':
-            return httpx.Response(404)
-        return httpx.Response(201, json={})
+        assert request.headers['Authorization'] == 'Bearer test-token'
+        assert request.url.host in {'api.github.com', 'uploads.github.com'}
+        if '/commits/' in request.url.path:
+            return httpx.Response(200, json={'sha': state['sha'],
+                'commit': {'committer': {'date': '2026-01-01T00:00:00Z'}}})
+        if '/releases/tags/' in request.url.path:
+            return httpx.Response(200 if state['existing'] else 404, json={})
+        if request.url.host == 'uploads.github.com':
+            assert request.url.params['name'] == 'update.json'
+            return httpx.Response(state['upload_status'], json={})
+        return httpx.Response(201, json={'id': 42})
 
     client = httpx.Client
     monkeypatch.setattr(release.httpx, 'Client', lambda **kwargs: client(transport=httpx.MockTransport(respond), **kwargs))
-    return tmp_path, tag, requests
-
-
-@pytest.mark.parametrize('lightweight', [False, True])
-def test_github_release_publishes_verified_manifest_to_gitlab(publication, lightweight):
-    root, tag, requests = publication
-    if lightweight:
-        tag['created_at'] = None
     for name, digest in [('app', 'b'), ('gateway', 'c')]:
-        (root / f'{name}.json').write_text(json.dumps({'containerimage.digest': 'sha256:' + digest * 64}))
-    (root / 'notes.md').write_text('Release test')
+        (tmp_path / f'{name}.json').write_text(json.dumps({'containerimage.digest': 'sha256:' + digest * 64}))
+    (tmp_path / 'notes.md').write_text('Release test')
+    return tmp_path, state, requests
+
+
+def publish(root):
     release.publish(root / 'app.json', root / 'gateway.json', root / 'notes.md')
-    assert [r.method for r in requests] == ['GET', 'GET', 'PUT', 'POST']
-    manifest = verify(requests[2].content, json.loads((root / 'keys.json').read_text()),
-                      'registry.example.com/team/app')
+
+
+def test_github_release_is_published_only_after_signed_asset_upload(publication):
+    root, _, requests = publication
+    publish(root)
+    assert [r.method for r in requests] == ['GET', 'GET', 'POST', 'POST', 'PATCH']
+    assert json.loads(requests[2].content)['draft'] is True
+    manifest = verify(requests[3].content, json.loads((root / 'keys.json').read_text()), 'ghcr.io/team/app')
     assert manifest.commit == 'a' * 40
-    assert manifest.published_at == (tag['created_at'] or tag['commit']['committed_date'])
-    assert json.loads(requests[3].content)['tag_name'] == 'v' + release.VERSION
+    assert manifest.published_at == '2026-01-01T00:00:00Z'
+    assert json.loads(requests[4].content) == {'draft': False}
+
+
+def test_failed_upload_leaves_release_unpublished(publication):
+    root, state, requests = publication
+    state['upload_status'] = 500
+    with pytest.raises(httpx.HTTPStatusError):
+        publish(root)
+    assert not any(r.method == 'PATCH' for r in requests)
+
+
+def test_existing_release_is_never_overwritten(publication):
+    root, state, requests = publication
+    state['existing'] = True
+    with pytest.raises(ValueError, match='already exists'):
+        publish(root)
+    assert all(r.method == 'GET' for r in requests)
 
 
 @pytest.mark.parametrize('name,value', [
     ('GITHUB_EVENT_NAME', 'pull_request'), ('GITHUB_REF_TYPE', 'branch'),
-    ('GITHUB_REF_NAME', 'v99.0.0'), ('GITLAB_API_URL', 'http://git.example.com/api/v4'),
+    ('GITHUB_REF_NAME', 'v99.0.0'), ('GITHUB_REF_PROTECTED', 'false'),
+    ('GITHUB_REPOSITORY', 'https://attacker.example'),
 ])
-def test_invalid_release_context_never_contacts_gitlab(publication, monkeypatch, name, value):
+def test_invalid_release_context_never_contacts_github(publication, monkeypatch, name, value):
     _, _, requests = publication
     monkeypatch.setenv(name, value)
     with pytest.raises(ValueError):
@@ -68,11 +87,9 @@ def test_invalid_release_context_never_contacts_gitlab(publication, monkeypatch,
     assert requests == []
 
 
-@pytest.mark.parametrize('protected,commit', [(False, 'a' * 40), (True, 'b' * 40)])
-def test_unprotected_or_different_gitlab_tag_prevents_publication(publication, protected, commit):
-    root, tag, requests = publication
-    tag.update(protected=protected)
-    tag['commit']['id'] = commit
-    with pytest.raises(ValueError, match='protected and point to the same commit'):
-        release.publish(root / 'missing.json', root / 'missing.json', root / 'missing.md')
+def test_moved_github_tag_prevents_publication(publication):
+    root, state, requests = publication
+    state['sha'] = 'b' * 40
+    with pytest.raises(ValueError, match='tested commit'):
+        publish(root)
     assert len(requests) == 1 and requests[0].method == 'GET'
