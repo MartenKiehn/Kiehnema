@@ -38,6 +38,10 @@ Beide Formate werden mit 30 fps, H.264 und AAC-Stereoton ausgegeben. Die Oberfl�
 
 ### Lokal starten
 
+Für Linux-Server gibt es eine [verwaltete Installation mit Updates über die Oberfläche](docs/updates.md).
+Sie prüft GitLab-Releases regelmäßig, zeigt während der Installation den Fortschritt und
+stellt bei fehlgeschlagenen Updates den vorherigen Stand wieder her.
+
 Du brauchst Python 3.13+, `uv`, Node.js/npm und AWS-Zugang mit Zugriff auf das konfigurierte
 Bedrock-Modell. Modellaufrufe verursachen Kosten in deinem AWS-Konto.
 
@@ -56,10 +60,12 @@ uv run python -m app
 ```
 
 Beim ersten Start legst du im Terminal das Administratorkonto an: Benutzername, Passwort
-mit 15–256 Zeichen und ein Authenticator-Code (TOTP). Bewahre den persönlichen
+mit 15–256 Zeichen. Zwei-Faktor-Authentifizierung ist zunächst optional. Bewahre den persönlichen
 Wiederherstellungsschlüssel außerhalb des Servers auf. Über **Users** lädt der Administrator
-weitere Nutzer ein; jedes Konto erhält ein eigenes Passwort und einen eigenen Authenticator.
-Für automatische Deployments kannst du das erste Administratorkonto über die vier
+weitere Nutzer ein und aktiviert oder deaktiviert 2FA pro Nutzer. Ein zusätzlicher Schalter
+verlangt 2FA für alle, einschließlich Administratoren und neuer Nutzer. Betroffene Nutzer
+richten ihren eigenen Authenticator ein, bevor sie weiterarbeiten können.
+Für automatische Deployments kannst du das erste Administratorkonto über die
 `MG_ADMIN_*`-Variablen vorgeben; siehe [Setup ohne Terminal](docs/security.md#unattended-first-admin-setup).
 
 Öffne anschließend **http://127.0.0.1:8000** und melde dich an. Die Einstellungen stehen in
@@ -135,6 +141,10 @@ Both formats export at 30 fps with H.264 video and AAC stereo audio. The interfa
 
 ### Run locally
 
+Linux servers can use the [managed installation with updates through the UI](docs/updates.md).
+It checks GitLab releases regularly, shows installation progress, and restores the previous
+working version when an update fails.
+
 You need Python 3.13+, `uv`, Node.js/npm and AWS credentials with access to the configured
 Bedrock model. Model calls incur charges in your AWS account.
 
@@ -153,10 +163,12 @@ uv run python -m app
 ```
 
 On the first start, create the administrator account in the terminal: choose a username,
-a password of 15–256 characters and an authenticator code (TOTP). Keep the personal recovery
+a password of 15–256 characters. Two-factor authentication is initially optional. Keep the personal recovery
 key outside the server. The administrator invites additional users through **Users**;
-each account gets its own password and authenticator.
-For automated deployments, supply the first administrator through the four `MG_ADMIN_*`
+each account gets its own password. Administrators can enable or disable two-factor
+authentication per user or require it for everyone, including administrators and future
+users. Affected users set up their own authenticator before accessing their workspace.
+For automated deployments, supply the first administrator through the `MG_ADMIN_*`
 variables; see [unattended setup](docs/security.md#unattended-first-admin-setup).
 
 Then open **http://127.0.0.1:8000** and sign in. Settings are listed in

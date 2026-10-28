@@ -5,6 +5,7 @@ import hmac
 import secrets
 import sqlite3
 import time
+import pyotp
 from contextvars import ContextVar
 from urllib.parse import parse_qs
 
@@ -36,6 +37,10 @@ def csrf_cookie(request):
 
 
 def form(request, template='auth.html', **context):
+    if context.get('mode') == 'admin':
+        context['require_all_totp'] = a.all_two_factor_required()
+    if context.get('mode') == 'account':
+        context['totp_enabled'] = a.two_factor_enabled(a.identity())
     return templates.TemplateResponse(request, template, context)
 
 
@@ -79,12 +84,21 @@ async def guard(request: Request, call_next):
                     session = None
         else:
             session = None
+    if session and a.two_factor_enabled(session.person) and not session.person.two_factor_verified:
+        with a.session_lock:
+            a.sessions.pop(sid, None)
+        session = None
     public = path in {'/login', '/activate', '/recover', '/healthz', '/favicon.ico'} or path.startswith('/static/')
     csrf = session.csrf if session else request.cookies.get(csrf_cookie(request)) or secrets.token_urlsafe(32)
     request.state.user = session.person if session else None
     request.state.csrf = csrf
     if not public and session is None:
         return RedirectResponse('/login', status_code=303) if request.method == 'GET' and not path.startswith(('/preview/', '/jobs/')) else HTMLResponse('Sign in required.', status_code=401)
+    if session and a.two_factor_required(session.person) and not a.two_factor_enabled(session.person):
+        if not public and path not in {'/account/two-factor', '/logout'}:
+            return (RedirectResponse('/account/two-factor', status_code=303)
+                    if request.method == 'GET' and not path.startswith(('/preview/', '/jobs/'))
+                    else HTMLResponse('Set up two-factor authentication before continuing.', status_code=403))
     if request.method not in {'GET', 'HEAD', 'OPTIONS'}:
         supplied = request.headers.get('x-csrf-token', '')
         if request.headers.get('content-type', '').startswith('application/x-www-form-urlencoded'):
@@ -133,7 +147,8 @@ async def login(request: Request):
                                         str(values.get('password', '')), str(values.get('code', '')))
     except ValueError as exc:
         return form(request, mode='login', ready=a.initialized(), error=str(exc))
-    response = RedirectResponse('/', status_code=303)
+    target = '/account/two-factor' if a.two_factor_required(person) and not a.two_factor_enabled(person) else '/'
+    response = RedirectResponse(target, status_code=303)
     set_cookie(response, request, cookie_name(request), a.new_session(person))
     return response
 
@@ -215,6 +230,30 @@ async def account_page(request: Request):
     return form(request, mode='account')
 
 
+@router.get('/account/two-factor')
+async def two_factor_page(request: Request):
+    if a.two_factor_enabled(a.identity()):
+        return RedirectResponse('/account', status_code=303)
+    session = current_session.get()[1]
+    if not session.totp_setup:
+        session.totp_setup = pyotp.random_base32()
+    return form(request, mode='two_factor', secret=session.totp_setup)
+
+
+@router.post('/account/two-factor')
+async def two_factor_setup(request: Request):
+    session = current_session.get()[1]
+    values = await request.form()
+    try:
+        person = await asyncio.to_thread(a.authenticate, a.identity().username, str(values.get('password', '')))
+        person = await asyncio.to_thread(a.enable_two_factor, person, session.totp_setup, str(values.get('code', '')))
+    except ValueError as exc:
+        return form(request, mode='two_factor', secret=session.totp_setup, error=str(exc))
+    response = RedirectResponse('/account', status_code=303)
+    set_cookie(response, request, cookie_name(request), a.new_session(person))
+    return response
+
+
 @router.post('/account/password')
 async def password_change(request: Request):
     values = await request.form()
@@ -231,12 +270,32 @@ def admin_users():
     if not a.identity().admin:
         raise PermissionError('Administrator access required.')
     with a.database() as con:
-        return [dict(row) for row in con.execute('SELECT id,username,admin,disabled FROM users ORDER BY username')]
+        return [dict(row) for row in con.execute('''SELECT id,username,admin,disabled,length(totp)>0 AS totp_enabled,
+            id IN (SELECT user_id FROM two_factor_policy) AS totp_required FROM users ORDER BY username''')]
 
 
 @router.get('/admin')
 async def admin_page(request: Request):
     return form(request, mode='admin', users=admin_users())
+
+
+@router.post('/admin/two-factor-policy')
+async def two_factor_policy(request: Request):
+    admin_users()
+    values = await request.form()
+    a.require_all_two_factor(a.identity(), values.get('required') == '1')
+    return RedirectResponse('/admin', status_code=303)
+
+
+@router.post('/admin/two-factor')
+async def user_two_factor(request: Request):
+    admin_users()
+    values = await request.form()
+    try:
+        a.require_two_factor(a.identity(), str(values.get('user_id', '')), values.get('required') == '1')
+    except ValueError as exc:
+        return form(request, mode='admin', users=admin_users(), error=str(exc))
+    return RedirectResponse('/admin', status_code=303)
 
 
 @router.post('/admin/invite')

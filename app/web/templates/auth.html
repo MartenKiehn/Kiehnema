@@ -8,7 +8,8 @@
 <form action="/login" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}">
 <label for="username">Username</label><input id="username" name="username" required autocomplete="username" maxlength="64">
 <label for="password">Password</label><input id="password" name="password" type="password" required autocomplete="current-password" maxlength="256">
-<label for="code">Authenticator code</label><input id="code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code">
+<label for="code">Authenticator code</label><input id="code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" aria-describedby="code-help">
+<p id="code-help" class="help">Leave blank if you have not set up two-factor authentication yet.</p>
 <button class="button" type="submit">Unlock workspace</button></form>
 <p class="help"><a href="/recover">Recover your account</a> using your personal recovery key.</p>
 <a href="/activate">Accept an invitation</a>{% endif %}
@@ -26,26 +27,48 @@
 <p class="help">Use at least 15 characters. A password manager can create and remember a strong password.</p>
 <button class="button" type="submit">Continue</button></form>
 {% elif mode == 'enroll' %}
-<h1>Protect your account</h1><p>Add this setup key to your authenticator app as a time-based account named Kiehnema.</p>
-<p><code>{{ secret }}</code></p><p>Save your personal recovery key in your password manager. It is shown only during setup. Without your password or this key, your existing videos cannot be recovered.</p>
+<h1>Protect your account</h1>{% if secret %}<p>Add this setup key to your authenticator app as a time-based account named Kiehnema.</p>
+<p><code>{{ secret }}</code></p>{% endif %}<p>Save your personal recovery key in your password manager. It is shown only during setup. Without your password or this key, your existing videos cannot be recovered.</p>
 <p class="recovery-key"><code>{{ recovery }}</code></p>
 <form action="/activate" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><input type="hidden" name="proof" value="{{ proof }}">
-<label for="code">Authenticator code</label><input id="code" name="code" inputmode="numeric" pattern="[0-9]{6}" required autocomplete="one-time-code">
+{% if secret %}<label for="code">Authenticator code</label><input id="code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code">{% endif %}
 <label class="checkbox"><input type="checkbox" required><span>I saved my recovery key.</span></label>
 <button class="button" type="submit">{{ 'Restore access' if recovering else 'Create account' }}</button></form>
 {% elif mode == 'account' %}
-<h1>Your account</h1><p>Changing your password preserves your videos and signs out your existing sessions. Started jobs keep running.</p>
+<h1>Your account</h1>
+<h2>Two-factor authentication</h2>
+{% if totp_enabled %}<p>Your authenticator is active. Contact an administrator to disable it.</p>{% else %}<p>Your account uses a password. You can add an authenticator for extra protection.</p><a class="button secondary" href="/account/two-factor">Set up two-factor authentication</a>{% endif %}
+<h2>Change password</h2><p>Changing your password preserves your videos and signs out your existing sessions. Started jobs keep running.</p>
 <form action="/account/password" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}">
 <label for="old-password">Current password</label><input id="old-password" name="old_password" type="password" required autocomplete="current-password" maxlength="256">
 <label for="password">New password</label><input id="password" name="password" type="password" required minlength="15" maxlength="256" autocomplete="new-password">
-<label for="code">Authenticator code</label><input id="code" name="code" inputmode="numeric" pattern="[0-9]{6}" required autocomplete="one-time-code">
+{% if totp_enabled %}<label for="code">Authenticator code</label><input id="code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code">{% endif %}
 <button class="button" type="submit">Change password</button></form>
+{% elif mode == 'two_factor' %}
+<h1>Set up two-factor authentication</h1>
+<p>Add this setup key to your authenticator app as a time-based account named Kiehnema. Confirm your password and the current code to finish setup.</p>
+<p><code>{{ secret }}</code></p>
+<form action="/account/two-factor" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}">
+<label for="password">Current password</label><input id="password" name="password" type="password" required autocomplete="current-password" maxlength="256">
+<label for="code">Authenticator code</label><input id="code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code">
+<button class="button" type="submit">Activate two-factor authentication</button></form>
 {% elif mode == 'admin' %}
 <h1>Users</h1><p>Manage accounts. Each person's videos and feedback remain private.</p>
+<h2>Two-factor authentication</h2>
+<form action="/admin/two-factor-policy" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}">
+<label class="checkbox"><input type="checkbox" name="required" value="1" {% if require_all_totp %}checked{% endif %}><span>Require two-factor authentication for all users</span></label>
+<p class="help">Includes administrators and future users. Users must finish setup before accessing their workspace. Turning this off keeps existing authenticators active.</p>
+<button class="button secondary" type="submit">Save policy</button></form>
+<h2>Invite a user</h2>
 {% if invitation %}<p>Share this invitation code privately. It expires in 24 hours and can be used once at <a href="/activate">Accept an invitation</a>.</p><p class="recovery-key"><code>{{ invitation }}</code></p>{% endif %}
 <form action="/admin/invite" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}">
 <label for="username">New username</label><input id="username" name="username" required minlength="3" maxlength="64"><button class="button" type="submit">Create invitation</button></form>
-<ul>{% for user in users %}<li>{{ user.username }} · {{ 'Admin' if user.admin else 'User' }} · {{ 'Disabled' if user.disabled else 'Active' }}
+<h2>Accounts</h2>
+<p class="help">Disabling two-factor authentication removes that user's authenticator and signs out their sessions. Individual settings cannot override the requirement for all users.</p>
+<ul>{% for user in users %}<li>{{ user.username }} · {{ 'Admin' if user.admin else 'User' }} · {{ 'Disabled' if user.disabled else 'Active' }} · 2FA: {{ 'Active' if user.totp_enabled else ('Setup required' if user.totp_required or require_all_totp else 'Off') }}
+<form action="/admin/two-factor" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><input type="hidden" name="user_id" value="{{ user.id }}">
+<label class="checkbox"><input type="checkbox" name="required" value="1" {% if require_all_totp or user.totp_required or user.totp_enabled %}checked{% endif %} {% if require_all_totp %}disabled{% endif %}><span>Require two-factor authentication for {{ user.username }}</span></label>
+<button class="button small secondary" type="submit" {% if require_all_totp %}disabled{% endif %}>Save for {{ user.username }}</button></form>
 {% if user.id != request.state.user.id %}<form action="/admin/disable" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><input type="hidden" name="user_id" value="{{ user.id }}"><input type="hidden" name="disabled" value="{{ '0' if user.disabled else '1' }}"><button class="button small secondary" type="submit">{{ 'Enable' if user.disabled else 'Disable' }}</button></form>{% endif %}</li>{% endfor %}</ul>
 {% endif %}
 </section>

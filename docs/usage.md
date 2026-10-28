@@ -53,7 +53,8 @@ and cloud metadata are blocked, including redirects and DNS changes. The standal
 crawl utility can explicitly inspect local websites for development; its output and
 standalone render exports are plaintext, not shared user storage.
 
-The pipeline CLI prompts for username, password and authenticator code. Stop the web
+The pipeline CLI prompts for username, password and an authenticator code (leave it blank
+if 2FA is not configured). If an administrator requires 2FA, finish setup in the web app first. Stop the web
 process before starting or resuming jobs through the CLI; only one coordinator may use
 a data directory at a time.
 

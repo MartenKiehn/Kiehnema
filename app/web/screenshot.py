@@ -93,7 +93,7 @@ def main():
         import getpass
         from app.security.workspace import memory_policy
         memory_policy()
-        credentials = (input('Username: '), getpass.getpass('Password: '), input('Authenticator code: ').strip())
+        credentials = (input('Username: '), getpass.getpass('Password: '), input('Authenticator code (leave blank if not configured): ').strip())
     print(json.dumps(asyncio.run(capture(args.url, args.out, width=args.width, height=args.height,
                                          selector=args.selector, time=args.time, credentials=credentials)), indent=2))
 

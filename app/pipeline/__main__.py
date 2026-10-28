@@ -42,12 +42,13 @@ def main() -> None:
     a = p.parse_args()
     from app.security.__main__ import unlock
     from app.security.accounts import current_identity
-    token = current_identity.set(unlock())
-    from contextlib import nullcontext
     from app.security.accounts import service_lock
+    from app.updates.state import assert_start_allowed
 
-    try:
-        with service_lock() if a.cmd != "status" else nullcontext():
+    with service_lock():
+        assert_start_allowed(cli=True)
+        token = current_identity.set(unlock())
+        try:
             if a.cmd == "start":
                 job_id, result = asyncio.run(start_job(a.url, a.duration, a.description, allow_client_logos=a.clients))
                 print(_summary({"job_id": job_id, **result}))
@@ -62,8 +63,8 @@ def main() -> None:
             else:
                 st = asyncio.run(job_state(a.job_id))
                 print(json.dumps({"next": st["next"], **{k: st["values"].get(k) for k in ("status", "error", "check", "qa", "outputs", "cost_usd")}}, indent=1))
-    finally:
-        current_identity.reset(token)
+        finally:
+            current_identity.reset(token)
 
 
 if __name__ == "__main__":

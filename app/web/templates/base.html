@@ -12,12 +12,13 @@
   <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
   <script src="{{ url_for('static', path='vendor/htmx.min.js') }}" defer></script>
   <script src="{{ url_for('static', path='app.js') }}" defer></script>
+  {% if request.state.user and request.state.user.admin %}<script src="{{ url_for('static', path='update-notice.js') }}" defer></script>{% endif %}
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="top">
     <a class="wordmark" href="/" aria-label="Kiehnema home"><img class="brand-icon" src="{{ url_for('static', path='kiehnema.svg') }}" width="44" height="44" alt=""> Kiehnema</a>
-    <nav aria-label="Main navigation">{% if request.state.user %}<a href="/#jobs">Your videos</a><a href="/account">{{ request.state.user.username }}</a>{% if request.state.user.admin %}<a href="/admin">Users</a>{% endif %}<form action="/logout" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><button class="button small secondary" type="submit">Sign out</button></form>{% else %}<a href="/login">Sign in</a>{% endif %}</nav>
+    <nav aria-label="Main navigation">{% if request.state.user %}<a href="/#jobs">Your videos</a><a href="/account">{{ request.state.user.username }}</a>{% if request.state.user.admin %}<a href="/admin/updates" data-update-link>Updates</a><a href="/admin">Users</a>{% endif %}<form action="/logout" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><button class="button small secondary" type="submit">Sign out</button></form>{% else %}<a href="/login">Sign in</a>{% endif %}</nav>
   </header>
   <main id="main">{% block content %}{% endblock %}</main>
   <footer class="footer"><span>Made from your website. Directed by you.</span><span class="local"><i aria-hidden="true"></i> Private workspace</span></footer>

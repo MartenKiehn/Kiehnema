@@ -28,7 +28,7 @@ def workspace(tmp_path, monkeypatch):
     monkeypatch.setattr('app.web.main.memory_policy', lambda: None)
     from app.security import accounts as a
     import pyotp
-    draft = a.enrollment('admin', 'test password with fifteen characters')
+    draft = a.enrollment('admin', 'test password with fifteen characters', two_factor=True)
     person = a.finish_enrollment(draft, pyotp.TOTP(draft['totp']).now(), setup=True)
     identity_token = a.current_identity.set(person)
     session_token = a.new_session(person)
@@ -564,10 +564,10 @@ async def test_browser_form_review_preview_and_results(review_job, monkeypatch, 
             frame = page.frame_locator('iframe[title="4:5 · Feed animation preview"]')
             await page.locator("iframe.preview.feed").scroll_into_view_if_needed()
             await expect(frame.locator("#mg-controls")).to_be_hidden()
-            await page.locator("#timeline-play").click()
-            await expect(page.locator("#timeline-play")).to_have_text("Pause both previews")
             preview_frame = next(f for f in page.frames if "/preview/" in f.url and "format=feed" in f.url)
             await preview_frame.wait_for_function("window.__ready === true")
+            await page.locator("#timeline-play").click()
+            await expect(page.locator("#timeline-play")).to_have_text("Pause both previews")
             assert await preview_frame.evaluate("document.fonts.status") == "loaded"
             assert await preview_frame.evaluate("[...document.fonts].every(font => font.status !== 'error')")
             assert await preview_frame.evaluate("() => { try { return !!parent.document.body; } catch { return false; } }") is False
@@ -891,7 +891,7 @@ async def test_advanced_editor_drag_layers_images_and_revision(review_job, monke
         note = frame.locator('[data-design-id]').first
         await expect(note).to_have_text('Make it memorable')
         await note.dblclick()
-        await page.keyboard.press('Meta+a')
+        await page.keyboard.press('ControlOrMeta+a')
         await page.keyboard.insert_text('Make it memorable')
         await expect(note).to_have_attribute('contenteditable', 'plaintext-only')
         await page.locator('#design-status').click()

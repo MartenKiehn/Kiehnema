@@ -79,6 +79,10 @@ def database():
             name BLOB NOT NULL, blob TEXT NOT NULL, size INTEGER NOT NULL,
             PRIMARY KEY(job, tag));
         CREATE TABLE IF NOT EXISTS failures (id TEXT PRIMARY KEY, count INTEGER NOT NULL, until REAL NOT NULL);
+        CREATE TABLE IF NOT EXISTS two_factor_policy (
+            user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE);
+        CREATE TABLE IF NOT EXISTS security_policy (
+            id INTEGER PRIMARY KEY CHECK(id=1), require_totp INTEGER NOT NULL CHECK(require_totp IN (0,1)));
     """)
     try:
         with con:
@@ -89,9 +93,11 @@ def database():
 
 @contextmanager
 def service_lock():
-    with database():
-        pass
-    fd = os.open(settings.data_dir / 'secure' / '.service.lock', os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    settings.data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if settings.data_dir.is_symlink():
+        raise ValueError('The data directory must not be a symlink.')
+    # Keep the lock inode outside the directory replaced during an update restore.
+    fd = os.open(settings.data_dir / '.service.lock', os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     try:
         try:
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -108,6 +114,7 @@ class Identity:
     username: str
     admin: bool
     key: bytes = field(repr=False)
+    two_factor_verified: bool = False
 
 
 current_identity: ContextVar[Identity | None] = ContextVar("identity", default=None)
@@ -129,21 +136,71 @@ def initialized() -> bool:
         return con.execute("SELECT 1 FROM users LIMIT 1").fetchone() is not None
 
 
-def enrollment(name: str, password: str) -> dict:
+def all_two_factor_required() -> bool:
+    with database() as con:
+        return con.execute('SELECT 1 FROM security_policy WHERE require_totp=1').fetchone() is not None
+
+
+def require_all_two_factor(person: Identity, required: bool) -> None:
+    if not person.admin:
+        raise PermissionError('Administrator access required.')
+    with database() as con:
+        con.execute('INSERT INTO security_policy VALUES(1,?) ON CONFLICT(id) DO UPDATE SET require_totp=excluded.require_totp',
+                    (int(required),))
+
+
+def two_factor_required(person: Identity) -> bool:
+    with database() as con:
+        return con.execute('''SELECT 1 FROM users WHERE id=? AND (length(totp)>0
+            OR id IN (SELECT user_id FROM two_factor_policy) OR EXISTS(SELECT 1 FROM security_policy WHERE require_totp=1))''',
+                           (person.id,)).fetchone() is not None
+
+
+def two_factor_enabled(person: Identity) -> bool:
+    with database() as con:
+        row = con.execute('SELECT totp FROM users WHERE id=? AND disabled=0', (person.id,)).fetchone()
+    if row is None:
+        raise PermissionError('Account unavailable.')
+    return bool(row['totp'])
+
+
+def require_two_factor(person: Identity, uid: str, required: bool) -> None:
+    if not person.admin:
+        raise PermissionError('Administrator access required.')
+    with database() as con:
+        con.execute('BEGIN IMMEDIATE')
+        if not con.execute('SELECT 1 FROM users WHERE id=?', (uid,)).fetchone():
+            raise ValueError('Account unavailable.')
+        if required:
+            con.execute('INSERT OR IGNORE INTO two_factor_policy VALUES(?)', (uid,))
+        else:
+            if con.execute('SELECT 1 FROM security_policy WHERE require_totp=1').fetchone():
+                raise ValueError('Turn off the requirement for all users before disabling an individual authenticator.')
+            con.execute('DELETE FROM two_factor_policy WHERE user_id=?', (uid,))
+            con.execute('UPDATE users SET totp=?,last_totp=-1 WHERE id=?', (b'', uid))
+    if not required:
+        revoke(uid)
+
+
+def enrollment(name: str, password: str, *, two_factor: bool = False) -> dict:
     return {"id": secrets.token_hex(16), "username": username(name), "password": password_bytes(password),
-            "key": secrets.token_bytes(32), "totp": pyotp.random_base32(), "recovery": secrets.token_bytes(32)}
+            "key": secrets.token_bytes(32), "totp": pyotp.random_base32() if two_factor or all_two_factor_required() else "",
+            "recovery": secrets.token_bytes(32)}
 
 
-def finish_enrollment(draft: dict, code: str, *, setup: bool = False, invite: str = "") -> Identity:
-    if not pyotp.TOTP(draft["totp"]).verify(code):
+def finish_enrollment(draft: dict, code: str = "", *, setup: bool = False, invite: str = "") -> Identity:
+    if draft['totp'] and not pyotp.TOTP(draft["totp"]).verify(code):
         raise ValueError("Enter the current code from your authenticator.")
     uid, key, password = draft["id"], draft["key"], draft["password"]
     salt = secrets.token_bytes(16)
     values = (uid, draft["username"], int(setup), kdf(secrets.token_bytes(16)).derive_phc_encoded(password), salt,
               seal(kdf(salt).derive(password), key, f"password:{uid}"),
-              seal(draft["recovery"], key, f"recovery:{uid}"), seal(key, draft["totp"].encode(), f"totp:{uid}"))
+              seal(draft["recovery"], key, f"recovery:{uid}"),
+              seal(key, draft["totp"].encode(), f"totp:{uid}") if draft['totp'] else b'')
     with database() as con:
         con.execute("BEGIN IMMEDIATE")
+        if not draft['totp'] and con.execute('SELECT 1 FROM security_policy WHERE require_totp=1').fetchone():
+            raise ValueError('Two-factor authentication is now required. Start account setup again.')
         if setup:
             if con.execute("SELECT 1 FROM users LIMIT 1").fetchone():
                 raise ValueError("Administrator setup is already complete.")
@@ -153,7 +210,7 @@ def finish_enrollment(draft: dict, code: str, *, setup: bool = False, invite: st
                 raise ValueError("This invitation is invalid or expired.")
             con.execute("DELETE FROM invites WHERE token=?", (digest(invite),))
         con.execute("INSERT INTO users(id,username,admin,password_hash,salt,wrapped_key,recovery_key,totp) VALUES(?,?,?,?,?,?,?,?)", values)
-    return Identity(uid, draft["username"], setup, key)
+    return Identity(uid, draft["username"], setup, key, bool(draft['totp']))
 
 
 def digest(value: str) -> str:
@@ -172,7 +229,7 @@ def throttle(scope: str) -> None:
                     (digest(scope), now + 900))
 
 
-def authenticate(name: str, password: str, code: str) -> Identity:
+def authenticate(name: str, password: str, code: str = "") -> Identity:
     name = username(name)
     throttle("login:" + name)
     with database() as con:
@@ -183,17 +240,22 @@ def authenticate(name: str, password: str, code: str) -> Identity:
             raise ValueError("Invalid username, password or authenticator code.")
         Argon2id.verify_phc_encoded(password[:256].encode(), row["password_hash"])
         key = unseal(kdf(row["salt"]).derive(password.encode()), row["wrapped_key"], f"password:{row['id']}")
-        totp = pyotp.TOTP(unseal(key, row["totp"], f"totp:{row['id']}").decode())
-        step = int(time.time()) // 30
-        if not totp.verify(code):
-            raise ValueError("Invalid username, password or authenticator code.")
+        if row['totp']:
+            totp = pyotp.TOTP(unseal(key, row["totp"], f"totp:{row['id']}").decode())
+            step = int(time.time()) // 30
+            if not totp.verify(code):
+                raise ValueError("Invalid username, password or authenticator code.")
         with database() as con:
-            changed = con.execute("UPDATE users SET last_totp=? WHERE id=? AND last_totp<? AND disabled=0",
-                                  (step, row["id"], step)).rowcount
-            if not changed:
-                raise ValueError("Wait for a new authenticator code before signing in again.")
+            if row['totp']:
+                changed = con.execute("UPDATE users SET last_totp=? WHERE id=? AND last_totp<? AND disabled=0 AND totp=?",
+                                      (step, row["id"], step, row['totp'])).rowcount
+                if not changed:
+                    raise ValueError("Wait for a new authenticator code before signing in again.")
+            elif not con.execute("SELECT 1 FROM users WHERE id=? AND disabled=0 AND totp=? AND password_hash=?",
+                                 (row['id'], b'', row['password_hash'])).fetchone():
+                raise ValueError('Account changed. Sign in again.')
             con.execute("DELETE FROM failures WHERE id=?", (digest("login:" + name),))
-        return Identity(row["id"], name, bool(row["admin"]), key)
+        return Identity(row["id"], name, bool(row["admin"]), key, bool(row['totp']))
     except (InvalidKey, InvalidTag):
         raise ValueError("Invalid username, password or authenticator code.") from None
 
@@ -204,6 +266,7 @@ class Session:
     csrf: str = field(default_factory=lambda: secrets.token_urlsafe(32))
     created: float = field(default_factory=time.time)
     used: float = field(default_factory=time.time)
+    totp_setup: str = field(default="", repr=False)
 
 
 sessions: dict[str, Session] = {}
@@ -251,6 +314,19 @@ def change_password(person: Identity, password: str) -> None:
     revoke(person.id)
 
 
+def enable_two_factor(person: Identity, secret: str, code: str) -> Identity:
+    throttle('totp-setup:' + person.id)
+    if not secret or not pyotp.TOTP(secret).verify(code):
+        raise ValueError('Enter the current code from your authenticator.')
+    with database() as con:
+        changed = con.execute('UPDATE users SET totp=?,last_totp=? WHERE id=? AND disabled=0 AND totp=?',
+            (seal(person.key, secret.encode(), f'totp:{person.id}'), int(time.time()) // 30, person.id, b'')).rowcount
+        if not changed:
+            raise ValueError('Account changed. Sign in again.')
+    revoke(person.id)
+    return Identity(person.id, person.username, person.admin, person.key, True)
+
+
 def recover(name: str, recovery: str, password: str) -> dict:
     name = username(name)
     throttle('recovery:' + name)
@@ -263,27 +339,33 @@ def recover(name: str, recovery: str, password: str) -> dict:
         key = unseal(secret, row['recovery_key'], f"recovery:{row['id']}")
     except (ValueError, InvalidTag):
         raise ValueError('Invalid recovery credentials.') from None
-    draft = enrollment(name, password)
-    draft.update(id=row['id'], key=key, admin=bool(row['admin']), previous_recovery=row['recovery_key'])
+    person = Identity(row['id'], name, bool(row['admin']), key)
+    draft = enrollment(name, password, two_factor=two_factor_required(person))
+    draft.update(id=row['id'], key=key, admin=bool(row['admin']), previous_recovery=row['recovery_key'], previous_totp=row['totp'])
     return draft
 
 
-def finish_recovery(draft: dict, code: str) -> Identity:
-    if not pyotp.TOTP(draft['totp']).verify(code):
+def finish_recovery(draft: dict, code: str = "") -> Identity:
+    if draft['totp'] and not pyotp.TOTP(draft['totp']).verify(code):
         raise ValueError('Enter the current code from your authenticator.')
     salt = secrets.token_bytes(16)
     uid, key, password = draft['id'], draft['key'], draft['password']
     with database() as con:
+        con.execute('BEGIN IMMEDIATE')
+        if not draft['totp'] and con.execute('''SELECT 1 FROM two_factor_policy WHERE user_id=?
+                UNION ALL SELECT 1 FROM security_policy WHERE require_totp=1''', (uid,)).fetchone():
+            raise ValueError('Two-factor authentication is now required. Start recovery again.')
         changed = con.execute('''UPDATE users SET password_hash=?,salt=?,wrapped_key=?,recovery_key=?,totp=?,last_totp=-1
-            WHERE id=? AND disabled=0 AND recovery_key=?''',
+            WHERE id=? AND disabled=0 AND recovery_key=? AND totp=?''',
             (kdf(secrets.token_bytes(16)).derive_phc_encoded(password), salt,
              seal(kdf(salt).derive(password), key, f'password:{uid}'),
-             seal(draft['recovery'], key, f'recovery:{uid}'), seal(key, draft['totp'].encode(), f'totp:{uid}'),
-             uid, draft['previous_recovery'])).rowcount
+             seal(draft['recovery'], key, f'recovery:{uid}'),
+             seal(key, draft['totp'].encode(), f'totp:{uid}') if draft['totp'] else b'',
+             uid, draft['previous_recovery'], draft['previous_totp'])).rowcount
         if not changed:
             raise ValueError('Recovery has expired or was already used.')
     revoke(uid)
-    return Identity(uid, draft['username'], draft['admin'], key)
+    return Identity(uid, draft['username'], draft['admin'], key, bool(draft['totp']))
 
 
 def recovery_text(draft: dict) -> str:

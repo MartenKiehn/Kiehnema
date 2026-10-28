@@ -22,17 +22,20 @@ def setup_admin():
     if a.initialized():
         raise ValueError('Administrator setup is already complete.')
     config = AdminSetupSettings()
-    credentials = (config.username, config.password, config.totp_secret, config.recovery_key)
-    if any(value is not None for value in credentials):
+    credentials = (config.username, config.password, config.recovery_key)
+    if any(value is not None for value in (*credentials, config.totp_secret)):
         if not all(credentials):
-            raise ValueError('Set all four MG_ADMIN_USERNAME, MG_ADMIN_PASSWORD, MG_ADMIN_TOTP_SECRET and MG_ADMIN_RECOVERY_KEY for unattended setup.')
+            raise ValueError('Set MG_ADMIN_USERNAME, MG_ADMIN_PASSWORD and MG_ADMIN_RECOVERY_KEY together for unattended setup.')
         draft = a.enrollment(config.username, config.password.get_secret_value())
-        totp = pyotp.TOTP(config.totp_secret.get_secret_value().strip())
-        try:
-            if len(totp.byte_secret()) < 20:
-                raise ValueError
-        except ValueError:
-            raise ValueError('MG_ADMIN_TOTP_SECRET must be a Base32 key containing at least 20 bytes (160 bits).') from None
+        code = ''
+        if config.totp_secret is not None:
+            totp = pyotp.TOTP(config.totp_secret.get_secret_value().strip())
+            try:
+                if len(totp.byte_secret()) < 20:
+                    raise ValueError
+            except ValueError:
+                raise ValueError('MG_ADMIN_TOTP_SECRET must be a Base32 key containing at least 20 bytes (160 bits).') from None
+            draft['totp'], code = totp.secret, totp.now()
         recovery = config.recovery_key.get_secret_value().strip()
         try:
             recovery = base64.b64decode(recovery + '=' * (-len(recovery) % 4), altchars=b'-_', validate=True)
@@ -40,12 +43,12 @@ def setup_admin():
                 raise ValueError
         except ValueError:
             raise ValueError('MG_ADMIN_RECOVERY_KEY must be a URL-safe Base64 key containing exactly 32 bytes.') from None
-        draft.update(totp=totp.secret, recovery=recovery)
-        a.finish_enrollment(draft, totp.now(), setup=True)
+        draft['recovery'] = recovery
+        a.finish_enrollment(draft, code, setup=True)
         print('Administrator created from deployment configuration.')
         return
     if not sys.stdin.isatty():
-        raise ValueError('Set MG_ADMIN_USERNAME, MG_ADMIN_PASSWORD, MG_ADMIN_TOTP_SECRET and MG_ADMIN_RECOVERY_KEY, or run uv run python -m app.security setup in a terminal.')
+        raise ValueError('Set MG_ADMIN_USERNAME, MG_ADMIN_PASSWORD and MG_ADMIN_RECOVERY_KEY, or run uv run python -m app.security setup in a terminal.')
     while True:
         try:
             name = a.username(input('Administrator username [admin]: ').strip() or 'admin')
@@ -63,17 +66,20 @@ def setup_admin():
             break
         print('Passwords do not match. Please try again.')
     draft = a.enrollment(name, password)
-    print('Add this time-based setup key to your authenticator:', draft['totp'])
     print('Save this personal recovery key outside the server:', a.recovery_text(draft))
-    code = input('Current authenticator code: ').strip()
-    a.finish_enrollment(draft, code, setup=True)
+    a.finish_enrollment(draft, setup=True)
     print('Administrator created. Keep the recovery key: it is not shown again.')
+    print('Two-factor authentication can be configured later in Users.')
 
 
 def unlock():
     from app.security.workspace import memory_policy
     memory_policy()
-    return a.authenticate(input('Username: '), getpass.getpass('Password: '), input('Authenticator code: ').strip())
+    person = a.authenticate(input('Username: '), getpass.getpass('Password: '),
+                            input('Authenticator code (leave blank if not configured): ').strip())
+    if a.two_factor_required(person) and not a.two_factor_enabled(person):
+        raise ValueError('Set up two-factor authentication in the web app before using the CLI.')
+    return person
 
 
 async def import_legacy(source: Path):
@@ -126,15 +132,17 @@ def main():
     migration.add_argument('source', type=Path)
     args = parser.parse_args()
     try:
-        if args.command == 'setup':
-            setup_admin()
-        else:
-            token = a.current_identity.set(unlock())
-            try:
-                with a.service_lock():
+        from app.updates.state import assert_start_allowed
+        with a.service_lock():
+            assert_start_allowed(cli=True)
+            if args.command == 'setup':
+                setup_admin()
+            else:
+                token = a.current_identity.set(unlock())
+                try:
                     asyncio.run(import_legacy(args.source))
-            finally:
-                a.current_identity.reset(token)
+                finally:
+                    a.current_identity.reset(token)
     except (ValueError, PermissionError) as exc:
         parser.exit(1, str(exc) + '\n')
 

@@ -18,51 +18,66 @@ uv run python -m app
 
 `python -m app` also runs setup on its first start. Without deployment credentials, setup
 requires an interactive terminal. There is no default password or public admin
-registration. Choose a password of at least 15 characters, enroll the displayed TOTP key
-in an authenticator, and save the personal recovery key outside the server. Setup can only
+registration. Choose a password of at least 15 characters and save the personal recovery
+key outside the server. Two-factor authentication is initially optional. Setup can only
 create the first administrator. Do not record the setup terminal in shared logs.
 
 Use **Users** to create single-use invitations (24-hour expiry), disable accounts or enable
-them again. Invitees choose their own password and authenticator at `/activate`. Disabling
+them again. Invitees choose their own password at `/activate`. Disabling
 an account revokes its sessions and cancels its jobs. `/recover` requires the user's
 personal recovery key, preserves existing content and rotates the password, authenticator
 and recovery key. Without a password or recovery key, the old content cannot be recovered.
 An administrator has no decryption override.
 
+### Two-factor authentication
+
+In **Users**, an administrator can require 2FA for an individual user or turn on
+**Require two-factor authentication for all users**. The global setting also covers
+administrators and future invitations; individual settings cannot override it. Users
+without an authenticator must complete setup before accessing their workspace, including
+through an existing session, a preview link or the CLI. Users can also set up an
+authenticator voluntarily under **Your account**. Setup requires their current password
+and a valid authenticator code, then signs out other sessions.
+
+Turning off the global setting keeps existing authenticators and individual requirements
+active. With the global setting off, an administrator can disable 2FA for a user. This
+removes that user's authenticator and signs out their sessions; their password and encrypted
+videos remain unchanged. Enabling it again requires a new authenticator setup. Existing
+accounts retain their authenticators when upgrading. Recovery requires a new authenticator
+whenever one was already configured or an administrator requires it.
+
 ### Unattended first-admin setup
 
-For automated deployments, supply all four variables through your deployment's secret
+For automated deployments, supply the username, password and recovery key through your deployment's secret
 store (for example, GitHub Actions secrets) to the application process:
 
 | Variable | Value |
 | --- | --- |
 | `MG_ADMIN_USERNAME` | Username, using the same rules as interactive setup. |
 | `MG_ADMIN_PASSWORD` | A unique password of 15–256 characters. |
-| `MG_ADMIN_TOTP_SECRET` | Base32 authenticator key containing at least 20 random bytes (160 bits). |
+| `MG_ADMIN_TOTP_SECRET` | Optional Base32 authenticator key containing at least 20 random bytes (160 bits). Omit to set up 2FA later. |
 | `MG_ADMIN_RECOVERY_KEY` | URL-safe Base64 encoding of exactly 32 random bytes, with optional padding. |
 
-Generate the two keys **once, locally in a private terminal**, and store them in your
+Generate the recovery key **once, locally in a private terminal**, and store it in your
 password manager and deployment secret store. Do not run this command in CI logs:
 
 ```sh
 uv run python - <<'PY'
 import secrets
-import pyotp
-print('MG_ADMIN_TOTP_SECRET=' + pyotp.random_base32())
 print('MG_ADMIN_RECOVERY_KEY=' + secrets.token_urlsafe(32))
 PY
 ```
 
-Add the TOTP key to your authenticator as a time-based account (SHA-1, six digits,
-30-second interval). Keep the recovery key outside the server. Supplying these keys
-replaces the interactive enrollment confirmation; subsequent logins still require
-the password and a current authenticator code.
+Keep the recovery key outside the server. To provision 2FA immediately, also generate a
+key with `pyotp.random_base32()`, supply it as `MG_ADMIN_TOTP_SECRET`, and add it to your
+authenticator as a time-based account (SHA-1, six digits, 30-second interval). Subsequent
+logins require the password and, if configured, a current authenticator code.
 
 Start with `uv run python -m app`; an empty account database is initialized without
 prompts or secret output. Alternatively, run `uv run python -m app.security setup` once
 before starting the server directly through Uvicorn. Both commands also accept these
 variables from the local `.env` file. Missing or invalid values abort setup without
-creating a user. With none of the four set, interactive setup remains available.
+creating a user. With none of the bootstrap variables set, interactive setup remains available.
 
 Subsequent `python -m app` starts preserve existing accounts and ignore these bootstrap
 values; changing them does not reset credentials. The explicit `setup` command still
@@ -167,3 +182,11 @@ and filename checks, ciphertext tampering, range downloads, logout/worker separa
 a real subprocess checkpoint round trip. Browser tests cover the editing workflow without
 Bedrock calls. `MG_LIVE_BEDROCK=1` is a separate, billable opt-in. These tests are not an
 independent penetration test or an audit of a deployment's OS, TLS proxy or backup system.
+
+## Managed Linux updates
+
+The [managed Linux installation](updates.md) keeps the encrypted store outside versioned
+images and preserves the existing RAM workspace, browser sandbox and account boundaries.
+Its separate updater needs Docker-host privileges. The web app can request only signed
+catalog releases through a private authenticated socket. A failed update restores data and
+images together; host and disaster recovery remain operator responsibilities.

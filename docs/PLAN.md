@@ -4,11 +4,16 @@ Python + HTMX app: URL, duration and description in the UI → Claude Opus 5.5 o
 LangGraph) writes the composition → two videos (4:5 feed 1080×1350, 9:16 story 1080×1920) with music.
 
 ## Decisions
+
+Follow-up deployment plan: [GitLab releases and updates through the UI](../plans/update-system.md)
+(ECC Blueprint; Linux implementation and local container verification completed;
+production GitLab/host acceptance remains). See the [installation and release guide](updates.md).
+
 | Topic | Decision |
 |---|---|
 | Creative approach | **B** – the model writes the full HTML/CSS/GSAP composition against a fixed harness contract (no scene library) |
 | Review | **yes** – human review (edit texts / feedback / approve) before the final render |
-| Deployment | **local**, single user, bound to 127.0.0.1 |
+| Deployment | Managed **Linux/Docker** with UI updates; local development remains available. One coordinator per data directory. |
 | UI language | **English**; video language follows the website unless the description says otherwise |
 | Orchestration | **LangChain + LangGraph** (langchain-aws `ChatBedrockConverse`), SQLite checkpoints |
 | Live-run budget (Phase 3) | 2–3 full runs |
