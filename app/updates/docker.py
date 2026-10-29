@@ -13,7 +13,7 @@ LABEL = 'org.kiehnema.installation'
 class Docker:
     def __init__(self, installation, socket='/var/run/docker.sock'):
         self.installation = installation
-        self.client = httpx.Client(transport=httpx.HTTPTransport(uds=socket), base_url='http://docker/v1.45', timeout=90)
+        self.client = httpx.Client(transport=httpx.HTTPTransport(uds=socket), base_url='http://docker/v1.44', timeout=90)
 
     def close(self):
         self.client.close()

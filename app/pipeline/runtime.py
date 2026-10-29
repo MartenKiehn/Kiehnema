@@ -16,7 +16,7 @@ from langgraph.types import Command
 from app.crawl.guard import UrlGuard
 from app.llm.client import Usage
 from app.pipeline.graph import build_graph
-from app.pipeline.llm import LLM, BedrockLLM
+from app.pipeline.llm import LLM, ProviderLLM
 from app.pipeline.status import write_status
 from app.security.workspace import workspace_dir
 from app.security.vault import active_job
@@ -45,8 +45,8 @@ def _config(job_id: str, llm: LLM, guard: UrlGuard | None) -> dict:
     return {"configurable": {"thread_id": job_id, "llm": llm, "guard": guard}, "recursion_limit": 60}
 
 
-def _bedrock(job_dir: Path, usage: dict | None = None) -> BedrockLLM:
-    llm = BedrockLLM(log_path=job_dir / "llm.jsonl")
+def _model(job_dir: Path, usage: dict | None = None) -> ProviderLLM:
+    llm = ProviderLLM(log_path=job_dir / "llm.jsonl")
     if usage:
         llm.usage = Usage(**usage)
     return llm
@@ -70,7 +70,7 @@ async def run_job(job_id: str, *, llm: LLM | None = None, guard: UrlGuard | None
     state = {**json.loads((job_dir / "request.json").read_text()),
              "job_id": job_id, "job_dir": str(job_dir), "error": None}
     async with _graph() as graph:
-        return await graph.ainvoke(state, _config(job_id, llm or _bedrock(job_dir), guard))
+        return await graph.ainvoke(state, _config(job_id, llm or _model(job_dir), guard))
 
 
 async def start_job(url: str, duration: float, description: str = "", *, allow_client_logos: bool = False,
@@ -86,7 +86,7 @@ async def resume_job(job_id: str, decision: dict, *, llm: LLM | None = None, gua
         snapshot = await graph.aget_state({"configurable": {"thread_id": job_id}})
         if snapshot.next != ("review",) or not any(t.interrupts for t in snapshot.tasks):
             raise ValueError(f"job {job_id} is not waiting for review")
-        llm = llm or _bedrock(job_dir, snapshot.values.get("usage"))
+        llm = llm or _model(job_dir, snapshot.values.get("usage"))
         return await graph.ainvoke(Command(resume=decision), _config(job_id, llm, guard))
 
 
@@ -105,7 +105,7 @@ async def reopen_job(job_id: str) -> dict:
         snapshot = await graph.aget_state(config)
         if snapshot.next or snapshot.values.get("status") != "done":
             raise ValueError(f"job {job_id} is not a completed render")
-        config = _config(job_id, _bedrock(job_dir, snapshot.values.get("usage")), None)
+        config = _config(job_id, _model(job_dir, snapshot.values.get("usage")), None)
         # The QA successor is review; clear its routing instruction without rerunning QA.
         await graph.aupdate_state(config, {"status": "review", "review": {}, "fix_instruction": None}, as_node="qa")
         return await graph.ainvoke(None, config)

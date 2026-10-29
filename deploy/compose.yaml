@@ -25,8 +25,8 @@ services:
       MG_UPDATE_CONTROL_DIR: /run/kiehnema
       MG_TRUSTED_PROXIES: "*"
     volumes:
-      - ${KIEHNEMA_HOME}/data:/data
-      - ${KIEHNEMA_HOME}/updates/control:/run/kiehnema:ro
+      - ${KIEHNEMA_HOME}/data:/data:z
+      - ${KIEHNEMA_HOME}/updates/control:/run/kiehnema:ro,z
     tmpfs:
       - /work:size=4294967296,mode=0700,uid=1000,gid=1000
       - /tmp:size=268435456,mode=1777
@@ -45,6 +45,8 @@ services:
       org.kiehnema.installation: ${KIEHNEMA_INSTALLATION:-kiehnema}
     user: "0:0"
     init: true
+    # The trusted updater controls Docker; SELinux isolation remains enabled for the app.
+    security_opt: ["label=disable"]
     command: [python, -m, app.updates, serve]
     restart: unless-stopped
     read_only: true
@@ -52,8 +54,8 @@ services:
       MG_DATA_DIR: /data
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ${KIEHNEMA_HOME}/data:/data
-      - ${KIEHNEMA_HOME}/updates:/updates
+      - ${KIEHNEMA_HOME}/data:/data:z
+      - ${KIEHNEMA_HOME}/updates:/updates:z
     tmpfs:
       - /tmp:size=67108864,mode=1777
     ulimits:
@@ -79,9 +81,9 @@ services:
       - "${KIEHNEMA_HTTP_PORT:-80}:80"
       - "${KIEHNEMA_HTTPS_PORT:-443}:443"
     volumes:
-      - ${KIEHNEMA_HOME}/updates/public:/srv/update:ro
-      - ${KIEHNEMA_HOME}/tls:/data
-      - ${KIEHNEMA_HOME}/caddy-config:/config
+      - ${KIEHNEMA_HOME}/updates/public:/srv/update:ro,z
+      - ${KIEHNEMA_HOME}/tls:/data:z
+      - ${KIEHNEMA_HOME}/caddy-config:/config:z
     logging:
       driver: none
     networks: [private]

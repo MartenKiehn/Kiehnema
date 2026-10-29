@@ -285,7 +285,7 @@ def test_docker_adapter_refuses_other_installations():
     from app.updates.docker import Docker
     engine = Docker('ours', socket='/unused')
     engine.client.close()
-    engine.client = httpx.Client(base_url='http://docker/v1.45', transport=httpx.MockTransport(
+    engine.client = httpx.Client(base_url='http://docker/v1.44', transport=httpx.MockTransport(
         lambda request: httpx.Response(200, json={'Config': {'Labels': {'org.kiehnema.installation': 'theirs'}}})))
     try:
         with pytest.raises(ValueError, match='belong'):

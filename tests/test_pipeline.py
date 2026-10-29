@@ -166,7 +166,7 @@ async def test_full_pipeline_with_fake_model(site, data_dir, monkeypatch):
     assert [c[0] for c in llm.calls] == ["distill", "concept", "compose", "fix", "qa", "fix"]
 
     exports = {name: (job / file).read_bytes() for name, file in result["outputs"].items()}
-    monkeypatch.setattr("app.pipeline.runtime._bedrock", lambda *args: FakeLLM({}, usage=llm.usage))
+    monkeypatch.setattr("app.pipeline.runtime._model", lambda *args: FakeLLM({}, usage=llm.usage))
     reopened = await reopen_job(job_id)
     assert "__interrupt__" in reopened
     saved = await job_state(job_id)

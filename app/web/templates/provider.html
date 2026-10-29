@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card auth-card">
+  <p class="eyebrow">INSTANCE SETTINGS</p>
+  <h1>AI provider</h1>
+  <p>Choose the provider and model used by everyone on this server. Your provider bills usage to your account.</p>
+  {% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
+  {% if saved %}<p class="notice" role="status">Settings saved. New jobs and resumed work will use this configuration. Running jobs keep their current settings.</p>{% endif %}
+  <form action="/admin/provider" method="post" data-provider-form>
+    <input type="hidden" name="csrf" value="{{ request.state.csrf }}">
+    <label for="ai-provider">Provider</label>
+    <select id="ai-provider" name="provider">
+      {% for value, label in [('bedrock', 'AWS Bedrock'), ('openai', 'OpenAI'), ('anthropic', 'Anthropic')] %}
+      <option value="{{ value }}" {% if values.get('provider', 'bedrock') == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <label for="ai-model">Model / inference profile ID</label>
+    <input id="ai-model" name="model" value="{{ values.get('model', '') }}" required maxlength="300" autocomplete="off" aria-describedby="model-help">
+    <p id="model-help" class="help">Use a model available to your account that supports images, tool calling and streaming. Availability and output limits depend on the provider and model.</p>
+    <label for="ai-output-limit">Maximum output tokens per request</label>
+    <input id="ai-output-limit" name="max_output_tokens" type="number" min="1024" max="128000" value="{{ values.get('max_output_tokens', 64000) }}" required>
+    <p class="help">Match your model’s limit. Long video compositions may need a large output budget.</p>
+    <div data-provider-fields="bedrock">
+      <label for="ai-region">AWS region</label>
+      <input id="ai-region" name="region" value="{{ values.get('region', 'eu-central-1') }}" maxlength="64">
+      <label for="ai-auth">AWS authentication</label>
+      <select id="ai-auth" name="auth">
+        <option value="keys" {% if values.get('auth', 'keys') == 'keys' %}selected{% endif %}>Access key and secret key</option>
+        <option value="environment" {% if values.get('auth') == 'environment' %}selected{% endif %}>Server IAM role / existing AWS configuration</option>
+      </select>
+      <p class="help">An IAM role is optional. On EC2, use IMDSv2 and response hop limit 2 for containers. AWS keys also work on other hosting providers.</p>
+      <div data-aws-keys>
+        <label for="ai-access-key">AWS access key ID</label>
+        <input id="ai-access-key" name="access_key" type="password" autocomplete="new-password" maxlength="8192">
+        <label for="ai-secret-key">AWS secret access key</label>
+        <input id="ai-secret-key" name="secret_key" type="password" autocomplete="new-password" maxlength="8192">
+        <label for="ai-session-token">AWS session token <span class="optional">optional</span></label>
+        <input id="ai-session-token" name="session_token" type="password" autocomplete="new-password" maxlength="8192">
+      </div>
+    </div>
+    <div data-provider-fields="api">
+      <label for="ai-api-key">API key</label>
+      <input id="ai-api-key" name="api_key" type="password" autocomplete="new-password" maxlength="8192">
+    </div>
+    {% if values.get('credentials_saved') %}<p class="help">Credentials are saved. Their values are never displayed.</p>{% endif %}
+    <p class="help">Leave all credential fields empty to keep the saved credentials for the same provider and authentication method. To replace credentials, enter the complete set, including any required session token.</p>
+    <button class="button" type="submit">Save AI settings</button>
+    <p class="help">Saving does not call the provider or incur model charges. Your first preview will use these settings.</p>
+  </form>
+</section>
+{% endblock %}
+{% block scripts %}<script src="/static/provider.js" defer></script>{% endblock %}

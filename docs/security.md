@@ -4,7 +4,7 @@ The shared app stores user content only as authenticated ciphertext under `data/
 The app administrator manages invitations and account suspension, but cannot open another
 user's jobs. This protects against other application users and copies of the database,
 files and backups without the user's secrets. It does **not** protect against root, code
-execution as the service user, a compromised browser, or live memory snapshots. Bedrock
+execution as the service user, a compromised browser, or live memory snapshots. The configured AI provider
 still receives the content needed for model inference.
 
 ## First start
@@ -88,13 +88,23 @@ secrets out of Git, command arguments and logs.
 
 ## RAM processing workspace
 
-The server refuses ordinary disk scratch directories. On Linux, `MG_WORK_DIR` defaults
+### Linux server
+
+The primary deployment is a dedicated Linux server using the [managed installer](updates.md).
+It configures a private `/work` tmpfs inside the app container and disables host swap.
+Operators do not need to create a separate RAM disk. The requirements below also apply
+when preparing a Linux host manually or running directly from source.
+
+The app refuses ordinary disk scratch directories. Outside the managed container, `MG_WORK_DIR` defaults
 to `/dev/shm/kiehnema`: use a sufficiently sized tmpfs, disable swap, and run the service as
 a dedicated unprivileged OS account without interactive SSH access. The directory must
 be owned by that account with mode `0700`. Generation runs Chromium's sandbox; do not run
 the service as root or disable the browser sandbox to work around deployment errors.
 
-On macOS, create a RAM disk for development. The following allocates a **new** 4 GiB memory
+### Local development on macOS
+
+macOS is a local development and testing setup; production deployment uses the Linux
+server installation above. Only this macOS setup requires manually creating a RAM disk. The following allocates a **new** 4 GiB memory
 device; only format the device returned by this allocation, never an existing disk:
 
 ```sh
@@ -106,7 +116,10 @@ MG_WORK_DIR=/Volumes/KiehnemaRAM/work uv run python -m app
 
 The app verifies RAM backing with `hdiutil` and requires encrypted macOS swap. RAM disks
 must be recreated after reboot. Stop the app before ejecting one. Core dumps are disabled.
-The application does not create mounts or change the host's swap configuration itself.
+The application process does not create mounts or change host swap; the Linux server
+installer performs the server preparation separately.
+
+### Worker lifecycle
 
 Each job runs in a subprocess with its own key and private temporary directory. Browser
 profiles and caches use that directory; browser subprocesses do not inherit AWS credentials.
@@ -190,3 +203,43 @@ images and preserves the existing RAM workspace, browser sandbox and account bou
 Its separate updater needs Docker-host privileges. The web app can request only signed
 catalog releases through a private authenticated socket. A failed update restores data and
 images together; host and disaster recovery remain operator responsibilities.
+
+
+## AI provider credentials
+
+Administrators configure one instance-wide AWS Bedrock, OpenAI or Anthropic account under
+**AI provider**. The setting applies to every user's generation, billing and provider data
+processing. Non-administrators cannot read or change this configuration. The browser never
+receives stored credential values, and saving settings makes no paid API call.
+
+Credentials are AES-GCM encrypted in `data/secure/provider.enc` with a random service key
+in `data/secure/provider.key`, both mode 0600. Back up and restore these files together.
+This service key allows unattended jobs and is separate from password-protected user content
+keys. **A complete server backup contains both the provider ciphertext and its key**;
+protect backup access accordingly. This does not protect provider credentials from root,
+the service account or a compromised application process. User content encryption is unchanged.
+Missing/corrupt keys fail closed instead of silently replacing credentials.
+
+Workers receive a configuration snapshot through their private stdin pipe, together with
+the existing job secret; saved provider credentials are not added to command arguments or
+environment variables. Model request errors show generic diagnostics rather than request
+headers or credentials. Existing AWS environment/profile authentication is still supported.
+API adapters use the fixed official OpenAI/Anthropic endpoints. The chosen model must support
+images, tool calling and streaming; availability, output limits and charges depend on the account.
+
+
+## Team roles
+
+The three roles use film titles: **Regisseur**, **Regieassistenz** and
+**Crew**. Every role creates and accesses only its own videos. A Regisseur
+controls roles, account access, two-factor policies, AI provider settings and updates.
+Regieassistenz has the same workspace rights as Crew plus permission to invite Crew users
+and view the team directory. It cannot change roles, disable accounts or change security
+or instance settings. Invitation forms cannot grant elevated roles.
+
+Only a Regisseur can change other users’ roles under **Users → Security & access**.
+Changing a role signs out that user without removing their videos. An administrator cannot
+change their own role, preventing accidental removal of the last active administrator.
+Roles are stored in the account database, refreshed when sessions are used, and preserved
+through password changes, recovery and normal updates. Existing administrators retain
+admin rights; existing members remain Crew. The team list is grouped by role (Regisseur, Regieassistenz, Crew), then sorted alphabetically by username within each role.

@@ -22,6 +22,8 @@ from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
 
 from app.config import settings
 
+ROLE_LABELS = {'admin': 'Regisseur', 'manager': 'Regieassistenz', 'user': 'Crew'}
+
 
 def seal(key: bytes, value: bytes, context: str) -> bytes:
     nonce = secrets.token_bytes(12)
@@ -79,6 +81,8 @@ def database():
             name BLOB NOT NULL, blob TEXT NOT NULL, size INTEGER NOT NULL,
             PRIMARY KEY(job, tag));
         CREATE TABLE IF NOT EXISTS failures (id TEXT PRIMARY KEY, count INTEGER NOT NULL, until REAL NOT NULL);
+        CREATE TABLE IF NOT EXISTS invitation_managers (
+            user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE);
         CREATE TABLE IF NOT EXISTS two_factor_policy (
             user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE);
         CREATE TABLE IF NOT EXISTS security_policy (
@@ -115,20 +119,56 @@ class Identity:
     admin: bool
     key: bytes = field(repr=False)
     two_factor_verified: bool = False
+    manager: bool = False
+
+    @property
+    def role(self) -> str:
+        return 'admin' if self.admin else 'manager' if self.manager else 'user'
+
+    @property
+    def role_label(self) -> str:
+        return ROLE_LABELS[self.role]
+
+    @property
+    def can_invite(self) -> bool:
+        return self.admin or self.manager
 
 
 current_identity: ContextVar[Identity | None] = ContextVar("identity", default=None)
+
+
+def refresh(person: Identity) -> Identity:
+    with database() as con:
+        row = con.execute("""SELECT disabled,admin,
+            id IN (SELECT user_id FROM invitation_managers) AS manager FROM users WHERE id=?""", (person.id,)).fetchone()
+    if row is None or row['disabled']:
+        raise PermissionError('Account unavailable.')
+    person.admin, person.manager = bool(row['admin']), bool(row['manager'])
+    return person
 
 
 def identity() -> Identity:
     person = current_identity.get()
     if person is None:
         raise PermissionError("Sign in to unlock your workspace.")
+    return refresh(person)
+
+
+def set_role(person: Identity, uid: str, role: str) -> None:
+    if role not in ROLE_LABELS:
+        raise ValueError('Choose a valid role.')
     with database() as con:
-        row = con.execute("SELECT disabled FROM users WHERE id=?", (person.id,)).fetchone()
-    if row is None or row["disabled"]:
-        raise PermissionError("Account unavailable.")
-    return person
+        con.execute('BEGIN IMMEDIATE')
+        if not con.execute('SELECT 1 FROM users WHERE id=? AND admin=1 AND disabled=0', (person.id,)).fetchone():
+            raise PermissionError('Administrator access required.')
+        if uid == person.id:
+            raise ValueError('You cannot change your own administrator role.')
+        if not con.execute('UPDATE users SET admin=? WHERE id=?', (int(role == 'admin'), uid)).rowcount:
+            raise ValueError('Account unavailable.')
+        con.execute('DELETE FROM invitation_managers WHERE user_id=?', (uid,))
+        if role == 'manager':
+            con.execute('INSERT INTO invitation_managers VALUES(?)', (uid,))
+    revoke(uid)
 
 
 def initialized() -> bool:
@@ -142,7 +182,7 @@ def all_two_factor_required() -> bool:
 
 
 def require_all_two_factor(person: Identity, required: bool) -> None:
-    if not person.admin:
+    if not refresh(person).admin:
         raise PermissionError('Administrator access required.')
     with database() as con:
         con.execute('INSERT INTO security_policy VALUES(1,?) ON CONFLICT(id) DO UPDATE SET require_totp=excluded.require_totp',
@@ -165,7 +205,7 @@ def two_factor_enabled(person: Identity) -> bool:
 
 
 def require_two_factor(person: Identity, uid: str, required: bool) -> None:
-    if not person.admin:
+    if not refresh(person).admin:
         raise PermissionError('Administrator access required.')
     with database() as con:
         con.execute('BEGIN IMMEDIATE')
@@ -255,7 +295,7 @@ def authenticate(name: str, password: str, code: str = "") -> Identity:
                                  (row['id'], b'', row['password_hash'])).fetchone():
                 raise ValueError('Account changed. Sign in again.')
             con.execute("DELETE FROM failures WHERE id=?", (digest("login:" + name),))
-        return Identity(row["id"], name, bool(row["admin"]), key, bool(row['totp']))
+        return refresh(Identity(row["id"], name, bool(row["admin"]), key, bool(row['totp'])))
     except (InvalidKey, InvalidTag):
         raise ValueError("Invalid username, password or authenticator code.") from None
 
@@ -288,9 +328,9 @@ def get_session(token: str) -> Session | None:
                 del sessions[sid]
         item = sessions.get(digest(token))
         if item:
-            with database() as con:
-                row = con.execute("SELECT disabled FROM users WHERE id=?", (item.person.id,)).fetchone()
-            if row is None or row[0]:
+            try:
+                refresh(item.person)
+            except PermissionError:
                 sessions.pop(digest(token), None)
                 return None
             item.used = now
@@ -324,7 +364,7 @@ def enable_two_factor(person: Identity, secret: str, code: str) -> Identity:
         if not changed:
             raise ValueError('Account changed. Sign in again.')
     revoke(person.id)
-    return Identity(person.id, person.username, person.admin, person.key, True)
+    return refresh(Identity(person.id, person.username, person.admin, person.key, True))
 
 
 def recover(name: str, recovery: str, password: str) -> dict:
@@ -365,7 +405,7 @@ def finish_recovery(draft: dict, code: str = "") -> Identity:
         if not changed:
             raise ValueError('Recovery has expired or was already used.')
     revoke(uid)
-    return Identity(uid, draft['username'], draft['admin'], key, bool(draft['totp']))
+    return refresh(Identity(uid, draft['username'], draft['admin'], key, bool(draft['totp'])))
 
 
 def recovery_text(draft: dict) -> str:
@@ -373,11 +413,13 @@ def recovery_text(draft: dict) -> str:
 
 
 def invite_user(person: Identity, name: str) -> str:
-    if not person.admin:
-        raise PermissionError("Administrator access required.")
     name = username(name)
     token = secrets.token_urlsafe(32)
     with database() as con:
+        con.execute('BEGIN IMMEDIATE')
+        if not con.execute("""SELECT 1 FROM users WHERE id=? AND disabled=0
+                AND (admin=1 OR id IN (SELECT user_id FROM invitation_managers))""", (person.id,)).fetchone():
+            raise PermissionError('An administrator or manager is required to invite users.')
         if con.execute("SELECT 1 FROM users WHERE username=?", (name,)).fetchone():
             raise ValueError("This username already exists.")
         con.execute("DELETE FROM invites WHERE username=?", (name,))

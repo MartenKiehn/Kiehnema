@@ -31,6 +31,9 @@ The video above uses Kiehnema itself as the example.
 3. **Shape the preview.** Watch both formats, change scene copy, order and duration, add comments or contribute visual ideas using text and images.
 4. **Approve and download.** **Approve & render** produces both MP4s with music. **Continue editing** lets you return to the video later.
 
+**Director’s desk** is the starting point for new projects. **Your videos** opens a separate
+page with only your own previews and finished videos.
+
 | Output | Resolution | Designed for |
 |---|---|---|
 | Feed · 4:5 | 1080 × 1350 | LinkedIn and Instagram feeds |
@@ -41,44 +44,56 @@ Both formats export at 30 fps with H.264 video and AAC stereo audio. The interfa
 ### Install on a server
 
 Published GitHub releases include an interactive installer for a fresh, dedicated
-**Ubuntu 24.04 instance (amd64/arm64)**:
+**Linux server (amd64/arm64, systemd)**: Ubuntu 22.04/24.04/26.04, Debian 12/13,
+Fedora 43–45, RHEL/Rocky/AlmaLinux/CentOS Stream 9/10 and Amazon Linux 2023.
 
 ```bash
 curl -fsSL --proto '=https' https://github.com/MartenKiehn/Kiehnema/releases/latest/download/install.sh -o kiehnema-install.sh && sudo bash ./kiehnema-install.sh
 ```
 
-Prepare DNS, the security group and an EC2 IAM role first; allow at least 16 GiB RAM and
-30 GiB free disk space. The installer asks for the domain, AWS region and Bedrock model,
-prepares Docker and the host, and walks through administrator creation. See the
+Prepare DNS and open ports 80/443; allow at least 16 GiB RAM and 30 GiB free disk space.
+The installer asks for the domain, prepares Docker and the host, and walks through
+administrator creation. After signing in, choose **AI provider** to configure AWS Bedrock,
+OpenAI or Anthropic with a model and credentials for all users. No AI credentials are
+needed during installation. Bedrock supports AWS keys or an optional server IAM role;
+EC2 is not required. See the
 [server installation workflow](docs/updates.md#serverinstallation-mit-einem-befehl) for prerequisites
 and host changes. This URL becomes available after the first signed release containing `install.sh`.
 
-### Run locally
+The Linux server is the primary deployment. The installer configures the private tmpfs
+workspace in the container and disables host swap; no separate RAM disk needs to be created.
+The [managed installation](docs/updates.md) checks GitHub releases regularly, shows update
+progress, and restores the previous working version when an update fails.
 
-Linux servers can use the [managed installation with updates through the UI](docs/updates.md).
-It checks GitHub releases regularly, shows installation progress, and restores the previous
-working version when an update fails.
+### Local development
 
-You need Python 3.13+, `uv`, Node.js/npm and AWS credentials with access to the configured
-Bedrock model. Model calls incur charges in your AWS account.
+The following source setup is for development and local testing.
 
-Before generating your first video, configure a private **RAM workspace** and set
-`MG_WORK_DIR` accordingly. Linux requires tmpfs with swap disabled; macOS requires a
-RAM disk with encrypted swap. Ordinary disk directories are rejected.
-The [setup guide](docs/security.md) covers both systems.
+You need Python 3.13+, `uv` and Node.js/npm. Before generating videos, an administrator
+configures the instance-wide **AI provider** (AWS Bedrock, OpenAI or Anthropic), model and
+credentials. Model calls are billed to that provider account.
+
+When running directly from source on Linux, configure a private tmpfs workspace with swap
+disabled and set `MG_WORK_DIR` accordingly; see the [setup guide](docs/security.md#linux-server).
+
+**macOS special case — local development only:** create a RAM disk and set `MG_WORK_DIR`
+to its private work directory. Encrypted macOS swap is required, and the RAM disk must be
+recreated after reboot. Follow the [macOS development setup](docs/security.md#local-development-on-macos).
+Ordinary disk directories are rejected.
 
 ```bash
 uv sync
 npm install
 uv run playwright install chromium
 cp .env.example .env
-# Adjust the AWS profile, region, model and MG_WORK_DIR in .env.
+# Adjust MG_WORK_DIR in .env; configure AI provider after signing in.
 uv run python -m app
 ```
 
 On the first start, create the administrator account in the terminal: choose a username,
 a password of 15–256 characters. Two-factor authentication is initially optional. Keep the personal recovery
-key outside the server. The administrator invites additional users through **Users**;
+key outside the server. Under **Users**, a **Regisseur** assigns roles; a **Regieassistenz**
+can also invite users. New accounts join as **Crew**;
 each account gets its own password. Administrators can enable or disable two-factor
 authentication per user or require it for everyone, including administrators and future
 users. Affected users set up their own authenticator before accessing their workspace.
@@ -86,7 +101,8 @@ For automated deployments, supply the first administrator through the `MG_ADMIN_
 variables; see [unattended setup](docs/security.md#unattended-first-admin-setup).
 
 Then open **http://127.0.0.1:8000** and sign in. Settings are listed in
-[`.env.example`](.env.example); AWS credentials use the standard AWS configuration.
+[`.env.example`](.env.example). Existing AWS environment/profile configuration remains a
+fallback until the administrator saves settings under **AI provider**.
 
 Keep the app running while it processes jobs. Jobs run sequentially; reloading the page
 or signing out does not interrupt already submitted jobs. Completed jobs and saved previews
@@ -100,7 +116,7 @@ another user's job content. Contents, filenames and pipeline checkpoints are enc
 under `data/secure/` with separate user keys. Account names, ownership, file sizes and
 activity remain visible as metadata.
 
-Processing takes place in RAM; selected content is sent to AWS Bedrock for AI processing.
+Processing takes place in RAM; selected content is sent to the configured AI provider for processing.
 Encryption protects stored content but does not protect against root access or compromised
 processes during processing. Server deployment requires HTTPS, a trusted reverse proxy and
 a dedicated service account, with exactly one application process per data directory.
@@ -117,7 +133,7 @@ is deleted.
 ### Technology and development
 
 Python, FastAPI and HTMX power the app; LangChain/LangGraph orchestrate generation through
-AWS Bedrock. HTML/CSS and GSAP provide the animation, while Playwright and FFmpeg produce the videos.
+AWS Bedrock, OpenAI or Anthropic. HTML/CSS and GSAP provide the animation, while Playwright and FFmpeg produce the videos.
 
 ```bash
 uv run pytest                                   # no live Bedrock calls
@@ -185,6 +201,9 @@ fertigen Videos gerendert werden. Das Video oben zeigt Kiehnema selbst als Beisp
 3. **Vorschau gestalten.** Beide Formate ansehen, Szenentexte, Reihenfolge und Dauer ändern, Kommentare setzen oder visuelle Ideen mit Texten und Bildern ergänzen.
 4. **Freigeben und herunterladen.** Mit **Approve & render** entstehen beide MP4s inklusive Musik. **Continue editing** öffnet das Video später erneut zur Bearbeitung.
 
+Unter **Director’s desk** beginnst du neue Projekte. **Your videos** öffnet eine eigene
+Seite mit ausschließlich deinen Vorschauen und fertigen Videos.
+
 | Ausgabe | Auflösung | Geeignet für |
 |---|---|---|
 | Feed · 4:5 | 1080 × 1350 | LinkedIn- und Instagram-Feed |
@@ -194,53 +213,70 @@ Beide Formate werden mit 30 fps, H.264 und AAC-Stereoton ausgegeben. Die Oberfl�
 
 ### Auf einem Server installieren
 
-Für eine frische, dedizierte **Ubuntu-24.04-Instanz (amd64/arm64)** gibt es einen interaktiven
-Installer als GitHub-Release-Anhang. Nach dem ersten entsprechend veröffentlichten Release:
+Für einen frischen, dedizierten **Linux-Server (amd64/arm64, systemd)** gibt es einen
+interaktiven Installer als GitHub-Release-Anhang: Ubuntu 22.04/24.04/26.04, Debian 12/13,
+Fedora 43–45, RHEL/Rocky/AlmaLinux/CentOS Stream 9/10 und Amazon Linux 2023.
+Nach dem ersten entsprechend veröffentlichten Release:
 
 ```bash
 curl -fsSL --proto '=https' https://github.com/MartenKiehn/Kiehnema/releases/latest/download/install.sh -o kiehnema-install.sh && sudo bash ./kiehnema-install.sh
 ```
 
-Vorher Domain, Security Group und EC2-IAM-Rolle vorbereiten; mindestens 16 GiB RAM und
-30 GiB freien Speicher einplanen. Das Skript fragt Domain, AWS-Region und Bedrock-Modell ab,
-bereitet Docker und den Host vor und führt durch die Admin-Einrichtung. Details und die
+Vorher Domain und offene Ports 80/443 vorbereiten; mindestens 16 GiB RAM und 30 GiB freien
+Speicher einplanen. Das Skript fragt die Domain ab, bereitet Docker und den Host vor und
+führt durch die Admin-Einrichtung. Nach der Anmeldung richtet der Administrator unter
+**AI provider** AWS Bedrock, OpenAI oder Anthropic mit Modell und Zugangsdaten für alle
+Benutzer ein. Während der Installation sind keine KI-Zugangsdaten nötig. Bedrock unterstützt
+AWS-Schlüssel oder optional eine Server-IAM-Rolle; EC2 ist keine Voraussetzung. Details und die
 Host-Änderungen stehen im [Server-Installationsablauf](docs/updates.md#serverinstallation-mit-einem-befehl).
 Der Download steht erst bereit, wenn ein signierter Release mit `install.sh` veröffentlicht wurde.
 
-### Lokal starten
+Der Linux-Server ist der vorgesehene Haupteinsatz. Der Installer richtet den privaten
+tmpfs-Arbeitsbereich im Container ein und deaktiviert Host-Swap; eine separate RAM-Disk
+muss dafür nicht angelegt werden. Die [verwaltete Installation](docs/updates.md) prüft
+GitHub-Releases regelmäßig, zeigt den Updatefortschritt und stellt bei fehlgeschlagenen
+Updates den vorherigen Stand wieder her.
 
-Für Linux-Server gibt es eine [verwaltete Installation mit Updates über die Oberfläche](docs/updates.md).
-Sie prüft GitHub-Releases regelmäßig, zeigt während der Installation den Fortschritt und
-stellt bei fehlgeschlagenen Updates den vorherigen Stand wieder her.
+### Lokale Entwicklung
 
-Du brauchst Python 3.13+, `uv`, Node.js/npm und AWS-Zugang mit Zugriff auf das konfigurierte
-Bedrock-Modell. Modellaufrufe verursachen Kosten in deinem AWS-Konto.
+Die folgenden Schritte zum Start aus dem Quellcode dienen der Entwicklung und lokalen Tests.
 
-Richte vor der ersten Generierung ein privates **RAM-Arbeitsverzeichnis** ein und setze
-`MG_WORK_DIR` entsprechend. Unter Linux wird tmpfs ohne Swap benötigt, unter macOS eine
-RAM-Disk mit verschlüsseltem Swap. Gewöhnliche Festplattenverzeichnisse werden abgelehnt.
-Die Schritte für beide Systeme stehen in der [Einrichtungsanleitung](docs/security.md).
+Du brauchst Python 3.13+, `uv` und Node.js/npm. Vor der ersten Generierung konfiguriert
+der Administrator unter **AI provider** den Anbieter (AWS Bedrock, OpenAI oder Anthropic),
+das Modell und den Zugang für die gesamte Instanz. Modellaufrufe werden diesem Anbieterkonto berechnet.
+
+Beim direkten Start aus dem Quellcode unter Linux wird ein privater tmpfs-Arbeitsbereich
+mit deaktiviertem Swap benötigt. Setze `MG_WORK_DIR` entsprechend; siehe
+[Einrichtungsanleitung](docs/security.md#linux-server).
+
+**Sonderfall macOS – nur für lokale Entwicklung:** Lege eine RAM-Disk an und setze
+`MG_WORK_DIR` auf deren privates Arbeitsverzeichnis. Verschlüsselter macOS-Swap ist nötig;
+nach einem Neustart muss die RAM-Disk neu angelegt werden. Die Schritte stehen im
+[macOS-Entwicklungssetup](docs/security.md#local-development-on-macos).
+Gewöhnliche Festplattenverzeichnisse werden abgelehnt.
 
 ```bash
 uv sync
 npm install
 uv run playwright install chromium
 cp .env.example .env
-# AWS-Profil, Region, Modell und MG_WORK_DIR in .env anpassen.
+# MG_WORK_DIR in .env anpassen; KI-Anbieter nach der Anmeldung einrichten.
 uv run python -m app
 ```
 
 Beim ersten Start legst du im Terminal das Administratorkonto an: Benutzername, Passwort
 mit 15–256 Zeichen. Zwei-Faktor-Authentifizierung ist zunächst optional. Bewahre den persönlichen
-Wiederherstellungsschlüssel außerhalb des Servers auf. Über **Users** lädt der Administrator
-weitere Nutzer ein und aktiviert oder deaktiviert 2FA pro Nutzer. Ein zusätzlicher Schalter
+Wiederherstellungsschlüssel außerhalb des Servers auf. Unter **Users** vergibt der **Regisseur** Rollen und verwaltet die Sicherheit.
+Die **Regieassistenz** darf ebenfalls Nutzer einladen; neue Konten starten als
+**Crew**. Nur der Regisseur aktiviert oder deaktiviert 2FA für andere Nutzer. Ein zusätzlicher Schalter
 verlangt 2FA für alle, einschließlich Administratoren und neuer Nutzer. Betroffene Nutzer
 richten ihren eigenen Authenticator ein, bevor sie weiterarbeiten können.
 Für automatische Deployments kannst du das erste Administratorkonto über die
 `MG_ADMIN_*`-Variablen vorgeben; siehe [Setup ohne Terminal](docs/security.md#unattended-first-admin-setup).
 
 Öffne anschließend **http://127.0.0.1:8000** und melde dich an. Die Einstellungen stehen in
-[`.env.example`](.env.example); AWS-Anmeldedaten werden über die übliche AWS-Konfiguration bereitgestellt.
+[`.env.example`](.env.example). Vorhandene AWS-Umgebungs-/Profilkonfiguration bleibt aktiv,
+bis der Administrator Einstellungen unter **AI provider** speichert.
 
 Lass die Anwendung während der Verarbeitung laufen. Jobs werden nacheinander ausgeführt;
 ein Neuladen der Seite oder Abmelden unterbricht bereits eingereichte Jobs nicht. Nach einem
@@ -255,7 +291,7 @@ unter `data/secure/` mit getrennten Nutzerschlüsseln verschlüsselt gespeichert
 Zuordnungen, Dateigrößen und Aktivität bleiben als Metadaten sichtbar.
 
 Die Verarbeitung erfolgt im RAM; für die KI-Verarbeitung werden ausgewählte Inhalte an
-AWS Bedrock übermittelt. Die Verschlüsselung schützt gespeicherte Inhalte, bietet aber
+den konfigurierten KI-Anbieter übermittelt. Die Verschlüsselung schützt gespeicherte Inhalte, bietet aber
 keinen Schutz vor Root-Zugriff oder kompromittierten Prozessen während der Verarbeitung.
 Für den Serverbetrieb sind HTTPS, ein vertrauenswürdiger Reverse-Proxy und ein eigener
 Betriebsnutzer nötig; pro Datenverzeichnis läuft genau ein Anwendungsprozess.
@@ -272,7 +308,7 @@ Löschen des ursprünglichen Jobs erhalten.
 ### Technik und Weiterentwicklung
 
 Python, FastAPI und HTMX bilden die Anwendung; LangChain/LangGraph steuern die Generierung
-über AWS Bedrock. HTML/CSS und GSAP liefern die Animation, Playwright und FFmpeg die Videos.
+über AWS Bedrock, OpenAI oder Anthropic. HTML/CSS und GSAP liefern die Animation, Playwright und FFmpeg die Videos.
 
 ```bash
 uv run pytest                                   # ohne Live-Bedrock-Aufrufe

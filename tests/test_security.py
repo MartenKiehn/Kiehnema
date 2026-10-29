@@ -372,11 +372,23 @@ async def test_real_worker_reopens_encrypted_checkpoint_and_removes_workspace(pe
     monkeypatch.setattr('app.pipeline.jobs.ram_root', lambda: scratch)
     monkeypatch.setenv('MG_ADMIN_PASSWORD', PASSWORD)
     monkeypatch.setenv('mg_admin_totp_secret', pyotp.random_base32())
+    from app.llm import provider
+    provider.save(provider.Provider(provider='openai', model='synthetic-model', api_key='synthetic-worker-key'))
     spawn = asyncio.create_subprocess_exec
 
     async def check_environment(*args, **kwargs):
         assert not any(key.upper().startswith('MG_ADMIN_') for key in kwargs['env'])
-        return await spawn(*args, **kwargs)
+        assert 'synthetic-worker-key' not in str(args) + str(kwargs['env'])
+        kwargs['stderr'] = asyncio.subprocess.PIPE
+        process = await spawn(*args, **kwargs)
+        communicate = process.communicate
+        async def checked_communicate(payload):
+            assert json.loads(payload)['provider']['api_key'] == 'synthetic-worker-key'
+            output = await communicate(payload)
+            assert process.returncode == 0, output[1].decode()
+            return output
+        process.communicate = checked_communicate
+        return process
 
     monkeypatch.setattr(asyncio, 'create_subprocess_exec', check_environment)
     result = await jobs.reopen_job(jid)
@@ -552,3 +564,31 @@ def test_public_server_rejects_plain_http_and_insecure_bind(people, monkeypatch)
     with pytest.raises(ValueError, match='HTTPS'):
         with TestClient(app, base_url=ORIGIN):
             pass
+
+
+def test_video_library_and_polling_show_only_the_signed_in_users_jobs(people):
+    admin, alice, *_ = people
+    alice_job = jobs.create_job('https://alice-private.example', 30)
+    token = a.current_identity.set(admin)
+    try:
+        admin_job = jobs.create_job('https://admin-private.example', 30)
+    finally:
+        a.current_identity.reset(token)
+    with TestClient(app, base_url=ORIGIN) as web:
+        assert web.get('/videos', follow_redirects=False).status_code == 303
+        for person, own, other, private_url in ((admin, admin_job, alice_job, 'alice-private.example'),
+                                                (alice, alice_job, admin_job, 'admin-private.example')):
+            credentials = headers(person)
+            for route in ('/videos', '/jobs'):
+                page = web.get(route, headers=credentials)
+                assert page.status_code == 200
+                assert f'href="/jobs/{own}"' in page.text
+                assert f'href="/jobs/{other}"' not in page.text and private_url not in page.text
+
+
+def test_expired_video_poll_redirects_whole_page_instead_of_injecting_login(people):
+    with TestClient(app, base_url=ORIGIN) as web:
+        response = web.get('/jobs', headers={'HX-Request':'true'})
+        assert response.status_code == 401
+        assert response.headers['HX-Redirect'] == '/login'
+        assert '<html' not in response.text

@@ -36,3 +36,14 @@ Recent commits mostly use `feat:` and `chore:` prefixes with imperative summarie
 ## Security & Configuration
 
 Use `.env.example` for local `MG_` settings. Keep credentials, `.env`, databases, crawled content, and rendered videos out of Git. Preserve crawler URL guards and human approval before final rendering.
+
+
+## UI Design Patterns
+
+Never use “fingernail” borders: no one-sided colored accent stripes on cards, notices or
+information boxes (for example, `border-left: 3px solid ...`). Use the shared `info_box`
+Jinja macro in `app/web/templates/components/info_box.html` with the `.info-box` styles
+in `app/static/app.css` for explanatory boxes. It uses the app’s warm paper palette, a uniform fine border, a small clapperboard motif,
+monospace “PRODUCTION NOTES” label and an editorial serif heading. Do not replace it
+with a generic circular information icon or a colored sidebar. Reuse this component for future
+information boxes; keep domain-specific content and layouts inside its caller block.

@@ -23,6 +23,7 @@ from pydantic import AnyHttpUrl, BaseModel, Field, ValidationError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.crawl.guard import UrlGuard
+from app.llm import provider
 from app.pipeline import jobs
 from app.pipeline.schemas import SceneChange
 from app.pipeline.design import DesignDraft
@@ -33,6 +34,7 @@ from app.config import settings
 from app.security import accounts, vault
 from app.web import auth
 from app.web.updates import router as updates_router
+from app.web.provider import router as provider_router
 from app.security.workspace import memory_policy
 from app.updates import DATA_SCHEMA, VERSION
 from app.updates.state import assert_start_allowed, writes_allowed
@@ -104,6 +106,7 @@ app = FastAPI(title="Kiehnema", lifespan=lifespan)
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=list({"127.0.0.1", "localhost", "[::1]", urlsplit(settings.public_origin).hostname}))
 app.include_router(auth.router)
 app.include_router(updates_router)
+app.include_router(provider_router)
 app.middleware("http")(auth.guard)
 app.mount("/static", StaticFiles(directory=HERE.parent / "static"), name="static")
 templates = Jinja2Templates(directory=HERE / "templates")
@@ -263,9 +266,22 @@ class JobRequest(BaseModel):
     max_depth: int = Field(default=2, ge=0, le=5)
 
 
+def ai_setup_required() -> bool:
+    try:
+        return provider.load() is None
+    except (ValueError, OSError):
+        return True
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse(request, "index.html", {"jobs": all_jobs(), "values": {}})
+    return templates.TemplateResponse(request, "index.html", {"values": {},
+                                                             'provider_missing': ai_setup_required()})
+
+
+@app.get("/videos", response_class=HTMLResponse)
+async def video_library(request: Request):
+    return templates.TemplateResponse(request, "videos.html", {"jobs": all_jobs()})
 
 
 @app.get("/jobs", response_class=HTMLResponse)
@@ -278,10 +294,11 @@ async def create_job(request: Request):
     form = dict(await request.form())
     try:
         data = JobRequest.model_validate(form)
+        provider.require()
         url = await asyncio.to_thread(UrlGuard().check, str(data.url))
     except (ValidationError, ValueError) as exc:
         error = "; ".join(f"{e['loc'][0]}: {e['msg']}" for e in exc.errors()) if isinstance(exc, ValidationError) else str(exc)
-        return templates.TemplateResponse(request, "index.html", {"jobs": all_jobs(), "values": form, "error": error}, status_code=422)
+        return templates.TemplateResponse(request, "index.html", {"values": form, "error": error, "provider_missing": ai_setup_required()}, status_code=422)
     job_id = jobs.create_job(url, data.duration, data.description, allow_client_logos=data.allow_client_logos,
                              max_pages=data.max_pages, max_depth=data.max_depth)
     enqueue(job_id)
@@ -466,7 +483,7 @@ async def delete(request: Request, job_id: str):
         await jobs.delete_job(job_id)
     finally:
         app.state.tasks.pop(job_id, None)
-    return RedirectResponse("/", status_code=303)
+    return RedirectResponse("/videos", status_code=303)
 
 
 def confined_file(root: Path, name: str) -> Path:

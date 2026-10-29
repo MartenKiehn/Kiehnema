@@ -1,0 +1,68 @@
+{% from 'components/info_box.html' import info_box %}
+<header class="users-heading">
+  <div><p class="eyebrow">ADMINISTRATION</p><h1>Users</h1><p class="lede">Manage your team’s access. Everyone’s videos and feedback stay private.</p></div>
+  <span class="badge">{{ users|length }} {{ 'account' if users|length == 1 else 'accounts' }}</span>
+</header>
+<div class="users-settings{{ ' users-settings-single' if not request.state.user.admin else '' }}">
+  <section class="card" aria-labelledby="invite-title">
+    <p class="eyebrow">GROW YOUR TEAM</p><h2 id="invite-title">Invite a user</h2>
+    <p class="help">New users join as <strong>Crew</strong> and choose their own password.</p>
+    <form class="users-invite" action="/admin/invite" method="post">
+      <input type="hidden" name="csrf" value="{{ request.state.csrf }}">
+      <div><label for="username">New username</label><input id="username" name="username" required minlength="3" maxlength="64" autocomplete="off" placeholder="e.g. alex" aria-describedby="username-help"></div>
+      <button class="button" type="submit">Create invitation</button>
+      <p id="username-help" class="help">3–64 characters: letters, numbers, dots, underscores or hyphens.</p>
+    </form>
+    {% if invitation %}<div class="users-invitation" role="status"><h3>Invitation ready</h3><p class="help">Share this code privately. It expires in 24 hours and can be used once at <a href="/activate">Accept an invitation</a>.</p><p class="recovery-key"><code>{{ invitation }}</code></p></div>{% endif %}
+  </section>
+  {% if request.state.user.admin %}<section class="card" aria-labelledby="policy-title">
+    <p class="eyebrow">WORKSPACE SECURITY</p><h2 id="policy-title">Two-factor authentication</h2>
+    <p class="help">Set a security requirement for your entire team.</p>
+    <form class="users-policy" action="/admin/two-factor-policy" method="post">
+      <input type="hidden" name="csrf" value="{{ request.state.csrf }}">
+      <label class="checkbox"><input type="checkbox" name="required" value="1" {% if require_all_totp %}checked{% endif %} aria-describedby="policy-help"><span>Require two-factor authentication for all users</span></label>
+      <p id="policy-help" class="help">Includes administrators and future users. Users must finish setup before accessing their workspace. Turning this off keeps existing authenticators active.</p>
+      <button class="button secondary" type="submit">Save policy</button>
+    </form>
+  </section>{% endif %}
+</div>
+{% call info_box('Roles & permissions', 'roles-title') %}
+<div class="users-roles">
+  <dl>
+    <div><dt>Regisseur</dt><dd>Creates videos, invites users, manages roles and account access, security, AI settings and updates.</dd></div>
+    <div><dt>Regieassistenz</dt><dd>Creates videos and invites Crew members. Roles, account access and instance settings stay with the Regisseur.</dd></div>
+    <div><dt>Crew</dt><dd>Creates, edits and downloads their own videos. Cannot invite users or manage other accounts.</dd></div>
+  </dl>
+  <p>Every role has a private workspace. Even a Regisseur cannot open another person’s videos. Only a Regisseur can assign roles.</p>
+</div>
+{% endcall %}
+<section class="card users-accounts" aria-labelledby="accounts-title">
+  <div class="section-heading"><div><p class="eyebrow">YOUR TEAM</p><h2 id="accounts-title">Accounts</h2></div><span class="users-private">Private workspaces</span></div>
+  <ul class="users-list">
+    {% for user in users %}
+    <li class="users-account">
+      <div class="users-account-summary">
+        <div class="users-person"><span class="users-avatar" aria-hidden="true">{{ user.username[0]|upper }}</span><div><h3>{{ user.username }} {% if user.id == request.state.user.id %}<span class="users-you">You</span>{% endif %}</h3><span class="help">{{ role_labels[user.role] }}</span></div></div>
+        <div class="users-statuses"><span class="users-status {{ 'is-disabled' if user.disabled else 'is-active' }}">{{ 'Disabled' if user.disabled else 'Active' }}</span><span class="users-status">2FA: {{ 'Active' if user.totp_enabled else ('Setup required' if user.totp_required or require_all_totp else 'Off') }}</span></div>
+      </div>
+      {% if request.state.user.admin %}<details class="users-access"><summary>Security &amp; access<span aria-hidden="true">+</span></summary>
+        <div class="users-access-content">
+          {% if user.id != request.state.user.id %}<form class="users-role-form" action="/admin/role" method="post">
+            <input type="hidden" name="csrf" value="{{ request.state.csrf }}"><input type="hidden" name="user_id" value="{{ user.id }}">
+            <div><label for="role-{{ user.id }}">Role for {{ user.username }}</label><select id="role-{{ user.id }}" name="role">{% for value, label in role_labels.items() %}<option value="{{ value }}" {% if user.role == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+            <button class="button small secondary" type="submit">Save role for {{ user.username }}</button>
+            <p class="help">Changing a role signs out this user. Their videos are kept.</p>
+          </form>{% else %}<p class="help">Your role: {{ role_labels[user.role] }}. You cannot change your own administrator role.</p>{% endif %}
+          <form class="users-factor" action="/admin/two-factor" method="post">
+            <input type="hidden" name="csrf" value="{{ request.state.csrf }}"><input type="hidden" name="user_id" value="{{ user.id }}">
+            <label class="checkbox"><input type="checkbox" name="required" value="1" {% if require_all_totp or user.totp_required or user.totp_enabled %}checked{% endif %} {% if require_all_totp %}disabled{% endif %} aria-describedby="factor-help-{{ user.id }}"><span>Require two-factor authentication for {{ user.username }}</span></label>
+            <p id="factor-help-{{ user.id }}" class="help">{% if require_all_totp %}Required by your workspace policy. Change the policy above to manage this individually.{% else %}Turning this off removes this user’s authenticator and signs out their sessions.{% endif %}</p>
+            <button class="button small secondary" type="submit" {% if require_all_totp %}disabled{% endif %}>Save for {{ user.username }}</button>
+          </form>
+          {% if user.id != request.state.user.id %}<form class="users-disable" action="/admin/disable" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><input type="hidden" name="user_id" value="{{ user.id }}"><input type="hidden" name="disabled" value="{{ '0' if user.disabled else '1' }}"><p class="help">{% if user.disabled %}Restore this user’s access to their workspace.{% else %}Disabling access signs out this user and stops their running jobs. Saved videos are kept.{% endif %}</p><button class="button small secondary" type="submit">{{ 'Enable' if user.disabled else 'Disable' }} {{ user.username }}</button></form>{% endif %}
+        </div>
+      </details>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</section>

@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% block title %}{{ concept.title|default(job.url) }} · Kiehnema{% endblock %}
 {% block content %}
-<a class="back-link" href="/#jobs">← All videos</a>
-<header class="job-heading"><div><p class="eyebrow">{% if job.status == 'review' %}02 / YOUR DIRECTOR’S CHAIR{% elif job.status == 'done' %}03 / READY TO SHARE{% else %}YOUR VIDEO{% endif %}</p><h1>{{ concept.title|default('From website to motion', true) }}</h1><p class="muted"><a href="{{ job.url|safe_url }}" target="_blank" rel="noopener noreferrer">{{ job.url }}</a> <span>· {{ job.duration }} seconds · 4:5 + 9:16</span></p></div><span class="cost-pill" id="job-cost">${{ '%.2f'|format(job.cost_usd|default(0)) }} <small>estimated</small></span></header>
+<a class="back-link" href="/videos">← All videos</a>
+<header class="job-heading"><div><p class="eyebrow">{% if job.status == 'review' %}02 / YOUR DIRECTOR’S CHAIR{% elif job.status == 'done' %}03 / READY TO SHARE{% else %}YOUR VIDEO{% endif %}</p><h1>{{ concept.title|default('From website to motion', true) }}</h1><p class="muted"><a href="{{ job.url|safe_url }}" target="_blank" rel="noopener noreferrer">{{ job.url }}</a> <span>· {{ job.duration }} seconds · 4:5 + 9:16</span></p></div><span class="cost-pill" id="job-cost">{% if job.cost_usd is defined and job.cost_usd is none %}Cost unavailable{% else %}${{ '%.2f'|format(job.cost_usd|default(0)) }} <small>estimated</small>{% endif %}</span></header>
 {% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
 {% if job.poll %}
   {% include "partials/progress.html" %}

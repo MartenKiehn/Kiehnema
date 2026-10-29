@@ -53,8 +53,8 @@
   {% include "partials/insights.html" %}
   <div class="progress-next"><span class="eyebrow">UP NEXT <span aria-hidden="true">↗</span></span><p>{{ progress_copy[2] }}</p></div>
   <ol class="steps" aria-label="Video production steps">{% for key, label in steps %}{% set complete = key in seen and loop.index0 < current_index %}<li class="{% if key == current_step %}current{% elif complete %}complete{% endif %}" {% if key == current_step %}aria-current="step"{% endif %}><span aria-hidden="true">{% if complete %}✓{% else %}{{ loop.index }}{% endif %}</span>{{ label }}</li>{% endfor %}</ol>
-  <div class="progress-footer"><p>Steps can take different amounts of time and may repeat during revisions.<br>You can leave this page and return while the app stays running.</p><div><b>${{ '%.2f'|format(job.cost_usd|default(0)) }}</b><small>Estimated so far · updates after model calls</small></div></div>
+  <div class="progress-footer"><p>Steps can take different amounts of time and may repeat during revisions.<br>You can leave this page and return while the app stays running.</p><div><b>{% if job.cost_usd is defined and job.cost_usd is none %}Cost unavailable{% else %}${{ '%.2f'|format(job.cost_usd|default(0)) }}{% endif %}</b><small>{% if job.cost_usd is defined and job.cost_usd is none %}Check usage and pricing with your AI provider{% else %}Estimated so far · updates after model calls{% endif %}</small></div></div>
   </div>
   <details class="activity"><summary>Activity log</summary><ol id="activity-entries">{% for item in job.history|default([])|reverse %}<li>{{ item.message }}</li>{% endfor %}</ol></details>
 </section>
-{% if poll_response %}<span id="job-cost">${{ '%.2f'|format(job.cost_usd|default(0)) }} <small>estimated</small></span>{% endif %}
+{% if poll_response %}<span id="job-cost">{% if job.cost_usd is defined and job.cost_usd is none %}Cost unavailable{% else %}${{ '%.2f'|format(job.cost_usd|default(0)) }} <small>estimated</small>{% endif %}</span>{% endif %}

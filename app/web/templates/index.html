@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block title %}Director’s desk · Kiehnema{% endblock %}
 {% block content %}
 <section class="intro">
   <p class="eyebrow">FROM WEBSITE TO THE FINAL CUT</p>
@@ -6,15 +7,28 @@
   <p class="lede">Turn your website into a short, on-brand video.<br>Shape the story. Review the details. Make it yours.</p>
 </section>
 <div class="create-grid">
-  <section class="card new-job" aria-labelledby="new-title">
+  <section class="card new-job{% if provider_missing %} is-locked{% endif %}" aria-labelledby="new-title">
     <div class="section-heading"><h2 id="new-title">New video</h2><span class="badge">01 / THE BRIEF</span></div>
+    {% if provider_missing %}
+    <div class="provider-lock" role="status" aria-labelledby="provider-lock-title" aria-describedby="provider-lock-message">
+      <div class="provider-lock-card format-art">
+        <div class="provider-lock-heading"><p class="eyebrow">PRODUCTION HOLD</p><img src="{{ url_for('static', path='clapperboard.svg') }}" width="36" height="36" alt=""></div>
+        <h3 id="provider-lock-title">Closed <em>set.</em></h3>
+        <p class="provider-lock-reason">AI provider required</p>
+        <p id="provider-lock-message">{% if request.state.user.admin %}Configure an AI provider to unlock this brief and start creating previews.{% else %}A Regisseur must configure an AI provider before anyone can create a preview. Ask your Regisseur to set it up.{% endif %}</p>
+        {% if request.state.user.admin %}<a class="button" href="/admin/provider">Set up AI provider <span aria-hidden="true">↗</span></a>{% endif %}
+        <p class="provider-lock-access">Only a Regisseur can configure the AI provider.</p>
+      </div>
+    </div>
+    {% endif %}
     {% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
     <form action="/jobs" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}">
+      <fieldset class="brief-fields" {% if provider_missing %}disabled aria-describedby="provider-lock-message"{% endif %}>
       <label for="website">Website URL</label>
       <input id="website" name="url" type="url" required maxlength="2048" placeholder="https://your-company.com" value="{{ values.get('url', '') }}" aria-describedby="url-help">
       <p id="url-help" class="help">We’ll find your colours, fonts, imagery and the story behind your brand. Use a publicly accessible website.</p>
       <details class="crawl-settings" {% if error %}open{% endif %}>
-        <summary>Website scan settings</summary>
+        <summary {% if provider_missing %}tabindex="-1"{% endif %}>Website scan settings</summary>
         <div class="field-row">
           <div><label for="max-pages">Maximum pages</label>
             <input id="max-pages" name="max_pages" type="number" min="1" max="50" step="1" required value="{{ values.get('max_pages', 20) }}" aria-describedby="max-pages-help">
@@ -38,8 +52,9 @@
       <textarea id="description" name="description" rows="4" maxlength="4000" placeholder="Who’s it for? What should they remember? A hook, a mood, a must-have message…">{{ values.get('description', '') }}</textarea>
       <p class="help">The video follows your website’s language unless you ask for another.</p>
       <label class="checkbox"><input name="allow_client_logos" type="checkbox" value="true" {% if values.get('allow_client_logos') %}checked{% endif %}><span>Show client logos found on the website</span></label>
-      <button class="button wide" type="submit">Create preview <span aria-hidden="true">↗</span></button>
+      <button class="button wide" type="submit" {% if provider_missing %}disabled{% endif %}>Create preview <span aria-hidden="true">↗</span></button>
       <p class="help centered">You’ll review everything before the final render.</p>
+      </fieldset>
     </form>
   </section>
   <aside class="process-card">
@@ -53,8 +68,7 @@
     </div>
     <p class="eyebrow">A SMALL BRIEF. A FULL STORY.</p>
     <ol class="process-list"><li><span>01</span><div><b>Give us the starting point</b><p>Your website and a little direction.</p></div></li><li><span>02</span><div><b>Put your eye on it</b><p>Preview both formats, edit copy, leave feedback.</p></div></li><li><span>03</span><div><b>Ready for the feed</b><p>Two MP4s with original music, ready to share.</p></div></li></ol>
-    <p class="cost-note">Usually about 15 minutes to the first preview.<br>Previous 30-second videos: roughly $1.50–$2 in model costs. Estimates only; Billing may differ.</p>
+    <p class="cost-note">Processing time and model costs depend on your provider, model and video.<br>Your provider bills usage to the account configured by your administrator.</p>
   </aside>
 </div>
-<section class="library" aria-labelledby="library-title"><div class="section-heading"><div><p class="eyebrow">YOUR WORKSPACE</p><h2 id="library-title">Your videos</h2></div><span class="muted">Pick up where you left off.</span></div>{% include "partials/jobs.html" %}</section>
 {% endblock %}

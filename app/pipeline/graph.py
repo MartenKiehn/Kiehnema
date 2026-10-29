@@ -5,7 +5,7 @@
                                                                                └─> review ⏸ ─┬─> fix (edits/feedback)
                                                                                               └─> render → END
 Large artefacts live in the job directory; the graph state only holds small JSON-able values.
-The model client is injected via ``config["configurable"]["llm"]`` (BedrockLLM or FakeLLM).
+The model client is injected via ``config["configurable"]["llm"]`` (ProviderLLM or FakeLLM).
 """
 
 from __future__ import annotations
@@ -74,7 +74,7 @@ class JobState(TypedDict, total=False):
     review: dict
     outputs: dict
     usage: dict
-    cost_usd: float
+    cost_usd: float | None
 
 
 # ---------------------------------------------------------------- helpers

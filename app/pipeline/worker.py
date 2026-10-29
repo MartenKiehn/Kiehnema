@@ -21,6 +21,9 @@ async def main():
     from app.pipeline import runtime
     from app.pipeline.status import write_status
     from app.crawl.guard import UrlGuard
+    from app.llm.provider import Provider, current
+
+    current.set(Provider.model_validate(payload.pop('provider')))
 
     job = Job(payload["id"], payload["owner"], base64.b64decode(payload.pop("secret")))
     active_job.set(job)

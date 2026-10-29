@@ -39,6 +39,7 @@ def csrf_cookie(request):
 def form(request, template='auth.html', **context):
     if context.get('mode') == 'admin':
         context['require_all_totp'] = a.all_two_factor_required()
+        context['role_labels'] = a.ROLE_LABELS
     if context.get('mode') == 'account':
         context['totp_enabled'] = a.two_factor_enabled(a.identity())
     return templates.TemplateResponse(request, template, context)
@@ -93,6 +94,8 @@ async def guard(request: Request, call_next):
     request.state.user = session.person if session else None
     request.state.csrf = csrf
     if not public and session is None:
+        if request.headers.get('HX-Request') == 'true':
+            return HTMLResponse('Sign in required.', status_code=401, headers={'HX-Redirect': '/login'})
         return RedirectResponse('/login', status_code=303) if request.method == 'GET' and not path.startswith(('/preview/', '/jobs/')) else HTMLResponse('Sign in required.', status_code=401)
     if session and a.two_factor_required(session.person) and not a.two_factor_enabled(session.person):
         if not public and path not in {'/account/two-factor', '/logout'}:
@@ -266,17 +269,32 @@ async def password_change(request: Request):
     return RedirectResponse('/login', status_code=303)
 
 
-def admin_users():
-    if not a.identity().admin:
+def admin_users(*, allow_invites=False):
+    person = a.identity()
+    if not (person.admin or (allow_invites and person.can_invite)):
         raise PermissionError('Administrator access required.')
     with a.database() as con:
         return [dict(row) for row in con.execute('''SELECT id,username,admin,disabled,length(totp)>0 AS totp_enabled,
-            id IN (SELECT user_id FROM two_factor_policy) AS totp_required FROM users ORDER BY username''')]
+            CASE WHEN admin=1 THEN 'admin' WHEN id IN (SELECT user_id FROM invitation_managers)
+                THEN 'manager' ELSE 'user' END AS role,
+            id IN (SELECT user_id FROM two_factor_policy) AS totp_required FROM users
+            ORDER BY CASE role WHEN 'admin' THEN 0 WHEN 'manager' THEN 1 ELSE 2 END, username''')]
 
 
 @router.get('/admin')
 async def admin_page(request: Request):
-    return form(request, mode='admin', users=admin_users())
+    return form(request, mode='admin', users=admin_users(allow_invites=True))
+
+
+@router.post('/admin/role')
+async def user_role(request: Request):
+    admin_users()
+    values = await request.form()
+    try:
+        a.set_role(a.identity(), str(values.get('user_id', '')), str(values.get('role', '')))
+    except ValueError as exc:
+        return form(request, mode='admin', users=admin_users(), error=str(exc))
+    return RedirectResponse('/admin', status_code=303)
 
 
 @router.post('/admin/two-factor-policy')
@@ -300,7 +318,7 @@ async def user_two_factor(request: Request):
 
 @router.post('/admin/invite')
 async def invite(request: Request):
-    users = admin_users()
+    users = admin_users(allow_invites=True)
     values = await request.form()
     try:
         token = a.invite_user(a.identity(), str(values.get('username', '')))

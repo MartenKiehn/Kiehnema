@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     bedrock_model_id: str = "eu.anthropic.claude-opus-5-5"
     aws_region: str = "eu-central-1"
     aws_profile: str | None = None
+    provider_setup_required: bool = False
 
     # Spike: effort=medium can spend >16k tokens thinking before the first text token,
     # so generous output budgets are required for code generation.

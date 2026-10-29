@@ -106,7 +106,7 @@ def review_form(client):
 
 def test_index_validation_and_static_assets(client):
     html = client.get("/").text
-    assert "Kiehnema · Website to video" in html and 'aria-label="Kiehnema home"' in html
+    assert "Director’s desk · Kiehnema" in html and 'aria-label="Kiehnema home"' in html
     assert "Motion Studio" not in html and "kiehnema.svg" in html
     assert "New video" in html and 'name="url"' in html and 'name="duration"' in html and 'name="description"' in html
     assert 'name="allow_client_logos"' in html and "checked" not in html
@@ -411,7 +411,8 @@ def test_delete_removes_files_and_checkpoint(review_job, client, monkeypatch):
     deleted = AsyncMock()
     monkeypatch.setattr(AsyncSqliteSaver, "adelete_thread", deleted)
     assert "Delete this video?" in client.get(f"/jobs/{JOB}/delete").text
-    assert client.post(f"/jobs/{JOB}/delete", follow_redirects=False).status_code == 303
+    response = client.post(f"/jobs/{JOB}/delete", follow_redirects=False)
+    assert response.status_code == 303 and response.headers['location'] == '/videos'
     with __import__("app.security.accounts", fromlist=["database"]).database() as con:
         assert con.execute("SELECT 1 FROM files WHERE job=?", (JOB,)).fetchone() is None
     assert not review_job.exists()
@@ -1049,4 +1050,123 @@ async def test_advanced_element_comment_stays_with_selection(review_job, monkeyp
         assert elements[0]['selector'].startswith('#s-hook > ')
         assert 'KI-Prototypv0.1' in elements[0]['label']
         assert not errors
+        await browser.close()
+
+
+@pytest.mark.browser
+async def test_admin_provider_form_switching_and_secret_preservation(review_job, live_web, monkeypatch, tmp_path):
+    from playwright.async_api import async_playwright, expect
+    from app.llm import provider
+    monkeypatch.setattr(settings, 'provider_setup_required', True)
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        page = await browser.new_page(viewport={'width': 390, 'height': 844})
+        errors = []
+        page.on('pageerror', lambda error: errors.append(str(error)))
+        await page.goto(live_web)
+        await expect(page.get_by_role('button', name='Create preview')).to_be_disabled()
+        await expect(page.get_by_label('Website URL')).to_be_disabled()
+        await expect(page.get_by_label('Creative direction optional')).to_be_disabled()
+        await expect(page.get_by_label('Duration seconds', exact=True)).to_be_disabled()
+        await expect(page.get_by_role('heading', name='Closed set.')).to_be_visible()
+        await expect(page.get_by_role('link', name='Set up AI provider')).to_be_visible()
+        await page.screenshot(path=str(tmp_path / 'provider-lock-mobile.png'), full_page=True)
+        await page.get_by_role('link', name='AI provider', exact=True).click()
+        await page.get_by_label('Provider', exact=True).select_option('openai')
+        await expect(page.get_by_label('API key', exact=True)).to_be_visible()
+        await expect(page.get_by_label('AWS region')).to_be_hidden()
+        await page.get_by_label('Model / inference profile ID').fill('test-model')
+        await page.get_by_label('API key', exact=True).fill('synthetic-browser-key')
+        await page.get_by_role('button', name='Save AI settings').click()
+        await expect(page.get_by_role('status')).to_contain_text('Settings saved')
+        await expect(page.get_by_label('API key', exact=True)).to_have_value('')
+        assert 'synthetic-browser-key' not in await page.content()
+        assert await page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+        await page.screenshot(path=str(tmp_path / 'provider-mobile.png'), full_page=True)
+        await page.set_viewport_size({'width': 1440, 'height': 1000})
+        await page.screenshot(path=str(tmp_path / 'provider-desktop.png'), full_page=True)
+        await page.get_by_role('button', name='Save AI settings').click()
+        await expect(page.get_by_role('status')).to_contain_text('Settings saved')
+        assert provider.load().api_key.get_secret_value() == 'synthetic-browser-key'
+        await page.get_by_label('Provider', exact=True).select_option('bedrock')
+        await page.get_by_label('AWS authentication').select_option('environment')
+        await expect(page.get_by_label('AWS access key ID')).to_be_hidden()
+        await page.get_by_role('button', name='Save AI settings').click()
+        await expect(page.get_by_role('status')).to_contain_text('Settings saved')
+        assert provider.load().provider == 'bedrock' and not provider.load().public()['credentials_saved']
+        await page.goto(live_web)
+        await expect(page.get_by_role('button', name='Create preview')).to_be_enabled()
+        await expect(page.get_by_label('Website URL')).to_be_enabled()
+        await expect(page.get_by_role('heading', name='Closed set.')).to_have_count(0)
+        assert not errors
+        await browser.close()
+
+
+@pytest.mark.parametrize(('route', 'active'), [
+    ('/', '/'), ('/videos', '/videos'), ('/jobs/' + JOB, '/videos'), ('/account', '/account'),
+    ('/admin', '/admin'), ('/admin/provider', '/admin/provider'), ('/admin/updates', '/admin/updates'),
+])
+def test_navigation_identifies_one_current_section(review_job, client, route, active):
+    response = client.get(route)
+    assert response.status_code == 200
+    nav = re.search(r'<nav aria-label="Main navigation">(.*?)</nav>', response.text, re.S)[1]
+    assert re.findall(r'<a href="([^"]+)" aria-current="page"', nav) == [active]
+
+
+def test_user_form_error_keeps_users_navigation_active(client):
+    response = client.post('/admin/invite', data={'username':'admin'})
+    assert 'role="alert"' in response.text
+    nav = re.search(r'<nav aria-label="Main navigation">(.*?)</nav>', response.text, re.S)[1]
+    assert re.findall(r'<a href="([^"]+)" aria-current="page"', nav) == ['/admin']
+
+
+def test_video_library_is_separate_from_new_video_form(review_job, client):
+    home = client.get('/').text
+    assert 'name="url"' in home and 'id="jobs"' not in home
+    page = client.get('/videos')
+    assert page.status_code == 200 and '<title>Your videos · Kiehnema</title>' in page.text
+    assert 'YOUR SCREENING ROOM' in page.text and f'href="/jobs/{JOB}"' in page.text
+    assert 'hx-get="/jobs"' in page.text and 'name="url"' not in page.text
+    assert 'href="/videos">← All videos' in client.get(f'/jobs/{JOB}').text
+    fragment = client.get('/jobs')
+    assert '<html' not in fragment.text and f'href="/jobs/{JOB}"' in fragment.text
+
+
+def test_empty_video_library_links_back_to_directors_desk(client):
+    page = client.get('/videos')
+    assert page.status_code == 200
+    assert 'A blank canvas, for now.' in page.text
+    assert '<a href="/">Create your first video</a>' in page.text
+    assert 'website above' not in page.text
+    error = client.post('/jobs', data={'url':'not-a-website'})
+    nav = re.search(r'<nav aria-label="Main navigation">(.*?)</nav>', error.text, re.S)[1]
+    assert re.findall(r'<a href="([^"]+)" aria-current="page"', nav) == ['/']
+
+
+@pytest.mark.browser
+async def test_directors_desk_and_video_library_navigation(review_job, live_web, tmp_path):
+    from playwright.async_api import async_playwright, expect
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        page = await browser.new_page(viewport={'width':1440, 'height':1000})
+        await page.goto(live_web)
+        await expect(page.get_by_role('link', name='Director’s desk', exact=True)).to_have_attribute('aria-current', 'page')
+        await expect(page.locator('#jobs')).to_have_count(0)
+        await page.get_by_role('link', name='Your videos', exact=True).click()
+        await expect(page).to_have_url(live_web + '/videos')
+        await expect(page.locator('#jobs .job-row')).to_have_count(1)
+        await expect(page.get_by_label('Website URL')).to_have_count(0)
+        await expect(page.get_by_role('link', name='Your videos', exact=True)).to_have_attribute('aria-current', 'page')
+        await page.screenshot(path=str(tmp_path / 'video-library-desktop.png'), full_page=True)
+        await page.locator('.job-link').click()
+        await expect(page).to_have_url(f'{live_web}/jobs/{JOB}')
+        await page.get_by_role('link', name='All videos').click()
+        await expect(page).to_have_url(live_web + '/videos')
+        await page.set_viewport_size({'width':390, 'height':844})
+        assert await page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+        await page.screenshot(path=str(tmp_path / 'video-library-mobile.png'), full_page=True)
+        await page.get_by_role('link', name='New video', exact=True).click()
+        await expect(page.get_by_role('heading', name='New video', exact=True)).to_be_visible()
+        await expect(page.get_by_role('link', name='Director’s desk', exact=True)).to_be_visible()
+        assert await page.evaluate('document.documentElement.scrollWidth <= innerWidth')
         await browser.close()

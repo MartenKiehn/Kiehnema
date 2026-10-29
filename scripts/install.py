@@ -121,7 +121,7 @@ def main():
         (root / 'compose.env').write_text(''.join(f'{key}={value}\n' for key, value in env.items()))
         compose = ['docker', 'compose', '--env-file', str(root / 'compose.env'), '-f', str(root / 'compose.yaml')]
         subprocess.run(compose + ['config', '--quiet'], check=True)
-        subprocess.run(compose + ['run', '--rm', '--no-deps', '--volume', str(bootstrap) + ':/bootstrap:ro',
+        subprocess.run(compose + ['run', '--rm', '--no-deps', '--volume', str(bootstrap) + ':/bootstrap:ro,z',
                                  'updater', 'python', '-m', 'app.updates.bootstrap'], check=True)
         compose[4:4] = ['--env-file', str(root / 'updates/images.env')]
         if not (root / 'data/secure/accounts.sqlite').exists():

@@ -1,4 +1,4 @@
-"""Model access for the pipeline: Bedrock (LangChain) in production, a scripted fake in tests."""
+"""Configured model access for the pipeline, with a scripted fake for offline tests."""
 
 from __future__ import annotations
 
@@ -24,7 +24,11 @@ T = TypeVar("T", bound=BaseModel)
 PRICE = {"input": 4.0, "output": 20.0, "cache_read": 0.4, "cache_write": 5.0}
 
 
-def estimate_cost(usage: Usage) -> float:
+def estimate_cost(usage: Usage) -> float | None:
+    from app.llm.provider import current
+    configured = current.get()
+    if not usage.cost_known or (configured and (configured.provider != 'bedrock' or configured.model != 'eu.anthropic.claude-opus-5-5')):
+        return None
     uncached = max(0, usage.input_tokens - usage.cache_read - usage.cache_write)
     return round((uncached * PRICE["input"] + usage.output_tokens * PRICE["output"]
                   + usage.cache_read * PRICE["cache_read"] + usage.cache_write * PRICE["cache_write"]) / 1e6, 3)
@@ -54,8 +58,8 @@ class LLM(Protocol):
 
 
 @dataclass
-class BedrockLLM:
-    """Claude Opus 5.5 on Bedrock via LangChain; every call is logged to ``log_path`` (JSONL)."""
+class ProviderLLM:
+    """Configured LangChain provider; only usage/timing metadata is logged to ``log_path``."""
 
     log_path: Path | None = None
     usage: Usage = field(default_factory=Usage)

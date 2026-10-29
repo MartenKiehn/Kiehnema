@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Your videos · Kiehnema{% endblock %}
+{% block content %}
+<section aria-labelledby="library-title">
+  <header class="intro section-heading video-library-heading">
+    <div><p class="eyebrow">YOUR SCREENING ROOM</p><h1 id="library-title">Your <em>videos.</em></h1><p class="lede">Pick up a preview, keep editing or revisit the final cut.<br>Only videos from your private workspace appear here.</p></div>
+    <a class="button" href="/">New video <span aria-hidden="true">↗</span></a>
+  </header>
+  {% include "partials/jobs.html" %}
+</section>
+{% endblock %}

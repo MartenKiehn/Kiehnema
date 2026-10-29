@@ -13,7 +13,7 @@ Automatische Installation ohne Klick ist bewusst nicht enthalten.
 
 ## Unterstützte Installation
 
-- Linux auf `amd64` oder `arm64`, rootful Docker Engine mit API 1.45 oder neuer (Engine 26+),
+- Linux auf `amd64` oder `arm64`, rootful Docker Engine mit API 1.44 oder neuer (Engine 25+),
   Docker Compose 2.30+ und Python 3/OpenSSL für den einmaligen Installer.
 - Genau ein Kiehnema-Anwendungsprozess pro Datenverzeichnis, lokales Dateisystem mit
   zuverlässigem `flock`, `fsync` und atomarem Umbenennen. Keine NFS-Datenverzeichnisse.
@@ -114,32 +114,52 @@ PR-Kommentare, Release-Anhänge, Images und Secrets sind nicht Teil dieser Git-C
 
 ## Serverinstallation mit einem Befehl
 
-Dieser Weg richtet eine **frische, dedizierte Ubuntu-24.04-EC2-Instanz** ein. Unterstützt
-werden amd64 und arm64, mindestens 16 GiB RAM und 30 GiB freier Speicher unter `/opt`.
-Für einen gemeinsam genutzten Server, andere Linux-Versionen, private Packages oder den
-Import vorhandener Daten den manuellen Installer im nächsten Abschnitt verwenden.
+Dieser Weg richtet einen **frischen, dedizierten Linux-Server** mit systemd ein,
+unabhängig vom Hosting-Anbieter. Unterstützt werden amd64 und arm64, mindestens 16 GiB
+RAM und 30 GiB freier Speicher unter `/opt`.
 
-### Einmal in AWS vorbereiten
+| Distribution | Versionen | Docker-Paketquelle |
+|---|---|---|
+| Ubuntu | 22.04, 24.04, 26.04 LTS | Docker Ubuntu |
+| Debian | 12, 13 | Docker Debian |
+| Fedora | 43, 44, 45 | Docker Fedora |
+| RHEL | 9, 10 | Docker RHEL |
+| Rocky Linux, AlmaLinux, CentOS Stream | 9, 10 | Docker CentOS |
+| Amazon Linux | 2023 | Amazon-Pakete; Compose separat mit festem SHA-256 |
 
-1. Ubuntu 24.04 starten, ausreichend Speicher zuweisen und SSH-/sudo-Zugang bereitstellen.
+Das sind explizite Installationspfade, keine Zusage für jede Linux-Variante. Alpine,
+Arch, openSUSE, ältere Versionen, 32-Bit-Systeme und Hosts ohne systemd werden vom
+Ein-Befehl-Installer abgelehnt. Die Paketpfade werden mit simulierten Host-Kommandos
+testgeprüft; vollständige Installationen auf jeder Distribution sind noch nicht validiert.
+Für vorbereitete Hosts, private Packages oder den Import vorhandener Daten den manuellen
+Installer im nächsten Abschnitt verwenden; dessen Laufzeitvoraussetzungen gelten weiterhin.
+
+### Server vorbereiten
+
+1. Eine unterstützte Distribution mit SSH-/sudo-Zugang, genügend RAM und Speicher starten.
    Eine öffentliche, möglichst beständige IP und eine Domain wie `video.example.com`
    verwenden. A-/gegebenenfalls AAAA-Einträge müssen auf diese Instanz zeigen; keine
    veralteten IPv6-Einträge stehen lassen.
-2. In der Security Group TCP 80 und 443 für Webzugriff freigeben. SSH 22 nur für den
-   eigenen Verwaltungszugang erlauben. Ausgehend werden DNS und HTTPS zu GitHub, GHCR,
-   Ubuntu-/Docker-Paketquellen, dem Zertifikatsanbieter und AWS benötigt. Das Skript
-   verändert keine AWS-Security-Groups oder DNS-Einträge.
-3. Eine IAM-Rolle mit den benötigten Bedrock-Berechtigungen und Zugriff auf das gewählte
-   Modell/Inference Profile an die Instanz hängen. In den Metadatenoptionen **IMDS aktiviert,
-   IMDSv2 erforderlich und Response Hop Limit 2** einstellen, damit die Container die
-   Rollen-Credentials beziehen können. Es werden keine langlebigen AWS-Schlüssel abgefragt
-   oder gespeichert. Modellzugang und Berechtigungen für die verwendete Region bleiben
-   Betreiberaufgaben.
-4. Auf Herausgeberseite müssen ein signierter GitHub-Release mit `install.sh` und beide
-   öffentlichen GHCR-Packages vorhanden sein. Der Download-Link funktioniert davor nicht.
+2. In der Anbieter-Firewall und Host-Firewall TCP 80/443 erlauben. SSH 22 nur für den
+   eigenen Verwaltungszugang freigeben. Ausgehend sind DNS und HTTPS zu GitHub, GHCR,
+   Distributions-/Docker-Paketquellen, dem Zertifikatsanbieter und gewählten KI-Anbieter nötig.
+   Das Skript verändert keine Anbieter-Firewall, Host-Firewall oder DNS-Einträge.
+3. KI-Zugang kann **nach** der Installation unter **AI provider** eingerichtet werden.
+   AWS Bedrock akzeptiert Access Key, Secret Key und optional Session Token auch außerhalb
+   von AWS. Auf EC2 kann alternativ eine IAM-Rolle verwendet werden: IMDS aktivieren,
+   IMDSv2 verlangen und Response Hop Limit 2 für Container einstellen. OpenAI und Anthropic
+   verwenden jeweils einen API-Key. Modellzugang und Kontingente müssen vorhanden sein.
+4. Ein signierter GitHub-Release mit `install.sh` und beide öffentlichen GHCR-Packages
+   müssen vorliegen. Bei privatem Repository funktioniert der anonyme Curl-Befehl nicht;
+   dafür den manuellen Installationsweg mit eigenem Lesetoken verwenden.
 
-AWS beschreibt die [Webserver-Security-Group-Regeln](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/security-group-rules-reference.html)
-und die [Metadatenoptionen für Container](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-options.html).
+Paketquellen: [Ubuntu](https://docs.docker.com/engine/install/ubuntu/),
+[Debian](https://docs.docker.com/engine/install/debian/),
+[Fedora](https://docs.docker.com/engine/install/fedora/),
+[RHEL](https://docs.docker.com/engine/install/rhel/),
+[CentOS](https://docs.docker.com/engine/install/centos/),
+[Amazon Linux](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-docker.html).
+AWS beschreibt die [Metadatenoptionen für Container](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-options.html).
 
 ### Installieren
 
@@ -155,20 +175,20 @@ Download. Wer sie vorher prüfen möchte, führt Download und `sudo bash ./kiehn
 getrennt aus. `bash ./kiehnema-install.sh --help` benötigt keine Root-Rechte.
 
 Das Skript prüft Betriebssystem, Architektur, Ressourcen, vorhandene Docker-Container,
-das Zielverzeichnis und freie Ports. Es fragt Domain (ohne `https://`), AWS-Region und
-Bedrock-Modell-/Inference-Profile-ID ab. Nach Eingabe von `INSTALL` führt es aus:
+das Zielverzeichnis und freie Ports. Es fragt die Domain (ohne `https://`) ab. Nach Eingabe von `INSTALL` führt es aus:
 
-- Docker Engine und Compose aus dem offiziellen Docker-APT-Repository installieren,
-  sofern Docker noch fehlt; vorhandene Versionen auf Kompatibilität prüfen.
+- Docker Engine und Compose über die oben genannten Paketquellen installieren, sofern
+  Docker noch fehlt; vorhandene Versionen auf Kompatibilität prüfen. Auf Amazon Linux
+  wird Compose v2.40.3 von GitHub geladen und gegen einen eingebauten SHA-256 geprüft.
 - Docker für den Systemstart aktivieren. Host-Swap abschalten, Swap-Zeilen in `/etc/fstab`
   auskommentieren (Original: `/etc/fstab.kiehnema-before-install`) und `swap.target` maskieren.
-- Ubuntus zusätzliche User-Namespace-Einschränkung über
+- Falls vorhanden, Ubuntus zusätzliche User-Namespace-Einschränkung über
   `/etc/sysctl.d/90-kiehnema.conf` mit `kernel.apparmor_restrict_unprivileged_userns=0`
   für Chromiums Sandbox anpassen. **Diese Einstellung gilt hostweit**; deshalb nur einen
   dedizierten Server verwenden. AppArmor bleibt aktiviert; Container behalten Seccomp,
   Chromium-Sandbox, entfernte Capabilities und `no-new-privileges`.
 - Die Release-Signatur vor dem Ausführen von Container-Code prüfen, Images anhand ihrer
-  Digests laden und die Verfügbarkeit der IAM-Rollen-Credentials aus einem Container testen.
+  Digests laden. KI-Zugang wird erst in der Anwendung konfiguriert.
 - Unter `/opt/kiehnema` App, Updater, Gateway und private Konfiguration einrichten.
   Der bestehende Installer fragt Admin-Benutzername und Passwort interaktiv ab und zeigt
   den persönlichen Recovery-Key. Diesen unabhängig vom Server sichern. 2FA lässt sich
@@ -176,14 +196,30 @@ Bedrock-Modell-/Inference-Profile-ID ab. Nach Eingabe von `INSTALL` führt es au
 - Container starten, die interne Betriebsbereitschaft prüfen und HTTPS `/login` aufrufen.
   Caddy richtet das Zertifikat ein. Docker startet die Container auch nach Serverneustarts.
 
-Es wird kein kostenpflichtiger Modellaufruf als Installationstest ausgeführt. Der IAM-Test
-bestätigt die Credential-Erreichbarkeit, nicht sämtliche Bedrock-Modellberechtigungen.
-Der bestehende Installer prüft außerdem Chromium und FFmpeg in der Laufzeitumgebung.
+Es wird kein kostenpflichtiger Modellaufruf als Installationstest ausgeführt. Der bestehende
+Installer prüft Chromium und FFmpeg in der Laufzeitumgebung. SELinux bleibt auf dem Host
+aktiv: private Bind-Mounts erhalten gemeinsame `:z`-Labels. Nur der vertrauenswürdige
+Updater mit Docker-Socket verwendet `label=disable`; er besitzt ohnehin Host-Administratorrechte.
+
+Nach der Anmeldung unter **AI provider** Anbieter, Modell-ID und maximale Ausgabetokens
+angeben. Das Modell muss Bilder, Tool-Aufrufe und Streaming unterstützen. Nur Administratoren
+können die Einstellung ändern; alle Benutzer verwenden dasselbe Anbieterkonto. Ohne diese
+Einrichtung kann eine neue Serverinstallation noch keine Videos generieren. Speichern führt
+keinen Modellaufruf aus und bestätigt daher auch keine Modellberechtigungen.
+
+Leere Zugangsfelder behalten bestehende Zugangsdaten beim selben Anbieter und Authentifizierungsweg.
+Zum Austausch den vollständigen Satz angeben; ein leerer optionaler AWS Session Token wird
+dabei entfernt. Beim Anbieterwechsel ist ein neuer API-Key erforderlich. Laufende Worker
+behalten ihre beim Start geladene Konfiguration; spätere Worker verwenden den neuen Stand.
+Tokenverbrauch wird weiter erfasst. Wo keine passende Preistabelle hinterlegt ist, zeigt die
+Oberfläche „Cost unavailable“ statt einer falschen Kostenschätzung. Zugangsdaten werden
+mit einem Instanzschlüssel verschlüsselt gespeichert; Details zur Sicherung und Schutzgrenze
+stehen unter [AI provider credentials](security.md#ai-provider-credentials).
 
 Der initial heruntergeladene Installer ist die Vertrauensbasis: GitHub-Repository,
 Release-Veröffentlichung und HTTPS-Download müssen vertrauenswürdig sein. Ein mitgelieferter
 öffentlicher Schlüssel schützt nicht vor einem vollständig ausgetauschten Installer.
-Der private Signierschlüssel bleibt beim Herausgeber und wird niemals auf EC2 benötigt.
+Der private Signierschlüssel bleibt beim Herausgeber und wird niemals auf dem Anwendungsserver benötigt.
 
 ### Fehler und erneuter Aufruf
 
@@ -203,7 +239,8 @@ den unabhängig erhaltenen `release-keys.json`, den Installer aus einer vertraue
 Quelle und eine private Konfigurationsdatei. Alle nachfolgenden Beispieldateien außerhalb
 des Git-Repositories mit Modus 0600 aufbewahren.
 
-`app.env` enthält die benötigte `MG_`-/`AWS_`-Konfiguration. Es ist eine **rohe** `KEY=value`-
+`app.env` enthält die benötigte `MG_`-/`AWS_`-Konfiguration. Mit
+`MG_PROVIDER_SETUP_REQUIRED=true` wird die KI-Einrichtung nach der Anmeldung verlangt. Es ist eine **rohe** `KEY=value`-
 Datei ohne Shell-Expansion und ohne Anführungszeichen um Werte. Für unbeaufsichtigtes
 Administrator-Setup Benutzername, Passwort und Wiederherstellungsschlüssel über die `MG_ADMIN_*`-Variablen aus
 [der Sicherheitsanleitung](security.md#unattended-first-admin-setup) angeben. Ohne diese

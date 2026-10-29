@@ -17,6 +17,7 @@ from app.security import vault
 from app.security.accounts import database
 from app.security.checkpoints import checkpoint
 from app.security.workspace import ram_root
+from app.llm.provider import require as provider_configuration
 
 
 def jobs_dir():
@@ -35,6 +36,7 @@ def create_job(url: str, duration: float, description: str = "", *, allow_client
 
 async def execute(job_id: str, action: str, decision: dict | None = None) -> dict:
     job = vault.get_job(job_id)
+    provider = provider_configuration()
     root = ram_root()
     with database() as con:
         if not con.execute("UPDATE jobs SET active=2 WHERE id=? AND active<2", (job_id,)).rowcount:
@@ -48,7 +50,8 @@ async def execute(job_id: str, action: str, decision: dict | None = None) -> dic
                 cwd=folder, env=env, stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL, start_new_session=True)
             payload = json.dumps({"id": job.id, "owner": job.owner, "secret": base64.b64encode(job.secret).decode(),
-                                  "workspace": folder, "action": action, "decision": decision}).encode()
+                                  "workspace": folder, "action": action, "decision": decision,
+                                  "provider": provider.private()}).encode()
             try:
                 await asyncio.wait_for(process.communicate(payload), settings.job_timeout_s)
             finally:
