@@ -6,16 +6,9 @@ Current version / Aktuelle Version: **0.1.0**
 
 [English](#english) · [Deutsch](#deutsch)
 
-![Kiehnema demo / Kiehnema-Demo](assets/readme/kiehnema-preview.mp4){width=432}
+[<img src="assets/readme/kiehnema-preview.jpg" alt="Kiehnema demo / Kiehnema-Demo" width="432">](assets/readme/kiehnema-preview.mp4)
 
 [▶ Watch demo / Demo ansehen — 60 s · MP4 · 1080 × 1350](assets/readme/kiehnema-preview.mp4)
-
-<details>
-<summary>Preview image / Vorschaubild</summary>
-
-[![Kiehnema: From website to on-brand video / Von der Website zum Video im Markenlook](assets/readme/kiehnema-preview.jpg)](assets/readme/kiehnema-preview.mp4)
-
-</details>
 
 ## English
 
