@@ -296,6 +296,30 @@ def test_docker_adapter_refuses_other_installations():
         engine.close()
 
 
+@pytest.mark.parametrize('subpath', [None, 'control'])
+def test_container_replacement_uses_required_mount_api(subpath, monkeypatch):
+    from app.updates.docker import Docker
+    engine = Docker('ours', socket='/unused')
+    engine.client.close()
+    requests = []
+    engine.client = httpx.Client(base_url='http://docker/v1.44', transport=httpx.MockTransport(
+        lambda request: requests.append(request) or httpx.Response(201, json={'Id':'replacement'})))
+    for action in ('stop', 'remove', 'start'):
+        monkeypatch.setattr(engine, action, lambda role: None)
+    mount = {'Type':'volume', 'Source':'updates', 'Target':'/run/kiehnema', 'ReadOnly':True}
+    if subpath:
+        mount['VolumeOptions'] = {'Subpath':subpath}
+    specification = {'Image':'old', 'HostConfig':{'Mounts':[mount]}}
+    try:
+        engine.replace('app', 'new', specification)
+        request, = requests
+        assert request.url.path == f'/v{"1.45" if subpath else "1.44"}/containers/create'
+        assert json.loads(request.content)['HostConfig']['Mounts'] == [mount]
+        assert specification['Image'] == 'old'
+    finally:
+        engine.close()
+
+
 def test_container_snapshot_preserves_assigned_ports_and_runtime_configuration():
     from app.updates.docker import Docker
     engine = Docker('ours', socket='/unused')

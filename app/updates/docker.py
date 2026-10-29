@@ -82,7 +82,11 @@ class Docker:
         spec = copy.deepcopy(specification)
         spec['Image'] = image
         spec.setdefault('Labels', {})[LABEL] = self.installation
-        self.request('POST', '/containers/create', params={'name': self.name(role)}, json=spec)
+        path = '/containers/create'
+        # Volume subdirectories require API 1.45; bind mounts still work with Engine 25.
+        if any(mount.get('VolumeOptions', {}).get('Subpath') for mount in spec.get('HostConfig', {}).get('Mounts', [])):
+            path = 'http://docker/v1.45/containers/create'
+        self.request('POST', path, params={'name': self.name(role)}, json=spec)
         self.start(role)
 
     def run_helper(self, role, image, specification):

@@ -474,6 +474,9 @@ async def test_account_onboarding_and_recovery_in_chromium(people, tmp_path, mon
     import socket
     import uvicorn
     from playwright.async_api import async_playwright, expect
+    # Browser startup and password hashing must not expire a synthetic authenticator code.
+    step = int(a.time.time()) // 30
+    monkeypatch.setattr(pyotp.TOTP, 'timecode', lambda self, for_time: step)
     monkeypatch.setattr('app.web.main.enqueue', lambda jid: None)
     monkeypatch.setattr('app.web.main.UrlGuard.check', lambda self, url: url)
     sock = socket.socket()
