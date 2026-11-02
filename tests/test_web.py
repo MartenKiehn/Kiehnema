@@ -1054,6 +1054,53 @@ async def test_advanced_element_comment_stays_with_selection(review_job, monkeyp
 
 
 @pytest.mark.browser
+async def test_provider_connection_survives_late_page_load_and_resets_on_history_restore(review_job, live_web, monkeypatch):
+    from playwright.async_api import async_playwright, expect
+    monkeypatch.setattr(settings, 'provider_setup_required', True)
+    monkeypatch.setattr('app.web.provider.test_connection', lambda config: None)
+    image_release, test_release, test_started = asyncio.Event(), asyncio.Event(), asyncio.Event()
+
+    async def delayed_image(route):
+        await image_release.wait()
+        await route.continue_()
+
+    async def delayed_test(route):
+        test_started.set()
+        await test_release.wait()
+        await route.continue_()
+
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        page = await browser.new_page()
+        await page.add_init_script("window.providerPageShown = false; addEventListener('pageshow', () => { window.providerPageShown = true; });")
+        await page.route('**/static/kiehnema.svg', delayed_image)
+        await page.route('**/admin/provider/test', delayed_test)
+        try:
+            await page.goto(live_web + '/admin/provider', wait_until='domcontentloaded')
+            await page.get_by_label('AWS authentication').select_option('environment')
+            await page.get_by_label('Model / inference profile ID').fill('test-model')
+            assert not await page.evaluate('window.providerPageShown')
+            await page.get_by_role('button', name='Test connection').click()
+            await asyncio.wait_for(test_started.wait(), 5)
+            image_release.set()
+            await asyncio.wait_for(page.evaluate("""() => window.providerPageShown || new Promise(resolve => {
+                addEventListener('pageshow', () => resolve(true), {once: true});
+            })"""), 5)
+            test_release.set()
+            feedback = page.locator('[data-provider-test-status]')
+            save = page.get_by_role('button', name='Save AI settings')
+            await expect(feedback).to_contain_text('Connection successful')
+            await expect(save).to_be_visible()
+            await page.evaluate("dispatchEvent(new PageTransitionEvent('pageshow', {persisted: true}))")
+            await expect(save).to_be_hidden()
+            await expect(feedback).to_contain_text('Test the connection before saving')
+        finally:
+            image_release.set()
+            test_release.set()
+            await browser.close()
+
+
+@pytest.mark.browser
 async def test_admin_provider_form_switching_and_secret_preservation(review_job, live_web, monkeypatch, tmp_path):
     from playwright.async_api import async_playwright, expect
     from app.llm import provider

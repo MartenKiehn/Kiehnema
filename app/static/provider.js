@@ -33,7 +33,9 @@ if (form) {
   };
   form.addEventListener('input', reset);
   form.addEventListener('change', reset);
-  addEventListener('pageshow', reset);
+  addEventListener('pageshow', (event) => {
+    if (event.persisted) reset();
+  });
   provider.addEventListener('change', update);
   auth.addEventListener('change', update);
   test.addEventListener('click', async () => {
