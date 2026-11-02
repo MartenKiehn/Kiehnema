@@ -44,7 +44,9 @@ Fedora 43–45, RHEL/Rocky/AlmaLinux/CentOS Stream 9/10 and Amazon Linux 2023.
 curl -fsSL --proto '=https' https://github.com/MartenKiehn/Kiehnema/releases/latest/download/install.sh -o kiehnema-install.sh && sudo bash ./kiehnema-install.sh
 ```
 
-Prepare DNS and open ports 80/443; allow at least 16 GiB RAM and 30 GiB free disk space.
+Prepare DNS and open ports 80/443; allow at least 4 GiB RAM and 30 GiB free disk space.
+4 GiB is a starting point for testing; 8 GiB is recommended for more headroom. The app
+container is limited to 3 GiB, including its RAM workspace. Larger jobs may need more memory.
 The installer asks for the domain, prepares Docker and the host, and walks through
 administrator creation. After signing in, choose **AI provider** to configure AWS Bedrock,
 OpenAI or Anthropic with a model and credentials for all users. Run **Test connection**,
@@ -216,8 +218,10 @@ Nach dem ersten entsprechend veröffentlichten Release:
 curl -fsSL --proto '=https' https://github.com/MartenKiehn/Kiehnema/releases/latest/download/install.sh -o kiehnema-install.sh && sudo bash ./kiehnema-install.sh
 ```
 
-Vorher Domain und offene Ports 80/443 vorbereiten; mindestens 16 GiB RAM und 30 GiB freien
-Speicher einplanen. Das Skript fragt die Domain ab, bereitet Docker und den Host vor und
+Vorher Domain und offene Ports 80/443 vorbereiten; mindestens 4 GiB RAM und 30 GiB freien
+Speicher einplanen. 4 GiB sind ein Einstieg für Tests; empfohlen sind 8 GiB für mehr Reserve.
+Der App-Container ist inklusive RAM-Arbeitsbereich auf 3 GiB begrenzt. Größere Jobs können
+mehr Speicher benötigen. Das Skript fragt die Domain ab, bereitet Docker und den Host vor und
 führt durch die Admin-Einrichtung. Nach der Anmeldung richtet der Administrator unter
 **AI provider** AWS Bedrock, OpenAI oder Anthropic mit Modell und Zugangsdaten für alle
 Benutzer ein. Zuerst **Test connection** ausführen, danach bei Erfolg **Save AI settings**.

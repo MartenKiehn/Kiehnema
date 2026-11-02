@@ -49,8 +49,9 @@ def validate_host(system, architecture, memory_kib, free_bytes, installed):
     host_profile(system)
     if architecture not in {'x86_64', 'aarch64'}:
         raise ValueError('Use an amd64 or arm64 instance.')
-    if memory_kib < 15 * 1024 * 1024 or free_bytes < 30 * 1024**3:
-        raise ValueError('Use an instance with at least 16 GiB RAM and 30 GiB free disk space.')
+    # Linux reports less than the advertised RAM after firmware/kernel reservations.
+    if memory_kib < 3584 * 1024 or free_bytes < 30 * 1024**3:
+        raise ValueError('Use an instance with at least 4 GiB RAM (3.5 GiB usable) and 30 GiB free disk space.')
     if installed:
         raise ValueError('/opt/kiehnema already exists. Use Updates; existing data will not be overwritten.')
 

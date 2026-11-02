@@ -31,7 +31,7 @@ services:
       - /work:size=4294967296,mode=0700,uid=1000,gid=1000
       - /tmp:size=268435456,mode=1777
     shm_size: 1gb
-    mem_limit: 8g
+    mem_limit: 3g
     ulimits:
       core: 0
     logging:

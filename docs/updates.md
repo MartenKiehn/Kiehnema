@@ -19,9 +19,11 @@ Automatische Installation ohne Klick ist bewusst nicht enthalten.
   Docker Compose 2.30+ und Python 3/OpenSSL für den einmaligen Installer.
 - Genau ein Kiehnema-Anwendungsprozess pro Datenverzeichnis, lokales Dateisystem mit
   zuverlässigem `flock`, `fsync` und atomarem Umbenennen. Keine NFS-Datenverzeichnisse.
-- Host-Swap deaktiviert; genügend RAM für Anwendung und Videoverarbeitung. Compose
-  begrenzt die App auf 8 GiB und stellt 4 GiB tmpfs-Arbeitsraum bereit. 16 GiB Host-RAM
-  sind ein Ausgangswert, der mit den tatsächlichen Renderjobs zu prüfen ist.
+- Host-Swap deaktiviert; mindestens 4 GiB Host-RAM als Einstieg für Tests, empfohlen
+  sind 8 GiB für mehr Reserve. Compose begrenzt die App inklusive RAM-Arbeitsbereich
+  auf insgesamt 3 GiB. Die tmpfs-Grenzen (4 GiB Arbeitsraum, 256 MiB `/tmp`, 1 GiB
+  Shared Memory) reservieren keinen Speicher vorab und erhöhen das App-Limit nicht.
+  Größere Jobs können mehr Speicher benötigen; den Bedarf mit den eigenen Videos prüfen.
 - Unprivilegierte User-Namespaces für Chromiums Sandbox müssen funktionieren. Das
   mitgelieferte Seccomp-Profil, UID 1000, `no-new-privileges` und entfernte Host-Capabilities
   gehören zur Installation. Die Bereitschaftsprüfung startet tatsächlich Chromium und FFmpeg.
@@ -117,8 +119,10 @@ PR-Kommentare, Release-Anhänge, Images und Secrets sind nicht Teil dieser Git-C
 ## Serverinstallation mit einem Befehl
 
 Dieser Weg richtet einen **frischen, dedizierten Linux-Server** mit systemd ein,
-unabhängig vom Hosting-Anbieter. Unterstützt werden amd64 und arm64, mindestens 16 GiB
+unabhängig vom Hosting-Anbieter. Unterstützt werden amd64 und arm64, mindestens 4 GiB
 RAM und 30 GiB freier Speicher unter `/opt`.
+Die RAM-Prüfung akzeptiert ab 3,5 GiB von Linux gemeldetem Gesamtspeicher, damit
+Firmware-/Kernel-Reservierungen bei einer 4-GiB-Instanz berücksichtigt werden.
 
 | Distribution | Versionen | Docker-Paketquelle |
 |---|---|---|

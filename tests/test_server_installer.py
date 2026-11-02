@@ -46,15 +46,23 @@ def test_release_installer_embeds_matching_verified_payload_without_private_key(
 @pytest.mark.parametrize('changes', [
     {'system': {'ID': 'debian', 'VERSION_ID': '10'}},
     {'system': {'ID': 'ubuntu', 'VERSION_ID': '18.04'}},
-    {'architecture': 'armv7l'}, {'memory_kib': 8 * 1024**2},
+    {'architecture': 'armv7l'}, {'memory_kib': 2 * 1024**2},
+    {'memory_kib': 3584 * 1024 - 1},
     {'free_bytes': 5 * 1024**3}, {'installed': True},
 ])
 def test_unsupported_hosts_and_existing_data_are_rejected(changes):
     inputs = dict(system={'ID': 'ubuntu', 'VERSION_ID': '24.04'}, architecture='aarch64',
-                  memory_kib=16 * 1024**2, free_bytes=40 * 1024**3, installed=False)
+                  memory_kib=3824 * 1024, free_bytes=40 * 1024**3, installed=False)
     setup_server.validate_host(**inputs)
     with pytest.raises(ValueError):
         setup_server.validate_host(**(inputs | changes))
+
+
+@pytest.mark.parametrize('architecture', ['x86_64', 'aarch64'])
+@pytest.mark.parametrize('memory_mib', [3584, 3824, 4096, 8192, 16384])
+def test_four_gib_hosts_allow_reserved_memory_and_larger_instances(architecture, memory_mib):
+    setup_server.validate_host({'ID': 'ubuntu', 'VERSION_ID': '24.04'}, architecture,
+                               memory_mib * 1024, 30 * 1024**3, False)
 
 
 @pytest.mark.parametrize('domain', [
