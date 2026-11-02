@@ -32,7 +32,7 @@
         <form action="/admin/updates/install" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><input type="hidden" name="version" value="{{ status.available[-1].version }}"><button class="button" type="submit" {% if status.error %}disabled{% endif %}>Install update</button></form>
       {% elif not status.error %}<p>No newer compatible release is available.</p>{% endif %}
       <form action="/admin/updates/check" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><button class="button secondary" type="submit">Check for updates</button></form>
-      <details class="release-notes"><summary>Update access</summary>
+      {% if request.state.user.admin %}<details class="release-notes"><summary>Update access</summary>
         <p>Use the GitHub credentials with read access to releases and container packages supplied for this installation. Existing credentials are never displayed.</p>
         <form action="/admin/updates/credentials" method="post">
           <input type="hidden" name="csrf" value="{{ request.state.csrf }}">
@@ -40,7 +40,7 @@
           <label for="update-token">Access token</label><input id="update-token" name="token" type="password" autocomplete="new-password" maxlength="8192" required>
           <button class="button secondary" type="submit">Check and save access</button>
         </form>
-      </details>
+      </details>{% endif %}
     {% endif %}
   {% endif %}
 </section>

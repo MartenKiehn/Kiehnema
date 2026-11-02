@@ -499,6 +499,7 @@ async def test_account_onboarding_and_recovery_in_chromium(people, tmp_path, mon
                 await admin_page.get_by_label('Password', exact=True).fill(PASSWORD)
                 await admin_page.get_by_label('Authenticator code').fill(pyotp.TOTP(people[2]['totp']).now())
                 await admin_page.get_by_role('button', name='Unlock workspace').click()
+                await admin_page.get_by_role('link', name='Backstage', exact=True).click()
                 await admin_page.get_by_role('link', name='Users', exact=True).click()
                 await admin_page.get_by_label('Require two-factor authentication for all users', exact=True).check()
                 await admin_page.get_by_role('button', name='Save policy', exact=True).click()

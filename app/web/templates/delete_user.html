@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from 'components/info_box.html' import info_box %}
+{% block title %}Delete account · Kiehnema{% endblock %}
+{% block content %}
+<section class="card compact">
+  <p class="eyebrow">ACCOUNT CLEANUP</p>
+  <h1>Delete {{ target.username }}?</h1>
+  {% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
+  {% call info_box('This is the final cut.', 'delete-account-warning') %}
+  <p>This permanently removes <strong>{{ target.username }}</strong>, their account access and
+    <strong>{{ target.job_count }} saved {{ 'video' if target.job_count == 1 else 'videos' }}</strong>, including previews, feedback and rendered files, from this instance.</p>
+  <p>You cannot undo this in Kiehnema. Other users and their videos are kept. Existing server backups are not changed.</p>
+  {% endcall %}
+  <form action="/admin/delete" method="post">
+    <input type="hidden" name="csrf" value="{{ request.state.csrf }}">
+    <input type="hidden" name="user_id" value="{{ target.id }}">
+    <label for="delete-confirmation">Type {{ target.username }} to confirm</label>
+    <input id="delete-confirmation" name="confirmation" required autocomplete="off" spellcheck="false" autocapitalize="none" maxlength="64" aria-describedby="delete-confirmation-help">
+    <p class="help" id="delete-confirmation-help">The username must match exactly.</p>
+    <div class="actions"><a class="button secondary" href="/admin">Keep account</a><button class="button danger" type="submit">Delete account permanently</button></div>
+  </form>
+</section>
+{% endblock %}

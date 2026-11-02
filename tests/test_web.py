@@ -1058,9 +1058,17 @@ async def test_admin_provider_form_switching_and_secret_preservation(review_job,
     from playwright.async_api import async_playwright, expect
     from app.llm import provider
     monkeypatch.setattr(settings, 'provider_setup_required', True)
+    tested = []
+    def probe(config):
+        from app.llm.client import LLMError
+        tested.append(config.public())
+        if config.api_key.get_secret_value() == 'invalid-synthetic-key':
+            raise LLMError('Connection test failed. Check credentials and model access.')
+    monkeypatch.setattr('app.web.provider.test_connection', probe)
     async with async_playwright() as pw:
         browser = await pw.chromium.launch()
         page = await browser.new_page(viewport={'width': 390, 'height': 844})
+        await page.clock.install()
         errors = []
         page.on('pageerror', lambda error: errors.append(str(error)))
         await page.goto(live_web)
@@ -1071,28 +1079,65 @@ async def test_admin_provider_form_switching_and_secret_preservation(review_job,
         await expect(page.get_by_role('heading', name='Closed set.')).to_be_visible()
         await expect(page.get_by_role('link', name='Set up AI provider')).to_be_visible()
         await page.screenshot(path=str(tmp_path / 'provider-lock-mobile.png'), full_page=True)
+        await page.get_by_role('link', name='Backstage', exact=True).click()
         await page.get_by_role('link', name='AI provider', exact=True).click()
+        await expect(page.get_by_role('button', name='Save AI settings')).to_be_hidden()
         await page.get_by_label('Provider', exact=True).select_option('openai')
         await expect(page.get_by_label('API key', exact=True)).to_be_visible()
         await expect(page.get_by_label('AWS region')).to_be_hidden()
         await page.get_by_label('Model / inference profile ID').fill('test-model')
+        await page.get_by_role('button', name='Test connection').click()
+        assert not tested and provider.load() is None
+        await expect(page.get_by_role('button', name='Save AI settings')).to_be_hidden()
+        await page.get_by_label('API key', exact=True).fill('invalid-synthetic-key')
+        await page.get_by_role('button', name='Test connection').click()
+        feedback = page.locator('[data-provider-test-status]')
+        await expect(feedback).to_contain_text('Connection test failed')
+        await expect(page.get_by_role('button', name='Save AI settings')).to_be_hidden()
         await page.get_by_label('API key', exact=True).fill('synthetic-browser-key')
+        await page.get_by_role('button', name='Test connection').click()
+        await expect(feedback).to_contain_text('Connection successful')
+        assert provider.load() is None
+        await expect(page.get_by_role('button', name='Save AI settings')).to_be_visible()
+        await page.clock.fast_forward(300001)
+        await expect(page.get_by_role('button', name='Save AI settings')).to_be_hidden()
+        await expect(feedback).to_contain_text('expired')
+        await page.get_by_label('Model / inference profile ID').fill('changed-model')
+        await expect(page.get_by_role('button', name='Save AI settings')).to_be_hidden()
+        await page.get_by_label('Model / inference profile ID').fill('test-model')
+        await page.get_by_role('button', name='Test connection').click()
+        await expect(feedback).to_contain_text('Connection successful')
         await page.get_by_role('button', name='Save AI settings').click()
-        await expect(page.get_by_role('status')).to_contain_text('Settings saved')
+        summary = page.get_by_role('complementary', name='Your AI setup is saved.')
+        await expect(summary.get_by_role('status')).to_contain_text('Settings saved')
+        await expect(summary).to_contain_text('OpenAI')
+        await expect(summary).to_contain_text('test-model')
+        await expect(summary).to_contain_text('64,000 tokens')
         await expect(page.get_by_label('API key', exact=True)).to_have_value('')
         assert 'synthetic-browser-key' not in await page.content()
         assert await page.evaluate('document.documentElement.scrollWidth <= innerWidth')
         await page.screenshot(path=str(tmp_path / 'provider-mobile.png'), full_page=True)
         await page.set_viewport_size({'width': 1440, 'height': 1000})
         await page.screenshot(path=str(tmp_path / 'provider-desktop.png'), full_page=True)
+        await page.goto(live_web + '/admin/provider')
+        await expect(summary).to_be_visible()
+        await expect(summary.get_by_role('status')).not_to_contain_text('Settings saved')
+        await page.get_by_label('Provider', exact=True).select_option('anthropic')
+        await expect(summary).to_contain_text('OpenAI')
+        await page.get_by_label('Provider', exact=True).select_option('openai')
+        await page.get_by_role('button', name='Test connection').click()
+        await expect(feedback).to_contain_text('Connection successful')
         await page.get_by_role('button', name='Save AI settings').click()
-        await expect(page.get_by_role('status')).to_contain_text('Settings saved')
+        await expect(summary.get_by_role('status')).to_contain_text('Settings saved')
         assert provider.load().api_key.get_secret_value() == 'synthetic-browser-key'
         await page.get_by_label('Provider', exact=True).select_option('bedrock')
         await page.get_by_label('AWS authentication').select_option('environment')
         await expect(page.get_by_label('AWS access key ID')).to_be_hidden()
+        await expect(page.get_by_role('button', name='Save AI settings')).to_be_hidden()
+        await page.get_by_role('button', name='Test connection').click()
+        await expect(feedback).to_contain_text('Connection successful')
         await page.get_by_role('button', name='Save AI settings').click()
-        await expect(page.get_by_role('status')).to_contain_text('Settings saved')
+        await expect(summary.get_by_role('status')).to_contain_text('Settings saved')
         assert provider.load().provider == 'bedrock' and not provider.load().public()['credentials_saved']
         await page.goto(live_web)
         await expect(page.get_by_role('button', name='Create preview')).to_be_enabled()
@@ -1110,7 +1155,10 @@ def test_navigation_identifies_one_current_section(review_job, client, route, ac
     response = client.get(route)
     assert response.status_code == 200
     nav = re.search(r'<nav aria-label="Main navigation">(.*?)</nav>', response.text, re.S)[1]
-    assert re.findall(r'<a href="([^"]+)" aria-current="page"', nav) == [active]
+    assert re.findall(r'<a href="([^"]+)" aria-current="page"', nav) == ['/admin' if active.startswith('/admin') else active]
+    if active.startswith('/admin'):
+        tabs = re.search(r'<nav class="backstage-tabs".*?</nav>', response.text, re.S)[0]
+        assert re.findall(r'<a href="([^"]+)" aria-current="page"', tabs) == [active]
 
 
 def test_user_form_error_keeps_users_navigation_active(client):
@@ -1164,9 +1212,77 @@ async def test_directors_desk_and_video_library_navigation(review_job, live_web,
         await expect(page).to_have_url(live_web + '/videos')
         await page.set_viewport_size({'width':390, 'height':844})
         assert await page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+        await page.get_by_role('link', name='Director’s desk', exact=True).click()
+        await expect(page).to_have_url(live_web + '/')
+        await page.get_by_role('link', name='Your videos', exact=True).click()
+        await expect(page).to_have_url(live_web + '/videos')
+        await page.locator('nav a[href="/account"]').click()
+        await expect(page).to_have_url(live_web + '/account')
+        await page.get_by_role('link', name='Your videos', exact=True).click()
+        await expect(page).to_have_url(live_web + '/videos')
+        await page.get_by_role('link', name='Backstage', exact=True).click()
+        tabs = page.get_by_role('navigation', name='Backstage sections')
+        await expect(tabs.get_by_role('link', name='Users', exact=True)).to_have_attribute('aria-current', 'page')
+        await tabs.get_by_role('link', name='AI provider', exact=True).click()
+        await expect(page).to_have_url(live_web + '/admin/provider')
+        await tabs.get_by_role('link', name='Updates', exact=True).click()
+        await expect(page).to_have_url(live_web + '/admin/updates')
+        await page.route('**/admin/updates/status', lambda route: route.fulfill(
+            json={'busy': False, 'available': [{'version': '0.2.0'}]}))
+        await page.reload()
+        await expect(page.get_by_role('navigation', name='Main navigation').get_by_role(
+            'link', name='Backstage · Update available', exact=True)).to_be_visible()
+        await expect(tabs.get_by_role('link', name='Update available', exact=True)).to_have_attribute(
+            'href', '/admin/updates')
+        await page.get_by_role('link', name='Your videos', exact=True).click()
         await page.screenshot(path=str(tmp_path / 'video-library-mobile.png'), full_page=True)
         await page.get_by_role('link', name='New video', exact=True).click()
         await expect(page.get_by_role('heading', name='New video', exact=True)).to_be_visible()
         await expect(page.get_by_role('link', name='Director’s desk', exact=True)).to_be_visible()
         assert await page.evaluate('document.documentElement.scrollWidth <= innerWidth')
         await browser.close()
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('role', ['admin', 'manager', 'user'])
+async def test_delete_disabled_account_in_browser(review_job, live_web, tmp_path, role):
+    from playwright.async_api import async_playwright, expect
+    from app.security import accounts as a
+    admin = a.identity()
+    target = a.finish_enrollment(a.enrollment('delete-fixture', 'Synthetic deletion test password!'),
+                                invite=a.invite_user(admin, 'delete-fixture'))
+    a.set_role(admin, target.id, role)
+    token = a.current_identity.set(target)
+    try:
+        jid = jobs.create_job('https://example.com', 30)
+        target_path = jobs.jobs_dir() / jid
+        (target_path / 'private.txt').write_text('Synthetic target content')
+    finally:
+        a.current_identity.reset(token)
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        try:
+            page = await browser.new_page(viewport={'width': 390, 'height': 844})
+            await page.goto(live_web + '/admin')
+            row = page.locator('.users-account').filter(has=page.get_by_role('heading', name=target.username, exact=True))
+            await row.locator('summary').click()
+            await expect(row.get_by_role('link', name='Delete permanently')).to_have_count(0)
+            await row.get_by_role('button', name='Disable ' + target.username, exact=True).click()
+            await row.locator('summary').click()
+            await row.get_by_role('link', name='Delete permanently', exact=True).click()
+            await expect(page.get_by_role('heading', name='Delete ' + target.username + '?', exact=True)).to_be_visible()
+            assert await page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+            await page.get_by_label('Type ' + target.username + ' to confirm', exact=True).fill('wrong-name')
+            await page.get_by_role('button', name='Delete account permanently', exact=True).click()
+            await expect(page.get_by_role('alert')).to_contain_text('exact username')
+            await page.screenshot(path=str(tmp_path / ('delete-account-' + role + '.png')), full_page=True)
+            await page.get_by_label('Type ' + target.username + ' to confirm', exact=True).fill(target.username)
+            await page.get_by_role('button', name='Delete account permanently', exact=True).click()
+            await expect(page).to_have_url(live_web + '/admin')
+            await expect(page.get_by_role('heading', name=target.username, exact=True)).to_have_count(0)
+            assert not target_path.job.directory.exists()
+            assert review_job.job.directory.exists()
+            with a.database() as con:
+                assert not con.execute('SELECT 1 FROM users WHERE id=?', (target.id,)).fetchone()
+        finally:
+            await browser.close()

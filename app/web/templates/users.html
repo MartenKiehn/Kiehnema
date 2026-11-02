@@ -29,8 +29,8 @@
 {% call info_box('Roles & permissions', 'roles-title') %}
 <div class="users-roles">
   <dl>
-    <div><dt>Regisseur</dt><dd>Creates videos, invites users, manages roles and account access, security, AI settings and updates.</dd></div>
-    <div><dt>Regieassistenz</dt><dd>Creates videos and invites Crew members. Roles, account access and instance settings stay with the Regisseur.</dd></div>
+    <div><dt>Regisseur</dt><dd>Creates videos, invites users, manages roles and account access, deletes disabled accounts, and manages security, AI settings and updates.</dd></div>
+    <div><dt>Regieassistenz</dt><dd>Creates videos, invites Crew members and manages updates. Roles, account access, security, AI settings and update credentials stay with the Regisseur.</dd></div>
     <div><dt>Crew</dt><dd>Creates, edits and downloads their own videos. Cannot invite users or manage other accounts.</dd></div>
   </dl>
   <p>Every role has a private workspace. Even a Regisseur cannot open another person’s videos. Only a Regisseur can assign roles.</p>
@@ -60,6 +60,7 @@
             <button class="button small secondary" type="submit" {% if require_all_totp %}disabled{% endif %}>Save for {{ user.username }}</button>
           </form>
           {% if user.id != request.state.user.id %}<form class="users-disable" action="/admin/disable" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><input type="hidden" name="user_id" value="{{ user.id }}"><input type="hidden" name="disabled" value="{{ '0' if user.disabled else '1' }}"><p class="help">{% if user.disabled %}Restore this user’s access to their workspace.{% else %}Disabling access signs out this user and stops their running jobs. Saved videos are kept.{% endif %}</p><button class="button small secondary" type="submit">{{ 'Enable' if user.disabled else 'Disable' }} {{ user.username }}</button></form>{% endif %}
+          {% if user.disabled and user.id != request.state.user.id %}<div class="users-delete"><p class="help">Permanently remove this disabled account and its videos from this instance.</p><a class="button small danger" href="/admin/delete/{{ user.id }}">Delete permanently</a></div>{% endif %}
         </div>
       </details>{% endif %}
     </li>

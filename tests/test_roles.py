@@ -39,8 +39,8 @@ def test_manager_can_invite_only_crew_and_cannot_manage_accounts(people):
         for endpoint in ('role', 'two-factor', 'two-factor-policy', 'disable'):
             assert web.post('/admin/' + endpoint, headers=credentials,
                             data={'user_id':admin.id, 'role':'admin', 'required':'1', 'disabled':'1'}).status_code == 403
-        for endpoint in ('/admin/provider', '/admin/updates'):
-            assert web.get(endpoint, headers=credentials).status_code == 403
+        assert web.get('/admin/provider', headers=credentials).status_code == 403
+        assert web.get('/admin/updates', headers=credentials).status_code == 200
         page = web.post('/admin/invite', headers=credentials, data={'username':'new-crew', 'role':'admin'})
         assert page.status_code == 200
         invitation = re.search(r'class="recovery-key"><code>([^<]+)', page.text)[1]
@@ -54,6 +54,30 @@ def test_manager_can_invite_only_crew_and_cannot_manage_accounts(people):
         finally:
             a.current_identity.reset(token)
         assert web.get('/jobs/' + jid, headers=credentials).status_code == 404
+
+
+@pytest.mark.parametrize('role', ['admin', 'manager', 'user'])
+def test_backstage_navigation_and_tabs_follow_role_permissions(people, role):
+    admin, member, *_ = people
+    if role == 'manager':
+        a.set_role(admin, member.id, role)
+    person = admin if role == 'admin' else member
+    with TestClient(app, base_url=ORIGIN) as web:
+        credentials = headers(person)
+        home = web.get('/', headers=credentials)
+        nav = re.search(r'<nav aria-label="Main navigation">(.*?)</nav>', home.text, re.S)[1]
+        assert ('>Backstage</a>' in nav) == (role != 'user')
+        assert 'href="/admin/provider"' not in nav and 'href="/admin/updates"' not in nav
+        assert re.findall(r'<a href="([^"]+)"', nav)[-1] == '/account'
+        for path in ('/admin', '/admin/provider', '/admin/updates'):
+            page = web.get(path, headers=credentials)
+            allowed = role == 'admin' or (role == 'manager' and path != '/admin/provider')
+            assert page.status_code == (200 if allowed else 403)
+            if allowed:
+                tabs = re.search(r'<nav class="backstage-tabs".*?</nav>', page.text, re.S)[0]
+                assert re.findall(r'<a href="([^"]+)"', tabs) == (
+                    ['/admin', '/admin/provider', '/admin/updates'] if role == 'admin' else ['/admin', '/admin/updates'])
+                assert re.findall(r'<a href="([^"]+)" aria-current="page"', tabs) == [path]
 
 
 def test_role_changes_revoke_sessions_and_stale_objects_cannot_keep_access(people):

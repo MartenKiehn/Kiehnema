@@ -1,16 +1,37 @@
 {% extends "base.html" %}
+{% from 'components/info_box.html' import info_box %}
+{% block title %}AI provider · Kiehnema{% endblock %}
 {% block content %}
-<section class="card auth-card">
+{% set provider_names = {'bedrock': 'AWS Bedrock', 'openai': 'OpenAI', 'anthropic': 'Anthropic'} %}
+<div class="provider-page">
+  <header class="provider-page-heading">
   <p class="eyebrow">INSTANCE SETTINGS</p>
   <h1>AI provider</h1>
-  <p>Choose the provider and model used by everyone on this server. Your provider bills usage to your account.</p>
+  <p class="lede">Choose the provider and model used by everyone on this server. Your provider bills usage to your account.</p>
+  </header>
+  {% if configured %}
+  {% call info_box('Your AI setup is saved.', 'provider-status-title') %}
+  <div class="provider-summary">
+    <p role="status">{% if saved %}<strong>Settings saved.</strong> {% endif %}An AI provider is configured for everyone on this server.</p>
+    <dl>
+      <div><dt>Provider</dt><dd>{{ provider_names[configured.provider] }}</dd></div>
+      <div><dt>Authentication</dt><dd>{% if configured.provider == 'bedrock' %}{{ 'Server IAM role / AWS configuration' if configured.auth == 'environment' else 'Encrypted AWS credentials' }}{% else %}Encrypted API key{% endif %}</dd></div>
+      <div><dt>Model</dt><dd>{{ configured.model }}</dd></div>
+      <div><dt>Output limit per request</dt><dd>{{ '{:,}'.format(configured.max_output_tokens) }} tokens</dd></div>
+      {% if configured.provider == 'bedrock' %}<div><dt>AWS region</dt><dd>{{ configured.region }}</dd></div>{% endif %}
+    </dl>
+    <p class="provider-summary-note">New jobs and resumed work use these settings. Running jobs keep their current settings. Test the connection again before saving any changes.</p>
+  </div>
+  {% endcall %}
+  {% endif %}
+<section class="card auth-card">
+  <h2>Provider settings</h2>
   {% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
-  {% if saved %}<p class="notice" role="status">Settings saved. New jobs and resumed work will use this configuration. Running jobs keep their current settings.</p>{% endif %}
-  <form action="/admin/provider" method="post" data-provider-form>
+  <form action="/admin/provider" method="post" data-provider-form data-saved-provider="{{ configured.provider if configured else '' }}" data-saved-auth="{{ configured.auth if configured else '' }}" data-credentials-saved="{{ 'true' if configured and configured.credentials_saved else 'false' }}">
     <input type="hidden" name="csrf" value="{{ request.state.csrf }}">
     <label for="ai-provider">Provider</label>
     <select id="ai-provider" name="provider">
-      {% for value, label in [('bedrock', 'AWS Bedrock'), ('openai', 'OpenAI'), ('anthropic', 'Anthropic')] %}
+      {% for value, label in provider_names.items() %}
       <option value="{{ value }}" {% if values.get('provider', 'bedrock') == value %}selected{% endif %}>{{ label }}</option>
       {% endfor %}
     </select>
@@ -31,7 +52,7 @@
       <p class="help">An IAM role is optional. On EC2, use IMDSv2 and response hop limit 2 for containers. AWS keys also work on other hosting providers.</p>
       <div data-aws-keys>
         <label for="ai-access-key">AWS access key ID</label>
-        <input id="ai-access-key" name="access_key" type="password" autocomplete="new-password" maxlength="8192">
+        <input id="ai-access-key" name="access_key" type="text" autocomplete="off" spellcheck="false" autocapitalize="none" maxlength="8192">
         <label for="ai-secret-key">AWS secret access key</label>
         <input id="ai-secret-key" name="secret_key" type="password" autocomplete="new-password" maxlength="8192">
         <label for="ai-session-token">AWS session token <span class="optional">optional</span></label>
@@ -44,9 +65,14 @@
     </div>
     {% if values.get('credentials_saved') %}<p class="help">Credentials are saved. Their values are never displayed.</p>{% endif %}
     <p class="help">Leave all credential fields empty to keep the saved credentials for the same provider and authentication method. To replace credentials, enter the complete set, including any required session token.</p>
-    <button class="button" type="submit">Save AI settings</button>
-    <p class="help">Saving does not call the provider or incur model charges. Your first preview will use these settings.</p>
+    <div class="provider-actions">
+      <button class="button secondary" type="button" data-provider-test>Test connection</button>
+      <button class="button" type="submit" data-provider-save hidden disabled>Save AI settings</button>
+    </div>
+    <p class="help provider-test-status" data-provider-test-status role="status" aria-live="polite"></p>
+    <p class="help">Test connection sends a short request to the selected model and may incur a small model charge. Settings are saved only after you click Save AI settings. Changing any field requires a new test.</p>
   </form>
 </section>
+</div>
 {% endblock %}
 {% block scripts %}<script src="/static/provider.js" defer></script>{% endblock %}

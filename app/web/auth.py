@@ -9,7 +9,7 @@ import pyotp
 from contextvars import ContextVar
 from urllib.parse import parse_qs
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -345,4 +345,53 @@ async def disable(request: Request):
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
+    return RedirectResponse('/admin', status_code=303)
+
+
+def deletion_target(uid: str):
+    target = next((user for user in admin_users() if user['id'] == uid), None)
+    if target is None:
+        raise HTTPException(404, 'User not found.')
+    if uid == a.identity().id:
+        raise HTTPException(409, 'You cannot delete your own administrator account.')
+    if not target['disabled']:
+        raise HTTPException(409, 'Disable this account before deleting it.')
+    from app.web.main import app
+    with a.database() as con:
+        jobs = con.execute('SELECT id,active FROM jobs WHERE owner=?', (uid,)).fetchall()
+    if any(job['active'] or job['id'] in app.state.tasks for job in jobs):
+        raise HTTPException(409, 'Wait for this user’s running jobs to stop before deleting the account.')
+    return {**target, 'job_count': len(jobs)}
+
+
+@router.get('/admin/delete/{uid}')
+async def confirm_user_delete(request: Request, uid: str):
+    return form(request, template='delete_user.html', target=deletion_target(uid))
+
+
+@router.post('/admin/delete')
+async def delete_user(request: Request):
+    admin_users()
+    values = await request.form()
+    uid = str(values.get('user_id', ''))
+    target = deletion_target(uid)
+    try:
+        deleted_jobs = a.delete_user(a.identity(), uid, str(values.get('confirmation', '')))
+    except FileNotFoundError:
+        raise HTTPException(404, 'User not found.') from None
+    except PermissionError:
+        raise
+    except ValueError as exc:
+        return templates.TemplateResponse(request, 'delete_user.html', {'target': target, 'error': str(exc)}, status_code=409)
+    except (OSError, sqlite3.Error):
+        return templates.TemplateResponse(request, 'delete_user.html', {'target': target,
+            'error': 'Deletion did not finish. This account remains disabled. Some files may already be removed. Try again.'}, status_code=409)
+    for token, item in list(pending.items()):
+        if item['draft']['id'] == uid:
+            pending.pop(token, None)
+    for token, item in list(grants.items()):
+        if item[1] in deleted_jobs:
+            grants.pop(token, None)
+    from app.web.main import app
+    app.state.interrupted.difference_update(deleted_jobs)
     return RedirectResponse('/admin', status_code=303)

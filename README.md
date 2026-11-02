@@ -47,7 +47,8 @@ curl -fsSL --proto '=https' https://github.com/MartenKiehn/Kiehnema/releases/lat
 Prepare DNS and open ports 80/443; allow at least 16 GiB RAM and 30 GiB free disk space.
 The installer asks for the domain, prepares Docker and the host, and walks through
 administrator creation. After signing in, choose **AI provider** to configure AWS Bedrock,
-OpenAI or Anthropic with a model and credentials for all users. No AI credentials are
+OpenAI or Anthropic with a model and credentials for all users. Run **Test connection**,
+then **Save AI settings** after a successful test. The short test request may incur model charges. No AI credentials are
 needed during installation. Bedrock supports AWS keys or an optional server IAM role;
 EC2 is not required. See the
 [server installation workflow](docs/updates.md#serverinstallation-mit-einem-befehl) for prerequisites
@@ -85,8 +86,8 @@ uv run python -m app
 
 On the first start, create the administrator account in the terminal: choose a username,
 a password of 15–256 characters. Two-factor authentication is initially optional. Keep the personal recovery
-key outside the server. Under **Users**, a **Regisseur** assigns roles; a **Regieassistenz**
-can also invite users. New accounts join as **Crew**;
+key outside the server. Under **Backstage → Users**, a **Regisseur** assigns roles; a **Regieassistenz**
+can also invite users and manage updates under **Backstage → Updates**. New accounts join as **Crew**;
 each account gets its own password. Administrators can enable or disable two-factor
 authentication per user or require it for everyone, including administrators and future
 users. Affected users set up their own authenticator before accessing their workspace.
@@ -219,7 +220,8 @@ Vorher Domain und offene Ports 80/443 vorbereiten; mindestens 16 GiB RAM und 30 
 Speicher einplanen. Das Skript fragt die Domain ab, bereitet Docker und den Host vor und
 führt durch die Admin-Einrichtung. Nach der Anmeldung richtet der Administrator unter
 **AI provider** AWS Bedrock, OpenAI oder Anthropic mit Modell und Zugangsdaten für alle
-Benutzer ein. Während der Installation sind keine KI-Zugangsdaten nötig. Bedrock unterstützt
+Benutzer ein. Zuerst **Test connection** ausführen, danach bei Erfolg **Save AI settings**.
+Die kurze Testanfrage kann Modellkosten verursachen. Während der Installation sind keine KI-Zugangsdaten nötig. Bedrock unterstützt
 AWS-Schlüssel oder optional eine Server-IAM-Rolle; EC2 ist keine Voraussetzung. Details und die
 Host-Änderungen stehen im [Server-Installationsablauf](docs/updates.md#serverinstallation-mit-einem-befehl).
 Der Download steht erst bereit, wenn ein signierter Release mit `install.sh` veröffentlicht wurde.
@@ -259,8 +261,8 @@ uv run python -m app
 
 Beim ersten Start legst du im Terminal das Administratorkonto an: Benutzername, Passwort
 mit 15–256 Zeichen. Zwei-Faktor-Authentifizierung ist zunächst optional. Bewahre den persönlichen
-Wiederherstellungsschlüssel außerhalb des Servers auf. Unter **Users** vergibt der **Regisseur** Rollen und verwaltet die Sicherheit.
-Die **Regieassistenz** darf ebenfalls Nutzer einladen; neue Konten starten als
+Wiederherstellungsschlüssel außerhalb des Servers auf. Unter **Backstage → Users** vergibt der **Regisseur** Rollen und verwaltet die Sicherheit.
+Die **Regieassistenz** darf ebenfalls Nutzer einladen und unter **Backstage → Updates** Updates verwalten; neue Konten starten als
 **Crew**. Nur der Regisseur aktiviert oder deaktiviert 2FA für andere Nutzer. Ein zusätzlicher Schalter
 verlangt 2FA für alle, einschließlich Administratoren und neuer Nutzer. Betroffene Nutzer
 richten ihren eigenen Authenticator ein, bevor sie weiterarbeiten können.

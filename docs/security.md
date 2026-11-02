@@ -210,7 +210,12 @@ images together; host and disaster recovery remain operator responsibilities.
 Administrators configure one instance-wide AWS Bedrock, OpenAI or Anthropic account under
 **AI provider**. The setting applies to every user's generation, billing and provider data
 processing. Non-administrators cannot read or change this configuration. The browser never
-receives stored credential values, and saving settings makes no paid API call.
+receives stored credential values. Before saving, **Test connection** sends a short streaming
+request to the selected model (up to 1,024 output tokens, low effort); provider charges may apply.
+Only a successful test unlocks saving. Server-side approval is bound to the exact effective
+settings and the administrator session, expires after five minutes, and is consumed on save.
+Changed settings require another test. Tests are limited to ten attempts per administrator
+in fifteen minutes. Failed tests do not change the stored provider. Saving itself makes no API call.
 
 Credentials are AES-GCM encrypted in `data/secure/provider.enc` with a random service key
 in `data/secure/provider.key`, both mode 0600. Back up and restore these files together.
@@ -233,11 +238,20 @@ images, tool calling and streaming; availability, output limits and charges depe
 The three roles use film titles: **Regisseur**, **Regieassistenz** and
 **Crew**. Every role creates and accesses only its own videos. A Regisseur
 controls roles, account access, two-factor policies, AI provider settings and updates.
-Regieassistenz has the same workspace rights as Crew plus permission to invite Crew users
-and view the team directory. It cannot change roles, disable accounts or change security
-or instance settings. Invitation forms cannot grant elevated roles.
+Regieassistenz has the same workspace rights as Crew plus permission to invite Crew users,
+view the team directory, and check, install or cancel updates. It cannot change roles,
+disable accounts, change security or AI settings, or manage update credentials.
+Invitation forms cannot grant elevated roles.
 
 Only a Regisseur can change other users’ roles under **Users → Security & access**.
+Under **Backstage → Users → Security & access**, a Regisseur can permanently delete
+another account after disabling it. The confirmation page requires the exact username.
+Deletion removes the account, its sessions and all owned encrypted jobs, previews,
+feedback and renders from the active instance; other users' workspaces and provider
+settings remain intact. Running jobs must stop first. Existing server backups are not
+changed. This is not a secure erase of storage media or backup copies.
+If filesystem cleanup fails, the account stays disabled and deletion can be retried;
+some of the confirmed files may already have been removed.
 Changing a role signs out that user without removing their videos. An administrator cannot
 change their own role, preventing accidental removal of the last active administrator.
 Roles are stored in the account database, refreshed when sessions are used, and preserved

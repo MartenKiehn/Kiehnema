@@ -1,7 +1,9 @@
 # Linux-Installation und Updates
 
 Kiehnema prüft ungefähr alle sechs Stunden mit zufälligem Zeitversatz auf neue stabile
-GitHub-Releases. Administratoren sehen einen Hinweis und installieren unter **Updates**.
+GitHub-Releases. Regisseur und Regieassistenz sehen einen Hinweis und können unter
+**Backstage → Updates** nach Updates suchen, sie installieren oder abbrechen.
+Nur der Regisseur verwaltet die Update-Zugangsdaten.
 Ein Release wird erst nach Tests, Image-Build und Signatur angeboten. Eine Änderung der
 Versionsnummer allein veröffentlicht noch kein Update.
 
@@ -204,8 +206,11 @@ Updater mit Docker-Socket verwendet `label=disable`; er besitzt ohnehin Host-Adm
 Nach der Anmeldung unter **AI provider** Anbieter, Modell-ID und maximale Ausgabetokens
 angeben. Das Modell muss Bilder, Tool-Aufrufe und Streaming unterstützen. Nur Administratoren
 können die Einstellung ändern; alle Benutzer verwenden dasselbe Anbieterkonto. Ohne diese
-Einrichtung kann eine neue Serverinstallation noch keine Videos generieren. Speichern führt
-keinen Modellaufruf aus und bestätigt daher auch keine Modellberechtigungen.
+Einrichtung kann eine neue Serverinstallation noch keine Videos generieren. Vor dem Speichern
+**Test connection** ausführen: Eine kurze Streaming-Anfrage prüft den Modellzugriff und kann
+geringe Modellkosten verursachen. Erst nach Erfolg erscheint **Save AI settings**. Änderungen
+erfordern einen neuen Test; die Freigabe gilt fünf Minuten und nur für diese Anmeldung und
+die getesteten Einstellungen. Speichern selbst löst keinen weiteren Modellaufruf aus.
 
 Leere Zugangsfelder behalten bestehende Zugangsdaten beim selben Anbieter und Authentifizierungsweg.
 Zum Austausch den vollständigen Satz angeben; ein leerer optionaler AWS Session Token wird

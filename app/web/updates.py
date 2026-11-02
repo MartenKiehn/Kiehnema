@@ -1,4 +1,4 @@
-"""Administrator-only update controls using the existing session and CSRF boundary."""
+"""Role-based update controls using the existing session and CSRF boundary."""
 
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,7 +19,12 @@ templates = Jinja2Templates(directory=Path(__file__).parent / 'templates')
 
 def administrator():
     if not identity().admin:
-        raise HTTPException(403, 'Only administrators can manage updates.')
+        raise HTTPException(403, 'Only administrators can manage update access.')
+
+
+def update_operator():
+    if not identity().can_invite:
+        raise HTTPException(403, 'Only directors and assistants can manage updates.')
 
 
 async def call(method, path, body=None):
@@ -37,7 +42,7 @@ async def call(method, path, body=None):
 
 @router.get('')
 async def page(request: Request):
-    administrator()
+    update_operator()
     status, error = None, None
     if settings.update_control_dir is not None:
         try:
@@ -52,7 +57,7 @@ async def page(request: Request):
 
 @router.get('/status')
 async def status():
-    administrator()
+    update_operator()
     if settings.update_control_dir is None:
         return {'available': [], 'busy': False}
     return await call('GET', '/status')
@@ -60,14 +65,14 @@ async def status():
 
 @router.post('/check')
 async def check():
-    administrator()
+    update_operator()
     await call('POST', '/check')
     return RedirectResponse('/admin/updates', status_code=303)
 
 
 @router.post('/install')
 async def install(request: Request):
-    administrator()
+    update_operator()
     form = await request.form()
     await call('POST', '/install', {'version': form.get('version', '')})
     return RedirectResponse('/admin/updates', status_code=303)
@@ -75,7 +80,7 @@ async def install(request: Request):
 
 @router.post('/cancel')
 async def cancel():
-    administrator()
+    update_operator()
     await call('POST', '/cancel')
     return RedirectResponse('/admin/updates', status_code=303)
 

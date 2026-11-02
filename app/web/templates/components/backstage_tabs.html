@@ -1,0 +1,10 @@
+<div class="backstage-navigation">
+  <p class="eyebrow">BACKSTAGE</p>
+  <nav class="backstage-tabs" aria-label="Backstage sections">
+    <a href="/admin" {% if not path.startswith(('/admin/provider', '/admin/updates')) %}aria-current="page"{% endif %}>Users</a>
+    {% if request.state.user.admin %}
+    <a href="/admin/provider" {% if path.startswith('/admin/provider') %}aria-current="page"{% endif %}>AI provider</a>
+    {% endif %}
+    <a href="/admin/updates" {% if path.startswith('/admin/updates') %}aria-current="page"{% endif %} data-update-link>Updates</a>
+  </nav>
+</div>

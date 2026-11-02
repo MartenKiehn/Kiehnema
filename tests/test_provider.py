@@ -26,6 +26,126 @@ def configuration(name='openai', **extra):
     return provider.Provider(provider=name, model='test-model', api_key='test-private-api-key', **extra)
 
 
+@pytest.fixture(autouse=True)
+def mock_connection_test(monkeypatch):
+    monkeypatch.setattr('app.web.provider.test_connection', lambda config: None)
+
+
+def save_after_test(web, credentials, values):
+    tested = web.post('/admin/provider/test', headers=credentials, data=values)
+    assert tested.status_code == 200, tested.text
+    return web.post('/admin/provider', headers=credentials, data=values, follow_redirects=False)
+
+
+def test_connection_is_required_session_bound_expires_and_is_used_once(people, isolated, monkeypatch):
+    from app.web import provider as web_provider
+    clock = [1000.0]
+    monkeypatch.setattr(web_provider, 'time', SimpleNamespace(monotonic=lambda: clock[0]))
+    values = dict(provider='openai', model='test-model', api_key='synthetic-key', max_output_tokens='64000')
+    with TestClient(app, base_url=ORIGIN) as web:
+        credentials = headers(people[0])
+        assert web.post('/admin/provider', headers=credentials, data=values).status_code == 409
+        assert provider.load() is None
+        response = web.post('/admin/provider/test', headers=credentials, data=values)
+        assert response.status_code == 200 and 'synthetic-key' not in response.text
+        assert provider.load() is None
+        assert web.post('/admin/provider', headers=headers(people[0]), data=values).status_code == 409
+        clock[0] += 301
+        assert web.post('/admin/provider', headers=credentials, data=values).status_code == 409
+        assert provider.load() is None
+        assert save_after_test(web, credentials, values).status_code == 303
+        assert provider.load().api_key.get_secret_value() == 'synthetic-key'
+        assert web.post('/admin/provider', headers=credentials, data=values).status_code == 409
+
+
+@pytest.mark.parametrize('change', [
+    {'model':'other-model'}, {'provider':'openai', 'api_key':'other-key'}, {'region':'eu-west-1'},
+    {'auth':'environment'}, {'max_output_tokens':'8192'}, {'access_key':'changed'},
+    {'secret_key':'changed'}, {'session_token':'changed'},
+])
+def test_changed_settings_cannot_use_previous_connection_test(people, isolated, change):
+    values = dict(provider='bedrock', model='test-model', region='eu-central-1', auth='keys',
+                  max_output_tokens='64000', access_key='synthetic-access', secret_key='synthetic-secret')
+    with TestClient(app, base_url=ORIGIN) as web:
+        credentials = headers(people[0])
+        assert web.post('/admin/provider/test', headers=credentials, data=values).status_code == 200
+        assert web.post('/admin/provider', headers=credentials, data=values | change).status_code == 409
+        assert provider.load() is None
+
+
+def test_invalid_and_failed_tests_do_not_save_or_keep_previous_approval(people, isolated, monkeypatch):
+    values = dict(provider='openai', model='test-model', api_key='synthetic-key', max_output_tokens='64000')
+    called = []
+    monkeypatch.setattr('app.web.provider.test_connection', lambda config: called.append(config))
+    with TestClient(app, base_url=ORIGIN) as web:
+        credentials = headers(people[0])
+        assert web.post('/admin/provider/test', headers=credentials, data=values | {'api_key':''}).status_code == 422
+        assert not called and provider.load() is None
+        assert web.post('/admin/provider/test', headers=credentials, data=values).status_code == 200
+        def fail(config):
+            raise client.LLMError('Connection test failed.')
+        monkeypatch.setattr('app.web.provider.test_connection', fail)
+        assert web.post('/admin/provider/test', headers=credentials, data=values).status_code == 422
+        assert web.post('/admin/provider', headers=credentials, data=values).status_code == 409
+        assert provider.load() is None
+
+
+@pytest.mark.parametrize('role', ['admin', 'manager', 'user', 'anonymous'])
+def test_connection_endpoint_requires_admin_csrf_and_origin(people, isolated, monkeypatch, role):
+    from app.security import accounts as a
+    admin, member, *_ = people
+    if role == 'manager':
+        a.set_role(admin, member.id, 'manager')
+    called = []
+    monkeypatch.setattr('app.web.provider.test_connection', lambda config: called.append(config))
+    values = dict(provider='openai', model='test-model', api_key='synthetic-key', max_output_tokens='64000')
+    with TestClient(app, base_url=ORIGIN) as web:
+        credentials = {'Origin':ORIGIN} if role == 'anonymous' else headers(admin if role == 'admin' else member)
+        assert web.post('/admin/provider/test', headers=credentials, data=values).status_code == (200 if role == 'admin' else (401 if role == 'anonymous' else 403))
+        if role == 'admin':
+            assert web.post('/admin/provider/test', headers={'Cookie':credentials['Cookie'], 'Origin':ORIGIN}, data=values).status_code == 403
+            assert web.post('/admin/provider/test', headers=credentials | {'Origin':'https://evil.example'}, data=values).status_code == 403
+        assert len(called) == (1 if role == 'admin' else 0)
+        assert provider.load() is None
+
+
+@pytest.mark.parametrize('outcome', ['success', 'empty', 'error'])
+def test_connection_probe_is_small_isolated_and_redacts_provider_errors(isolated, monkeypatch, outcome):
+    selected, closed = [], []
+    def stream(messages):
+        try:
+            if outcome == 'error':
+                raise RuntimeError('Authorization: test-private-api-key')
+            if outcome == 'success':
+                yield AIMessageChunk(content='OK')
+        finally:
+            closed.append(True)
+    def model(effort, max_tokens, *, probe):
+        selected.append((effort, max_tokens, probe, provider.require().model))
+        return SimpleNamespace(stream=stream)
+    monkeypatch.setattr(client, 'chat_model', model)
+    if outcome == 'success':
+        client.test_connection(configuration())
+    else:
+        with pytest.raises(client.LLMError) as error:
+            client.test_connection(configuration())
+        assert 'test-private-api-key' not in str(error.value)
+    assert selected == [('low', 1024, True, 'test-model')]
+    assert closed == [True] and provider.current.get() is None
+
+
+@pytest.mark.parametrize('code', ['AccessDeniedException', 'UnrecognizedClientException', 'ValidationException', 'UnknownFailure'])
+def test_connection_probe_reports_safe_aws_error_category(isolated, monkeypatch, code):
+    from botocore.exceptions import ClientError
+    def stream(messages):
+        raise ClientError({'Error':{'Code':code, 'Message':'Authorization: test-private-api-key'}}, 'ConverseStream')
+    monkeypatch.setattr(client, 'chat_model', lambda *args, **kwargs: SimpleNamespace(stream=stream))
+    with pytest.raises(client.LLMError) as error:
+        client.test_connection(configuration('bedrock', auth='environment'))
+    assert 'test-private-api-key' not in str(error.value)
+    assert (code in str(error.value)) == (code != 'UnknownFailure')
+
+
 def test_encrypted_credentials_roundtrip_and_fail_closed(isolated):
     assert provider.load() is None
     with pytest.raises(ValueError, match='administrator'):
@@ -75,16 +195,16 @@ def test_provider_page_requires_admin_and_csrf_and_never_echoes_keys(people, iso
         assert web.post('/admin/provider', headers=user_headers, data=values).status_code == 403
         assert web.post('/admin/provider', headers={'Cookie': admin_headers['Cookie'], 'Origin': ORIGIN}, data=values).status_code == 403
         assert web.post('/admin/provider', headers=admin_headers | {'Origin': 'https://evil.example'}, data=values).status_code == 403
-        assert 'AI provider' in web.get('/', headers=admin_headers).text
+        assert 'Backstage' in web.get('/', headers=admin_headers).text
         assert web.post('/jobs', headers=user_headers, data={'url': 'https://example.com'}).status_code == 422
-        response = web.post('/admin/provider', headers=admin_headers, data=values, follow_redirects=False)
+        response = save_after_test(web, admin_headers, values)
         assert response.status_code == 303
         page = web.get('/admin/provider', headers=admin_headers)
         assert page.status_code == 200 and 'unique-private-key' not in page.text
         assert page.headers['cache-control'] == 'no-store'
         # Empty credentials keep the same provider's key; switching providers requires a new key.
         values['api_key'] = ''
-        assert web.post('/admin/provider', headers=admin_headers, data=values, follow_redirects=False).status_code == 303
+        assert save_after_test(web, admin_headers, values).status_code == 303
         assert provider.load().api_key.get_secret_value() == 'unique-private-key'
         values['provider'] = 'anthropic'
         assert web.post('/admin/provider', headers=admin_headers, data=values).status_code == 422
@@ -92,9 +212,51 @@ def test_provider_page_requires_admin_and_csrf_and_never_echoes_keys(people, iso
         response = web.post('/admin/provider', headers=admin_headers, data=values)
         assert response.status_code == 422 and 'rotated-private-key' not in response.text
         values['max_output_tokens'] = '8192'
-        assert web.post('/admin/provider', headers=admin_headers, data=values, follow_redirects=False).status_code == 303
+        assert save_after_test(web, admin_headers, values).status_code == 303
         assert provider.load().provider == 'anthropic'
         assert provider.load().api_key.get_secret_value() == 'rotated-private-key'
+
+
+@pytest.mark.parametrize('config', [
+    configuration(), configuration('anthropic'), configuration('bedrock', auth='environment'),
+    configuration('bedrock', access_key='synthetic-access', secret_key='synthetic-secret'),
+])
+def test_saved_provider_summary_uses_stored_settings_and_hides_credentials(people, isolated, config):
+    with TestClient(app, base_url=ORIGIN) as web:
+        credentials = headers(people[0])
+        page = web.get('/admin/provider?saved=1', headers=credentials)
+        assert 'Your AI setup is saved.' not in page.text and 'Settings saved.' not in page.text
+        provider.save(config)
+        for path in ('/admin/provider', '/admin/provider?saved=1'):
+            page = web.get(path, headers=credentials)
+            assert page.status_code == 200
+            summary = page.text.split('<aside class="info-box"', 1)[1].split('</aside>', 1)[0]
+            assert 'Your AI setup is saved.' in summary and config.model in summary
+            assert '64,000 tokens' in summary
+            assert 'Test the connection again before saving any changes.' in summary
+            assert ('Settings saved.' in summary) == path.endswith('?saved=1')
+            for field in provider.SECRET_FIELDS:
+                value = getattr(config, field).get_secret_value()
+                if value:
+                    assert value not in page.text
+            if config.provider == 'bedrock':
+                assert config.region in summary
+                assert ('Server IAM role' if config.auth == 'environment' else 'Encrypted AWS credentials') in summary
+        page = web.post('/admin/provider', headers=credentials, data={
+            'provider':'openai', 'model':'unsaved-model', 'max_output_tokens':'invalid'})
+        assert page.status_code == 422
+        summary = page.text.split('<aside class="info-box"', 1)[1].split('</aside>', 1)[0]
+        assert config.model in summary and 'unsaved-model' not in summary
+        assert 'Settings saved.' not in summary
+
+
+def test_unreadable_provider_cannot_show_save_confirmation(people, isolated, monkeypatch):
+    monkeypatch.setattr(provider, 'load', lambda: (_ for _ in ()).throw(ValueError('Unreadable configuration')))
+    with TestClient(app, base_url=ORIGIN) as web:
+        page = web.get('/admin/provider?saved=1', headers=headers(people[0]))
+        assert page.status_code == 200
+        assert 'AI settings could not be read.' in page.text
+        assert 'Your AI setup is saved.' not in page.text and 'Settings saved.' not in page.text
 
 
 @pytest.mark.parametrize('role', ['admin', 'manager', 'user'])
@@ -112,7 +274,8 @@ def test_provider_access_and_navigation_are_admin_only(people, isolated, role, c
             page = web.get(path, headers=credentials)
             assert page.status_code == 200
             navigation = page.text.split('<nav aria-label="Main navigation">', 1)[1].split('</nav>', 1)[0]
-            assert ('href="/admin/provider"' in navigation) == (role == 'admin')
+            assert 'href="/admin/provider"' not in navigation
+            assert ('href="/admin"' in navigation) == (role in ('admin', 'manager'))
         page = web.get('/admin/provider', headers=credentials)
         assert page.status_code == (200 if role == 'admin' else 403)
         if role != 'admin':
@@ -130,15 +293,15 @@ def test_aws_key_rotation_requires_complete_set_and_clears_session_token(people,
     values = dict(provider='bedrock', model='test-model', region='eu-central-1', auth='keys',
                   max_output_tokens='8192', access_key='access', secret_key='secret', session_token='session')
     with TestClient(app, base_url=ORIGIN) as web:
-        assert web.post('/admin/provider', headers=admin_headers, data=values, follow_redirects=False).status_code == 303
+        assert save_after_test(web, admin_headers, values).status_code == 303
         values.update(access_key='new-access', secret_key='', session_token='')
         assert web.post('/admin/provider', headers=admin_headers, data=values).status_code == 422
         assert provider.load().access_key.get_secret_value() == 'access'
         values['secret_key'] = 'new-secret'
-        assert web.post('/admin/provider', headers=admin_headers, data=values, follow_redirects=False).status_code == 303
+        assert save_after_test(web, admin_headers, values).status_code == 303
         assert not provider.load().session_token.get_secret_value()
         values['auth'] = 'environment'
-        assert web.post('/admin/provider', headers=admin_headers, data=values, follow_redirects=False).status_code == 303
+        assert save_after_test(web, admin_headers, values).status_code == 303
         assert not provider.load().public()['credentials_saved']
 
 

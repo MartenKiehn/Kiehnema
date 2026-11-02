@@ -8,6 +8,7 @@ import fcntl
 import os
 import re
 import secrets
+import shutil
 import sqlite3
 import threading
 import time
@@ -171,6 +172,48 @@ def set_role(person: Identity, uid: str, role: str) -> None:
     revoke(uid)
 
 
+def delete_user(person: Identity, uid: str, confirmation: str) -> list[str]:
+    from app.security.vault import valid_id
+
+    with database() as con:
+        con.execute('BEGIN IMMEDIATE')
+        if not con.execute('SELECT 1 FROM users WHERE id=? AND admin=1 AND disabled=0', (person.id,)).fetchone():
+            raise PermissionError('Administrator access required.')
+        if uid == person.id:
+            raise ValueError('You cannot delete your own administrator account.')
+        target = con.execute('SELECT username,disabled FROM users WHERE id=?', (uid,)).fetchone()
+        if target is None:
+            raise FileNotFoundError('User not found.')
+        if not target['disabled']:
+            raise ValueError('Disable this account before deleting it.')
+        if confirmation != target['username']:
+            raise ValueError('Enter the exact username to confirm deletion.')
+        rows = con.execute('SELECT id,active FROM jobs WHERE owner=?', (uid,)).fetchall()
+        if any(row['active'] for row in rows):
+            raise ValueError('Wait for this user’s running jobs to stop before deleting the account.')
+        objects = settings.data_dir / 'secure/objects'
+        if objects.is_symlink():
+            raise ValueError('Invalid encrypted storage directory.')
+        paths = [objects / valid_id(row['id']) for row in rows]
+        if any(path.is_symlink() or (path.exists() and not path.is_dir()) for path in paths):
+            raise ValueError('Invalid encrypted video directory.')
+        # Remove files first so failed cleanup leaves a disabled account that can be retried.
+        try:
+            for path in paths:
+                if path.exists():
+                    shutil.rmtree(path)
+        except OSError:
+            raise ValueError('Deletion did not finish. This account remains disabled. Some files may already be removed. Try again.') from None
+        con.execute('DELETE FROM jobs WHERE owner=?', (uid,))
+        con.execute('DELETE FROM invites WHERE username=?', (target['username'],))
+        for scope in ('login:' + target['username'], 'recovery:' + target['username'],
+                      'totp-setup:' + uid, 'provider-test:' + uid):
+            con.execute('DELETE FROM failures WHERE id=?', (digest(scope),))
+        con.execute('DELETE FROM users WHERE id=?', (uid,))
+    revoke(uid)
+    return [row['id'] for row in rows]
+
+
 def initialized() -> bool:
     with database() as con:
         return con.execute("SELECT 1 FROM users LIMIT 1").fetchone() is not None
@@ -307,6 +350,7 @@ class Session:
     created: float = field(default_factory=time.time)
     used: float = field(default_factory=time.time)
     totp_setup: str = field(default="", repr=False)
+    provider_test: tuple[str, float] | None = field(default=None, repr=False)
 
 
 sessions: dict[str, Session] = {}

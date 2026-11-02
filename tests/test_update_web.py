@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import settings
+from app.security import accounts as a
 from app.web.main import app
 from tests.test_security import people, headers, ORIGIN
 
@@ -33,6 +34,42 @@ def test_updates_require_administrator_origin_and_csrf(people, monkeypatch, tmp_
         assert client.post('/admin/updates/install', headers={**admin, 'Origin': 'https://other.example'}, data={'version': '0.2.0'}).status_code == 403
         assert client.post('/admin/updates/install', headers=admin, data={'version': '0.2.0'}, follow_redirects=False).status_code == 303
         assert calls[-1] == ('POST', '/install', {'version': '0.2.0'})
+
+
+@pytest.mark.parametrize('busy', [False, True])
+def test_assistant_can_manage_updates_but_not_update_credentials(people, monkeypatch, tmp_path, busy):
+    admin, assistant, *_ = people
+    a.set_role(admin, assistant.id, 'manager')
+    calls = []
+    async def request(method, path, body=None):
+        calls.append((method, path, body))
+        return {'version': '0.1.0', 'available': [{'version': '0.2.0', 'notes': 'Release notes.'}],
+                'busy': busy, 'operation': {'phase': 'queued'}, 'progress': {'message': 'Waiting.'}, 'error': None}
+    monkeypatch.setattr('app.updates.client.request', request)
+    monkeypatch.setattr('app.web.main.writes_allowed', lambda: True)
+    with TestClient(app, base_url=ORIGIN) as client:
+        monkeypatch.setattr(settings, 'update_control_dir', tmp_path)
+        credentials = headers(assistant)
+        page = client.get('/admin/updates', headers=credentials)
+        assert page.status_code == 200
+        assert 'update-notice.js' in page.text and 'href="/admin/provider"' not in page.text
+        assert 'action="/admin/updates/credentials"' not in page.text
+        assert 'Update access</summary>' not in page.text
+        assert ('action="/admin/updates/cancel"' in page.text) == busy
+        assert ('action="/admin/updates/install"' in page.text) == (not busy)
+        assert ('action="/admin/updates/check"' in page.text) == (not busy)
+        assert client.get('/admin/updates/status', headers=credentials).status_code == 200
+        assert all(method == 'GET' for method, *_ in calls)
+        for path, body in [('check', {}), ('install', {'version': '0.2.0'}), ('cancel', {})]:
+            assert client.post('/admin/updates/' + path, headers=credentials,
+                               data=body, follow_redirects=False).status_code == 303
+        assert calls[-3:] == [('POST', '/check', None), ('POST', '/install', {'version': '0.2.0'}), ('POST', '/cancel', None)]
+        previous = list(calls)
+        assert client.post('/admin/updates/credentials', headers=credentials,
+                           data={'username': 'test', 'token': 'synthetic-test-token'}).status_code == 403
+        for invalid in (credentials | {'X-CSRF-Token': ''}, credentials | {'Origin': 'https://other.example'}):
+            assert client.post('/admin/updates/install', headers=invalid, data={'version': '0.2.0'}).status_code == 403
+        assert calls == previous
 
 
 @pytest.mark.browser

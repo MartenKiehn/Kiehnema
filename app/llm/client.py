@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import logging
+from contextlib import closing
 from dataclasses import dataclass, field
 from typing import Callable, Literal, Sequence, TypeVar
 
 import boto3
 from botocore.config import Config
+from botocore.exceptions import ClientError
 from langchain_aws import ChatBedrockConverse
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
@@ -65,15 +67,17 @@ class Usage:
             acc[k] += v
 
 
-def chat_model(effort: Effort = "medium", max_tokens: int | None = None):
+def chat_model(effort: Effort = "medium", max_tokens: int | None = None, *, probe: bool = False):
     config = require()
     limit = min(max_tokens or settings.max_tokens_default, config.max_output_tokens)
+    timeout = 60 if probe else settings.read_timeout_s
     if config.provider == 'openai':
         return ChatOpenAI(model=config.model, api_key=config.api_key, base_url='https://api.openai.com/v1',
-                          max_completion_tokens=limit, timeout=settings.read_timeout_s, stream_usage=True)
+                          max_completion_tokens=limit, timeout=timeout, stream_usage=True,
+                          **({'max_retries': 0} if probe else {}))
     if config.provider == 'anthropic':
         return ChatAnthropic(model=config.model, api_key=config.api_key, base_url='https://api.anthropic.com',
-                             max_tokens=limit, timeout=settings.read_timeout_s)
+                             max_tokens=limit, timeout=timeout, **({'max_retries': 0} if probe else {}))
     credentials = ({'aws_access_key_id': config.access_key.get_secret_value(),
                     'aws_secret_access_key': config.secret_key.get_secret_value(),
                     'aws_session_token': config.session_token.get_secret_value() or None}
@@ -81,7 +85,8 @@ def chat_model(effort: Effort = "medium", max_tokens: int | None = None):
     session = boto3.Session(region_name=config.region, **credentials)
     client = session.client(
         "bedrock-runtime",
-        config=Config(read_timeout=settings.read_timeout_s, connect_timeout=30, retries={"max_attempts": 4, "mode": "adaptive"}),
+        config=Config(read_timeout=timeout, connect_timeout=5 if probe else 30,
+                      retries={"max_attempts": 0 if probe else 4, "mode": "adaptive"}),
     )
     return ChatBedrockConverse(
         model=config.model,
@@ -89,6 +94,44 @@ def chat_model(effort: Effort = "medium", max_tokens: int | None = None):
         max_tokens=limit,
         **({'reasoning_effort': effort} if 'anthropic.' in config.model else {}),
     )
+
+
+def test_connection(config) -> None:
+    from app.llm import provider
+    token = provider.current.set(config)
+    try:
+        model = chat_model('low', 1024, probe=True)
+        with closing(model.stream([('human', 'Reply with OK. This is a connection test.')])) as chunks:
+            for chunk in chunks:
+                if chunk.text.strip():
+                    return
+        raise LLMError('The model returned no text. Check the selected model and its output limit.')
+    except LLMError:
+        raise
+    except Exception as exc:
+        if isinstance(exc, ClientError):
+            code = exc.response.get('Error', {}).get('Code')
+            messages = {
+                'AccessDeniedException': 'AWS denied access. Check Bedrock model permissions and model access for this account.',
+                'UnrecognizedClientException': 'AWS did not accept the credentials. Check the access key, secret key and any required session token.',
+                'InvalidSignatureException': 'AWS could not verify the request signature. Check the secret key and server clock.',
+                'ExpiredTokenException': 'The AWS session token has expired. Enter fresh temporary credentials.',
+                'ValidationException': 'AWS rejected the model or request settings. Check the model ID, inference profile and region.',
+                'ResourceNotFoundException': 'AWS could not find the selected model or inference profile in this region.',
+                'ThrottlingException': 'AWS throttled the request. Check the account quota and try again later.',
+                'ServiceUnavailableException': 'AWS Bedrock is temporarily unavailable. Try again later.',
+                'ModelNotReadyException': 'The selected AWS model is not ready. Try again later.',
+            }
+            if code in messages:
+                raise LLMError(f'{messages[code]} ({code})') from None
+        status = getattr(exc, 'status_code', None)
+        if status in (401, 403):
+            raise LLMError('The provider rejected access. Check the credentials and permission to use this model.') from None
+        if status == 429:
+            raise LLMError('The provider rate limit or quota was reached. Check the account quota and try again later.') from None
+        raise LLMError('Connection test failed. Check credentials, model access, region, permissions and quota.') from None
+    finally:
+        provider.current.reset(token)
 
 
 def _check_stop(step: str, stop: str | None) -> None:
