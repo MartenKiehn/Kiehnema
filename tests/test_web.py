@@ -432,13 +432,13 @@ def test_restart_marks_unfinished_work_without_restarting_it(workspace):
 
 
 @pytest.mark.browser
-async def test_progress_insights_survive_polling_and_expand_as_results_arrive(review_job, tmp_path):
+async def test_progress_insight_scroll_survives_polling_as_results_arrive(review_job, tmp_path):
     from playwright.async_api import async_playwright, expect
 
     async with app.router.lifespan_context(app), async_playwright() as pw:
         (review_job / "profile.json").write_text(json.dumps({"facts": [
-            {"text": text, "source_url": "https://example.com/about"} for text in
-            ("Robots that work.", "Founded in 2019.", "Fixed-price projects.", "Built for small factories.")]}))
+            {"text": f"Verified website fact {i}: built for small factories.", "source_url": "https://example.com/about"}
+            for i in range(15)]}))
         write_status(review_job, "crawl", "Reading page 1 (limit 20): https://example.com/")
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
             browser = await pw.chromium.launch()
@@ -455,13 +455,22 @@ async def test_progress_insights_survive_polling_and_expand_as_results_arrive(re
                 await page.get_by_text("Activity log", exact=True).click()
                 activity = await page.locator("details.activity").element_handle()
                 assert await page.locator(".progress-motion").count() == 0
-                await page.get_by_text("Read 1 more", exact=True).click()
-                facts = await page.locator(".insight-card").first.element_handle()
+                facts_region = page.get_by_role('region', name='What your website tells us')
+                assert await facts_region.locator('li').count() == 15
+                assert await page.locator('.insight-card details').count() == 0
+                assert await facts_region.evaluate('el => el.scrollHeight > el.clientHeight')
+                await facts_region.focus()
+                await facts_region.evaluate('el => { el.scrollTop = 150; }')
+                await expect(facts_region).to_be_focused()
+                scroll = await facts_region.evaluate('el => el.scrollTop')
+                assert scroll > 0
+                facts = await facts_region.element_handle()
                 (review_job / "brand").mkdir()
                 (review_job / "brand/brand.json").write_text(json.dumps({"colors": [{"hex": "#ffffff"}, {"hex": "#19285a"}]}))
                 write_status(review_job, "brand", "Brand assets found")
                 await page.get_by_role("heading", name="Finding your visual identity").wait_for(timeout=10000)
-                assert await facts.evaluate("el => el.isConnected && el.querySelector('details').open")
+                assert await facts.evaluate("el => el.isConnected && el === document.activeElement")
+                assert await facts.evaluate('el => el.scrollTop') == scroll
                 assert await activity.evaluate("el => el.isConnected && el.open")
                 assert "White" in await page.locator(".insight-colours").inner_text()
                 assert "#ffffff" not in await page.locator(".discoveries").inner_text()
@@ -470,7 +479,16 @@ async def test_progress_insights_survive_polling_and_expand_as_results_arrive(re
                 assert await page.locator('[aria-current="step"]').text_content() == "2Brand"
                 await page.set_viewport_size({"width": 390, "height": 844})
                 assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+                assert await facts_region.evaluate('el => el.scrollHeight > el.clientHeight && el.clientHeight <= 352')
                 await page.screenshot(path=str(tmp_path / "progress-mobile.png"), full_page=True)
+                (review_job / 'profile.json').write_text(json.dumps({'facts': [
+                    {'text': 'A long website fact for smaller screens. ' * 10, 'source_url': 'https://example.com/about'}
+                    for _ in range(3)]}))
+                await expect(facts_region.locator('li')).to_have_count(3)
+                await expect(facts_region).to_have_attribute('tabindex', '0')
+                assert await facts_region.evaluate('el => el.scrollHeight > el.clientHeight')
+                await facts_region.focus()
+                await expect(facts_region).to_be_focused()
                 await page.emulate_media(reduced_motion="reduce")
                 assert await page.locator(".live-dot").evaluate("el => getComputedStyle(el).animationName") == "none"
                 write_status(review_job, 'render', 'Rendering feed video',
@@ -1360,5 +1378,57 @@ async def test_delete_disabled_account_in_browser(review_job, live_web, tmp_path
             assert review_job.job.directory.exists()
             with a.database() as con:
                 assert not con.execute('SELECT 1 FROM users WHERE id=?', (target.id,)).fetchone()
+        finally:
+            await browser.close()
+
+
+@pytest.mark.parametrize('passed', [False, True])
+def test_review_check_guidance_explains_feedback_and_separates_visual_notes(review_job, client, monkeypatch, passed):
+    jobs.job_state.return_value['values']['check']['ok'] = passed
+    (review_job / 'check.json').write_text(json.dumps({'ok': passed, 'issues': [] if passed else [
+        {'severity': 'error', 'code': 'nondeterministic', 'message': 'Frame differs depending on seek order.', 'format': 'feed', 't': 18.3}]}))
+    (review_job / 'qa.json').write_text(json.dumps({'summary': 'Nothing here blocks the render.', 'issues': []}))
+    html = client.get(f'/jobs/{JOB}').text
+    assert ('One more take before rendering' in html) == (not passed)
+    assert ('Write correction feedback' in html) == (not passed)
+    assert ('Nothing here blocks the render.' in html) == passed
+    if not passed:
+        assert 'class="info-box" aria-labelledby="review-checks-title"' in html
+        assert 'Describe what needs fixing in <a href="#feedback">Feedback</a>' in html
+        assert 'Choose <strong>Revise preview</strong>' in html
+        assert 'feed · 18.3 s' in html
+        assert 'value="approve" disabled' in html
+        assert 'id="feedback" name="feedback" required' not in html
+        captured = []
+        monkeypatch.setattr('app.web.main.enqueue', lambda jid, decision: captured.append(decision))
+        form = {**review_form(client), 'action': 'revise', 'feedback': 'Fix the seek-order error at 18.3 seconds.'}
+        assert client.post(f'/jobs/{JOB}/review', data=form, follow_redirects=False).status_code == 303
+        assert captured == [{'action': 'feedback', 'text': form['feedback']}]
+
+
+@pytest.mark.browser
+async def test_blocked_review_feedback_jump_and_mobile_layout(review_job, live_web, tmp_path):
+    from playwright.async_api import async_playwright, expect
+    jobs.job_state.return_value['values']['check']['ok'] = False
+    (review_job / 'check.json').write_text(json.dumps({'ok': False, 'issues': [
+        {'severity': 'error', 'code': 'nondeterministic', 'message': 'Frame differs depending on seek order.', 'format': 'feed', 't': 18.3}]}))
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        try:
+            page = await browser.new_page(viewport={'width': 1440, 'height': 1000})
+            for width, height in [(1440, 1000), (390, 844)]:
+                await page.set_viewport_size({'width': width, 'height': height})
+                await page.goto(f'{live_web}/jobs/{JOB}')
+                await expect(page.get_by_role('heading', name='One more take before rendering')).to_be_visible()
+                await page.get_by_role('link', name='Write correction feedback').click()
+                await expect(page.locator('#feedback')).to_be_focused()
+                await expect(page.get_by_role('button', name='Approve & render')).to_be_disabled()
+                assert await page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+                await page.screenshot(path=str(tmp_path / f'correction-feedback-{width}.png'), full_page=True)
+            jobs.job_state.return_value['values']['check']['ok'] = True
+            (review_job / 'check.json').write_text(json.dumps({'ok': True, 'issues': []}))
+            await page.reload()
+            await expect(page.locator('#review-checks-title')).to_have_count(0)
+            await expect(page.get_by_role('button', name='Approve & render')).to_be_enabled()
         finally:
             await browser.close()

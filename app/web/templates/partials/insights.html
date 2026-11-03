@@ -8,14 +8,16 @@
 <section class="discoveries" aria-label="Discoveries from your website">
   {% for card in insights|default([]) %}
   <article class="insight-card" id="{{ card.id }}" hx-preserve="true">
-    <p class="eyebrow">{{ card.label }}</p><h3>{{ card.title }}</h3>
+    <p class="eyebrow">{{ card.label }}</p><h3 id="{{ card.id }}-title">{{ card.title }}</h3>
     {% if card.description %}<p class="insight-description">{{ card.description }}</p>{% endif %}
     {% if card.colours %}<ul class="insight-colours">{% for colour in card.colours %}<li>
       <svg viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="8" fill="{{ colour.value }}"/></svg>
       <span>{{ colour.name }}</span>
     </li>{% endfor %}</ul>{% endif %}
-    {{ entries(card['items'][:3]) }}
-    {% if card['items']|length > 3 %}<details><summary>Read {{ card['items']|length - 3 }} more</summary>{{ entries(card['items'][3:]) }}</details>{% endif %}
+    {% if card['items'] %}
+    {% if card['items']|length > 3 %}<p class="insight-scroll-hint" id="{{ card.id }}-hint">Scroll to explore all {{ card['items']|length }} <span aria-hidden="true">↓</span></p>{% endif %}
+    <div class="insight-scroll" id="{{ card.id }}-items" role="region" tabindex="0" aria-labelledby="{{ card.id }}-title" {% if card['items']|length > 3 %}aria-describedby="{{ card.id }}-hint"{% endif %}>{{ entries(card['items']) }}</div>
+    {% endif %}
   </article>
   {% else %}
   <p class="insights-empty">The first discoveries will appear here as we read your website.</p>

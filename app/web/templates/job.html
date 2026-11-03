@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/info_box.html" import info_box %}
 {% block title %}{{ concept.title|default(job.url) }} · Kiehnema{% endblock %}
 {% block content %}
 <a class="back-link" href="/videos">← All videos</a>
@@ -22,6 +23,17 @@
   {% if job.status == 'review' %}
   <form id="review-form" action="/jobs/{{ job.id }}/review" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}">
     <input type="hidden" name="revision" value="{{ revision }}">
+  {% if not can_approve %}
+  {% call info_box("One more take before rendering", "review-checks-title") %}
+    <p>Automatic checks found technical issues. Ask for a correction before rendering your videos.</p>
+    <ol>
+      <li>Describe what needs fixing in <a href="#feedback">Feedback</a>. You can copy an issue from Review notes below.</li>
+      <li>Choose <strong>Revise preview</strong>. Kiehnema will revise the animation and run the checks again.</li>
+      <li>When <strong>Automatic checks passed</strong> appears, review both previews and choose <strong>Approve &amp; render</strong>.</li>
+    </ol>
+    <a class="button secondary" href="#feedback">Write correction feedback ↓</a>
+  {% endcall %}
+  {% endif %}
   <section class="card review-studio" aria-labelledby="studio-title">
     <div class="section-heading studio-heading"><div><p class="eyebrow">YOUR EDITING DESK</p><h2 id="studio-title">Fine-tune the details.</h2></div><span class="badge" id="edit-status" role="status">Preview up to date</span></div>
     <div class="studio-grid">
@@ -48,14 +60,14 @@
     </div>
     <div class="scene-plan-note"><p id="planned-duration"></p><p class="help">Scene edits are drafts. Choose Revise preview to apply them. Playback and comments use the current preview.</p><div id="planned-order" aria-label="Scene order after revision" hidden></div></div>
   </section>
-  <div class="review-health"><span class="badge {% if can_approve %}status-done{% else %}status-failed{% endif %}">{% if can_approve %}✓ Automatic checks passed{% else %}Checks need attention{% endif %}</span><details><summary>Review notes</summary><p>{{ qa.summary|default('No visual review is available.') }}</p>{% if job.history|selectattr('status', 'equalto', 'fix')|list %}<p class="help">Visual review notes refer to the initial review; later revisions are checked automatically for layout and readability.</p>{% endif %}<ul>{% for issue in check.get('issues', []) %}<li>{{ issue.message }}</li>{% endfor %}{% for issue in qa.get('issues', []) %}<li>{{ issue.scene_id }} · {{ issue.format }}: {{ issue.problem }}</li>{% endfor %}</ul></details></div>
+  <div class="review-health"><span class="badge {% if can_approve %}status-done{% else %}status-failed{% endif %}">{% if can_approve %}✓ Automatic checks passed{% else %}Rendering paused · correction needed{% endif %}</span><details {% if not can_approve %}open{% endif %}><summary>Review notes</summary>{% if check.get('issues') %}<h3>Automatic checks</h3><ul>{% for issue in check.get('issues', []) %}<li>{{ issue.message }}{% if issue.format %} · {{ issue.format }}{% endif %}{% if issue.t is defined %} · {{ issue.t }} s{% endif %}</li>{% endfor %}</ul>{% endif %}<h3>Visual review</h3>{% if can_approve %}<p>{{ qa.summary|default('No visual review is available.') }}</p>{% else %}<p class="help">Visual feedback is separate from the technical checks above. Rendering stays paused until the automatic checks pass.</p>{% endif %}{% if job.history|selectattr('status', 'equalto', 'fix')|list %}<p class="help">Visual review notes refer to the initial review; later revisions are checked automatically for layout and readability.</p>{% endif %}<ul>{% for issue in qa.get('issues', []) %}<li>{{ issue.scene_id }} · {{ issue.format }}: {{ issue.problem }}</li>{% endfor %}</ul></details></div>
   {% else %}
     <div class="section-heading scene-heading"><div><p class="eyebrow">THE STORY, FRAME BY FRAME</p><h2>The story & its sources</h2></div><span class="muted">{{ concept.scenes|length }} scenes</span></div>
     {% include "partials/scenes.html" %}
   {% endif %}
   {% if job.status == 'review' %}
-    <section class="card feedback-card"><div><p class="eyebrow">ONE MORE THING?</p><h2>Give it your direction.</h2><p class="muted">Ask for a stronger hook, a different pace or a visual adjustment. Scene edits, confirmed comments and feedback are applied together.</p></div><div><label for="feedback">Feedback <span class="optional">optional</span></label><textarea id="feedback" name="feedback" rows="4" maxlength="4000" placeholder="Make the opening bolder. Hold the last scene a little longer…">{{ feedback|default('') }}</textarea><p class="help">Revisions use the model and return here for another review.</p></div></section>
-    <div class="review-actions"><p>Happy with this version?<small>Apply scene edits, comments and feedback before approving.</small></p><div><button class="button secondary" type="submit" name="action" value="revise">Revise preview ↻</button><button class="button" type="submit" name="action" value="approve" {% if not can_approve %}disabled{% endif %}>Approve & render ↗</button></div></div>
+    <section class="card feedback-card"><div><p class="eyebrow">{{ 'ONE MORE THING?' if can_approve else 'YOUR NEXT TAKE' }}</p><h2>{{ 'Give it your direction.' if can_approve else 'Ask for a correction.' }}</h2><p class="muted">{% if can_approve %}Ask for a stronger hook, a different pace or a visual adjustment. Scene edits, confirmed comments and feedback are applied together.{% else %}Describe the technical issue from Review notes in Feedback, then choose Revise preview. Review the updated version once the checks pass.{% endif %}</p></div><div><label for="feedback">Feedback {% if can_approve %}<span class="optional">optional</span>{% endif %}</label><textarea id="feedback" name="feedback" rows="4" maxlength="4000" placeholder="{{ 'Make the opening bolder. Hold the last scene a little longer…' if can_approve else 'Please fix: [copy an issue from Review notes]. Keep the scenes and copy as they are.' }}">{{ feedback|default('') }}</textarea><p class="help">Revisions use the model and return here for another review.</p></div></section>
+    <div class="review-actions"><p>{{ 'Happy with this version?' if can_approve else 'Request a correction to continue.' }}<small>{{ 'Apply scene edits, comments and feedback before approving.' if can_approve else 'Describe the issue in Feedback, then choose Revise preview.' }}</small></p><div><button class="button secondary" type="submit" name="action" value="revise">Revise preview ↻</button><button class="button" type="submit" name="action" value="approve" {% if not can_approve %}disabled{% endif %}>Approve & render ↗</button></div></div>
   </form>
   </div>
   {% endif %}
