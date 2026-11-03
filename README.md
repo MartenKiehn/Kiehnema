@@ -2,7 +2,7 @@
 
 **Your website. Your brand. Your video.**
 
-Current version / Aktuelle Version: **0.1.2**
+Current version / Aktuelle Version: **0.1.3**
 
 [English](#english) · [Deutsch](#deutsch)
 

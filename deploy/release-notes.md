@@ -1,1 +1,1 @@
-Initial managed server release
+- Change your username without losing videos or settings. - Clearer instructions for fixing blocked video previews. - Scrollable facts and scenes with preserved scroll positions. - More reliable AI responses and clearer error messages.
