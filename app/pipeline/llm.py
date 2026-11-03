@@ -71,7 +71,11 @@ class ProviderLLM:
 
     async def structured(self, step, schema, msgs, *, effort, max_tokens):
         t0 = time.monotonic()
-        out = await asyncio.to_thread(client.structured, step, schema, msgs, self.usage, effort=effort, max_tokens=max_tokens)
+        try:
+            out = await asyncio.to_thread(client.structured, step, schema, msgs, self.usage, effort=effort, max_tokens=max_tokens)
+        except client.LLMError as exc:
+            self._log(step, time.monotonic() - t0, {"schema": schema.__name__, "error": type(exc).__name__})
+            raise
         self._log(step, time.monotonic() - t0, {"schema": schema.__name__})
         return out
 

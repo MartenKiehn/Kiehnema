@@ -235,7 +235,8 @@ async def run_background(job_id: str, decision: dict | None, capability):
         raise
     except Exception as exc:
         log.error("Job %s failed (%s); details are stored in the encrypted job", job_id, type(exc).__name__)
-        write_status(path, "failed", f"{type(exc).__name__}: {exc}")
+        if read_json(path / 'status.json').get('status') != 'failed':
+            write_status(path, "failed", f"{type(exc).__name__}: {exc}")
     finally:
         app.state.tasks.pop(job_id, None)
         with accounts.database() as con:

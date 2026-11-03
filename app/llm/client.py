@@ -13,8 +13,8 @@ from botocore.exceptions import ClientError
 from langchain_aws import ChatBedrockConverse
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import AIMessageChunk, BaseMessage
-from pydantic import BaseModel
+from langchain_core.messages import AIMessageChunk, BaseMessage, HumanMessage
+from pydantic import BaseModel, ValidationError
 
 from app.config import settings
 from app.llm.provider import require
@@ -189,22 +189,37 @@ def structured(
     max_tokens: int | None = None,
     cache: bool = True,
 ) -> T:
-    """Return a validated Pydantic object (function calling with tool_choice=auto)."""
+    """Request the schema tool explicitly; allow one correction of invalid output."""
     try:
         model = chat_model(effort, max_tokens).with_structured_output(schema, method="function_calling", include_raw=True)
         kwargs = {"cache_control": {"type": "ephemeral"}} if cache and require().provider == 'bedrock' else {}
-        result = model.invoke(list(messages), **kwargs)
     except LLMError:
         raise
     except Exception as exc:
         raise LLMError(f'AI request failed ({type(exc).__name__}). Check provider, model, credentials, permissions and quota.') from None
-    raw = result["raw"]
-    config = require()
-    usage.add(step, raw.usage_metadata, cost_known=config.provider == 'bedrock' and config.model == 'eu.anthropic.claude-opus-5-5')
-    _check_stop(step, raw.response_metadata.get('stopReason') or raw.response_metadata.get('stop_reason')
-                or raw.response_metadata.get('finish_reason'))
-    if raw.additional_kwargs.get('refusal'):
-        raise Refused(f'{step}: model declined the request')
-    if result.get("parsing_error") or result.get("parsed") is None:
-        raise LLMError(f"{step}: no valid {schema.__name__}")
-    return result["parsed"]
+    instruction = f'Return the result by calling the supplied {schema.__name__} tool. Do not return the result as plain text.'
+    for attempt in range(2):
+        try:
+            result = model.invoke([*messages, HumanMessage(instruction)], **kwargs)
+        except LLMError:
+            raise
+        except Exception as exc:
+            raise LLMError(f'AI request failed ({type(exc).__name__}). Check provider, model, credentials, permissions and quota.') from None
+        raw = result["raw"]
+        config = require()
+        usage.add(step, raw.usage_metadata, cost_known=config.provider == 'bedrock' and config.model == 'eu.anthropic.claude-opus-5-5')
+        _check_stop(step, raw.response_metadata.get('stopReason') or raw.response_metadata.get('stop_reason')
+                    or raw.response_metadata.get('finish_reason'))
+        if raw.additional_kwargs.get('refusal'):
+            raise Refused(f'{step}: model declined the request')
+        error = result.get('parsing_error')
+        if error is None and result.get('parsed') is not None:
+            return result['parsed']
+        if isinstance(error, ValidationError):
+            types = sorted({e['type'] for e in error.errors(include_input=False, include_context=False, include_url=False)})
+            detail = 'schema validation failed (' + ', '.join(types) + ')'
+        else:
+            detail = 'invalid schema tool arguments' if error or raw.tool_calls or raw.invalid_tool_calls else 'no schema tool call'
+        if attempt:
+            raise LLMError(f'{step}: no valid {schema.__name__} after 2 attempts: {detail}')
+        instruction += f' The previous attempt failed: {detail}. Generate a complete result matching the tool schema.'

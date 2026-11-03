@@ -596,3 +596,28 @@ def test_expired_video_poll_redirects_whole_page_instead_of_injecting_login(peop
         assert response.status_code == 401
         assert response.headers['HX-Redirect'] == '/login'
         assert '<html' not in response.text
+
+
+@pytest.mark.parametrize('worker_wrote_failure', [True, False])
+async def test_background_preserves_private_worker_failure(people, monkeypatch, worker_wrote_failure):
+    from app.web import main as web
+    from app.pipeline.status import write_status
+    jid = jobs.create_job('https://example.com', 30)
+    job = vault.get_job(jid)
+    path = vault.VaultPath(job)
+    detail = 'LLMError: concept: no valid Concept after 2 attempts: no schema tool call'
+    generic = 'RuntimeError: The secure worker failed. Check the private job activity.'
+    async def failed(job_id):
+        assert job_id == jid
+        if worker_wrote_failure:
+            write_status(path, 'failed', detail)
+        raise RuntimeError('The secure worker failed. Check the private job activity.')
+    monkeypatch.setattr(jobs, 'run_job', failed)
+    monkeypatch.setattr(app.state, 'worker_lock', asyncio.Lock(), raising=False)
+    monkeypatch.setattr(app.state, 'tasks', {}, raising=False)
+    await web.run_background(jid, None, job)
+    status = json.loads((path / 'status.json').read_text())
+    assert status['status'] == 'failed'
+    assert status['message'] == (detail if worker_wrote_failure else generic)
+    assert len([item for item in status['history'] if item['status'] == 'failed']) == 1
+    assert detail.encode() not in b''.join(p.read_bytes() for p in job.directory.iterdir())
