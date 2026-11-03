@@ -233,6 +233,24 @@ async def account_page(request: Request):
     return form(request, mode='account')
 
 
+@router.post('/account/username')
+async def username_change(request: Request):
+    values = await request.form()
+    name = str(values.get('username', ''))
+    uid = a.identity().id
+    try:
+        person = await asyncio.to_thread(a.authenticate, a.identity().username,
+            str(values.get('password', '')), str(values.get('code', '')))
+        if person.id != uid:
+            raise ValueError('Account changed. Reload the page and try again.')
+        a.change_username(person, name)
+    except ValueError as exc:
+        return form(request, mode='account', new_username=name, error=str(exc))
+    response = RedirectResponse('/account?username_changed=1', status_code=303)
+    set_cookie(response, request, cookie_name(request), a.new_session(person))
+    return response
+
+
 @router.get('/account/two-factor')
 async def two_factor_page(request: Request):
     if a.two_factor_enabled(a.identity()):

@@ -1054,6 +1054,35 @@ async def test_advanced_element_comment_stays_with_selection(review_job, monkeyp
 
 
 @pytest.mark.browser
+async def test_long_username_account_form_fits_mobile_and_desktop(review_job, live_web, tmp_path):
+    from playwright.async_api import async_playwright, expect
+    from app.security import accounts
+
+    person = accounts.identity()
+    name = 'w' * 64
+    accounts.change_username(person, name)
+    token = accounts.new_session(person)
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        try:
+            page = await browser.new_page(viewport={'width': 390, 'height': 844})
+            await page.context.add_cookies([{'name': 'kiehnema-local', 'value': token,
+                                            'domain': '127.0.0.1', 'path': '/', 'httpOnly': True, 'sameSite': 'Strict'}])
+            await page.goto(live_web + '/account?username_changed=1')
+            form = page.get_by_role('form', name='Change username', exact=True)
+            await expect(form.get_by_label('New username')).to_have_value(name)
+            await expect(form.get_by_label('Current password')).to_be_visible()
+            await expect(form.get_by_label('Authenticator code')).to_be_visible()
+            await expect(page.get_by_role('complementary', name='Your username is updated.')).to_be_visible()
+            for width, height, label in [(390, 844, 'mobile'), (1440, 1000, 'desktop')]:
+                await page.set_viewport_size({'width': width, 'height': height})
+                assert await page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+                await page.screenshot(path=str(tmp_path / f'account-username-{label}.png'), full_page=True)
+        finally:
+            await browser.close()
+
+
+@pytest.mark.browser
 async def test_provider_connection_survives_late_page_load_and_resets_on_history_restore(review_job, live_web, monkeypatch):
     from playwright.async_api import async_playwright, expect
     monkeypatch.setattr(settings, 'provider_setup_required', True)

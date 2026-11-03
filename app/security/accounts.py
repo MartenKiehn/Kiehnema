@@ -140,10 +140,11 @@ current_identity: ContextVar[Identity | None] = ContextVar("identity", default=N
 
 def refresh(person: Identity) -> Identity:
     with database() as con:
-        row = con.execute("""SELECT disabled,admin,
+        row = con.execute("""SELECT username,disabled,admin,
             id IN (SELECT user_id FROM invitation_managers) AS manager FROM users WHERE id=?""", (person.id,)).fetchone()
     if row is None or row['disabled']:
         raise PermissionError('Account unavailable.')
+    person.username = row['username']
     person.admin, person.manager = bool(row['admin']), bool(row['manager'])
     return person
 
@@ -395,6 +396,25 @@ def change_password(person: Identity, password: str) -> None:
         con.execute("UPDATE users SET password_hash=?,salt=?,wrapped_key=? WHERE id=?",
                     (kdf(secrets.token_bytes(16)).derive_phc_encoded(password), salt,
                      seal(kdf(salt).derive(password), person.key, f"password:{person.id}"), person.id))
+    revoke(person.id)
+
+
+def change_username(person: Identity, name: str) -> None:
+    name = username(name)
+    try:
+        with database() as con:
+            con.execute('BEGIN IMMEDIATE')
+            row = con.execute('SELECT username FROM users WHERE id=? AND disabled=0', (person.id,)).fetchone()
+            if row is None:
+                raise PermissionError('Account unavailable.')
+            if row['username'] == name:
+                raise ValueError('You are already using this username.')
+            if con.execute('SELECT 1 FROM invites WHERE username=? AND expires>?', (name, time.time())).fetchone():
+                raise ValueError('This username is reserved by a pending invitation.')
+            con.execute('UPDATE users SET username=? WHERE id=? AND disabled=0', (name, person.id))
+    except sqlite3.IntegrityError:
+        raise ValueError('This username already exists.') from None
+    person.username = name
     revoke(person.id)
 
 

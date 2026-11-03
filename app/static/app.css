@@ -14,8 +14,10 @@ button, a, input, textarea, summary { -webkit-tap-highlight-color: transparent; 
 .top { max-width: 1360px; margin: auto; padding: 23px 54px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; border-bottom: 3px double var(--line); }
 .wordmark { display: flex; align-items: center; gap: 11px; font-size: 19px; font-weight: 750; letter-spacing: -.7px; text-decoration: none; }
 .brand-icon { display: block; width: 44px; height: 44px; flex-shrink: 0; }
-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 30px; font-size: 1rem; }
+nav { display: flex; flex-wrap: wrap; align-items: center; gap: 30px; font-size: 1rem; max-width: 100%; }
 nav a { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
+.top nav a[href="/account"] { min-width: 0; max-width: 100%; }
+.account-username { min-width: 0; overflow-wrap: anywhere; }
 nav a[aria-current="page"] { font-weight: 600; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 7px; }
 nav a[aria-current="page"]::after { content: ""; width: 18px; height: 18px; flex-shrink: 0; background: url('/static/clapperboard.svg') center / contain no-repeat; }
 .backstage-navigation { margin-bottom: 32px; }

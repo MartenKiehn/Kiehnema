@@ -93,6 +93,9 @@ can also invite users and manage updates under **Backstage → Updates**. New ac
 each account gets its own password. Administrators can enable or disable two-factor
 authentication per user or require it for everyone, including administrators and future
 users. Affected users set up their own authenticator before accessing their workspace.
+Every user can change their sign-in name under **Your account → Change username** after
+confirming their password and, if enabled, an authenticator code. Videos stay with the account;
+other sessions are signed out.
 For automated deployments, supply the first administrator through the `MG_ADMIN_*`
 variables; see [unattended setup](docs/security.md#unattended-first-admin-setup).
 
@@ -270,6 +273,9 @@ Die **Regieassistenz** darf ebenfalls Nutzer einladen und unter **Backstage → 
 **Crew**. Nur der Regisseur aktiviert oder deaktiviert 2FA für andere Nutzer. Ein zusätzlicher Schalter
 verlangt 2FA für alle, einschließlich Administratoren und neuer Nutzer. Betroffene Nutzer
 richten ihren eigenen Authenticator ein, bevor sie weiterarbeiten können.
+Jeder Benutzer kann unter **Your account → Change username** seinen Anmeldenamen ändern,
+bestätigt mit Passwort und gegebenenfalls Authenticator-Code. Die Videos bleiben erhalten;
+andere Sitzungen werden abgemeldet.
 Für automatische Deployments kannst du das erste Administratorkonto über die
 `MG_ADMIN_*`-Variablen vorgeben; siehe [Setup ohne Terminal](docs/security.md#unattended-first-admin-setup).
 

@@ -24,7 +24,7 @@
       <a href="/" {% if path == '/' or (path == '/jobs' and request.method == 'POST') %}aria-current="page"{% endif %}>Director’s desk</a>
       <a href="/videos" {% if path == '/videos' or path.startswith('/jobs/') %}aria-current="page"{% endif %}>Your videos</a>
       {% if request.state.user.can_invite %}<a href="/admin" {% if path == '/admin' or path.startswith('/admin/') %}aria-current="page"{% endif %} data-update-link data-update-label="Backstage">Backstage</a>{% endif %}
-      <a href="/account" {% if path == '/account' or path.startswith('/account/') %}aria-current="page"{% endif %}>{{ request.state.user.username }}</a>
+      <a href="/account" {% if path == '/account' or path.startswith('/account/') %}aria-current="page"{% endif %}><span class="account-username">{{ request.state.user.username }}</span></a>
       <form action="/logout" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><button class="button small secondary" type="submit">Sign out</button></form>
       {% else %}<a href="/login" {% if path in ('/login', '/activate', '/recover') %}aria-current="page"{% endif %}>Sign in</a>{% endif %}
     </nav>

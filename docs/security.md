@@ -29,6 +29,16 @@ personal recovery key, preserves existing content and rotates the password, auth
 and recovery key. Without a password or recovery key, the old content cannot be recovered.
 An administrator has no decryption override.
 
+### Change your username
+
+Every role can change its own sign-in name under **Your account → Change username**.
+Confirm the current password and, if enabled, a fresh authenticator code. Names use the
+existing 3–64 character rules and are saved in lowercase. Existing account names and
+names reserved by unexpired invitations cannot be taken.
+The current browser receives a new session; other sessions and their preview links
+are signed out. Videos, roles, passwords, authenticators, recovery keys and running jobs
+stay attached to the same account ID. Use the new name for future sign-ins and recovery.
+
 ### Two-factor authentication
 
 In **Users**, an administrator can require 2FA for an individual user or turn on
