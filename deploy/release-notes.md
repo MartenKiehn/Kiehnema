@@ -1,1 +1,1 @@
-- Change your username without losing videos or settings. - Clearer instructions for fixing blocked video previews. - Scrollable facts and scenes with preserved scroll positions. - More reliable AI responses and clearer error messages.
+Added update notices to the homepage and redesigned the Updates page with clearer actions, release notes, and credential guidance.
