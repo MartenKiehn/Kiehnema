@@ -5,6 +5,6 @@
     {% if request.state.user.admin %}
     <a href="/admin/provider" {% if path.startswith('/admin/provider') %}aria-current="page"{% endif %}>AI provider</a>
     {% endif %}
-    <a href="/admin/updates" {% if path.startswith('/admin/updates') %}aria-current="page"{% endif %} data-update-link>Updates</a>
+    <a href="/admin/updates" {% if path.startswith('/admin/updates') %}aria-current="page"{% endif %}>Updates</a>
   </nav>
 </div>

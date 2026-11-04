@@ -1,46 +1,91 @@
 {% extends "base.html" %}
+{% from 'components/info_box.html' import info_box %}
 {% block title %}Updates · Kiehnema{% endblock %}
 {% block content %}
-<section class="card updates-card">
-  <p class="eyebrow">ADMINISTRATION</p>
-  <h1>Updates</h1>
-  <p>Installed version <strong>{{ version }}</strong></p>
+<section class="updates-page" aria-labelledby="updates-title">
+  <header class="updates-heading">
+    <div><h1 id="updates-title">Updates</h1><p class="muted">Keep your studio up to date.</p></div>
+    <dl class="updates-installed"><dt>Installed version</dt><dd>{{ version }}</dd></dl>
+  </header>
   {% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
   {% if not managed %}
+    {% call info_box('Set up updates once.', 'updates-setup-title') %}
     <p>Updates through this page require the managed Linux installation. An operator needs to set it up once; future application updates can then be installed here.</p>
+    {% endcall %}
   {% elif status %}
-    <p class="help">Last successful check: {{ checked }}. Updates are checked automatically about every six hours.</p>
-    {% if status.checking %}<p data-update-checking role="status">Checking for updates…</p>{% endif %}
-    {% if status.error %}<p class="notice error" role="alert">{{ status.error }}</p>{% endif %}
-    {% if status.operation.error %}<p class="notice error" role="alert">{{ status.operation.error }} Active version: {{ status.version }}.</p>{% endif %}
-    {% if status.busy %}
-      <div data-update-progress>
-        <h2>Updating Kiehnema</h2>
-        <p data-update-message role="status" aria-live="polite">{{ status.progress.message }}</p>
-        <progress data-update-bar aria-label="Update progress"></progress>
-        <p class="help">You can close this page. The update will continue.</p>
-        <a data-update-return class="button" href="/login" hidden>Sign in again</a>
+    <div class="updates-layout">
+      <section class="card updates-card" aria-labelledby="update-status-title">
+        {% if status.error %}<p class="notice error" role="alert">{{ status.error }}</p>{% endif %}
+        {% if status.operation.error %}<p class="notice error" role="alert">{{ status.operation.error }} Active version: {{ status.version }}.</p>{% endif %}
+        {% if status.busy %}
+          <p class="eyebrow">UPDATE IN PROGRESS</p>
+          <div data-update-progress>
+            <h2 id="update-status-title">Updating Kiehnema</h2>
+            <p data-update-message role="status" aria-live="polite">{{ status.progress.message }}</p>
+            <progress data-update-bar aria-label="Update progress"></progress>
+            <p class="help">You can close this page. The update will continue.</p>
+            <a data-update-return class="button" href="/login" hidden>Sign in again</a>
+          </div>
+          {% if status.operation.phase in ['queued', 'checking', 'downloading', 'draining'] %}
+            <form action="/admin/updates/cancel" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><button class="button secondary" type="submit">Cancel update</button></form>
+          {% endif %}
+        {% else %}
+          {% if status.available %}
+            <p class="eyebrow">UPDATE AVAILABLE</p>
+            <h2 id="update-status-title">Version {{ status.available[-1].version }}</h2>
+            <p class="muted">A new release is ready for your studio.</p>
+            <form action="/admin/updates/install" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><input type="hidden" name="version" value="{{ status.available[-1].version }}"><button class="button" type="submit" {% if status.error %}disabled{% endif %}>Install update <span aria-hidden="true">↗</span></button></form>
+            <p class="help">Everyone will need to sign in again after the update.</p>
+            <section class="updates-notes" aria-labelledby="release-notes-title">
+              <h3 id="release-notes-title">What’s new</h3>
+              {% for release in status.available %}<details class="release-notes" open><summary>Changes in {{ release.version }}</summary><p>{{ release.notes or 'No release notes provided.' }}</p></details>{% endfor %}
+            </section>
+          {% elif status.checking %}
+            <p class="eyebrow">RELEASE CHECK</p>
+            <h2 id="update-status-title">Looking for a new release</h2>
+          {% elif status.error %}
+            <p class="eyebrow">RELEASE CHECK</p>
+            <h2 id="update-status-title">Update check needs attention</h2>
+            <p class="muted">Your installed version can keep running. Try checking again.</p>
+          {% elif not status.checked_at %}
+            <p class="eyebrow">RELEASE CHECK</p>
+            <h2 id="update-status-title">Check for a new release</h2>
+            <p class="muted">Check for a newer compatible version of Kiehnema.</p>
+          {% else %}
+            <p class="eyebrow">UP TO DATE</p>
+            <h2 id="update-status-title">You’re on the latest release.</h2>
+            <p class="muted">No newer compatible release is available.</p>
+          {% endif %}
+          <div class="updates-check">
+            <div><p class="help">Last successful check<br><strong>{{ checked }}</strong></p><p class="help">Automatic checks about every six hours.</p></div>
+            <form action="/admin/updates/check" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><button class="button small secondary" type="submit">Check for updates</button></form>
+          </div>
+        {% endif %}
+        {% if status.checking %}<p class="help" data-update-checking role="status">Checking for updates…</p>{% endif %}
+      </section>
+      <div class="updates-sidebar">
+        {% call info_box('Before you update', 'update-process-title') %}
+        <ol class="process-list">
+          <li><span aria-hidden="true">01</span><div><b>Finish the current work</b><p>Kiehnema waits for running jobs to finish.</p></div></li>
+          <li><span aria-hidden="true">02</span><div><b>Back up, then update</b><p>A backup is saved before installation. Kiehnema checks that the new version starts correctly.</p></div></li>
+          <li><span aria-hidden="true">03</span><div><b>Sign in again</b><p>Everyone will need to unlock their workspace after the update.</p></div></li>
+        </ol>
+        {% endcall %}
       </div>
-      {% if status.operation.phase in ['queued', 'checking', 'downloading', 'draining'] %}
-        <form action="/admin/updates/cancel" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><button class="button secondary" type="submit">Cancel update</button></form>
-      {% endif %}
-    {% else %}
-      {% if status.available %}
-        <h2>Version {{ status.available[-1].version }} is available</h2>
-        {% for release in status.available %}<details class="release-notes" open><summary>Changes in {{ release.version }}</summary><p>{{ release.notes or 'No release notes provided.' }}</p></details>{% endfor %}
-        <p>Current work will finish first. Kiehnema will save a backup, install the update and check that it starts correctly. Everyone will need to sign in again.</p>
-        <form action="/admin/updates/install" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><input type="hidden" name="version" value="{{ status.available[-1].version }}"><button class="button" type="submit" {% if status.error %}disabled{% endif %}>Install update</button></form>
-      {% elif not status.error %}<p>No newer compatible release is available.</p>{% endif %}
-      <form action="/admin/updates/check" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><button class="button secondary" type="submit">Check for updates</button></form>
-      {% if request.state.user.admin %}<details class="release-notes"><summary>Update access</summary>
-        <p>Use the GitHub credentials with read access to releases and container packages supplied for this installation. Existing credentials are never displayed.</p>
+    </div>
+    {% if request.state.user.admin and not status.busy %}
+      <details class="card updates-access"><summary>Update credentials <span class="optional">Usually no changes needed</span></summary>
+        <p>Updates from a public GitHub repository and public container packages work without credentials. Only private repositories or container packages require a GitHub username and a token with read access. Saved credentials are reused automatically.</p>
+        <p class="help">Only a Regisseur can manage these credentials. Existing credentials are never displayed.</p>
         <form action="/admin/updates/credentials" method="post">
           <input type="hidden" name="csrf" value="{{ request.state.csrf }}">
-          <label for="update-username">Registry username</label><input id="update-username" name="username" autocomplete="off" maxlength="256" required>
-          <label for="update-token">Access token</label><input id="update-token" name="token" type="password" autocomplete="new-password" maxlength="8192" required>
+          <div class="field-row">
+            <div><label for="update-username">Registry username</label><input id="update-username" name="username" autocomplete="off" maxlength="256" required></div>
+            <div><label for="update-token">Access token</label><input id="update-token" name="token" type="password" autocomplete="new-password" maxlength="8192" required></div>
+          </div>
           <button class="button secondary" type="submit">Check and save access</button>
         </form>
-      </details>{% endif %}
+      </details>
     {% endif %}
   {% endif %}
 </section>

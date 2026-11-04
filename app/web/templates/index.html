@@ -1,11 +1,22 @@
 {% extends "base.html" %}
+{% from 'components/info_box.html' import info_box %}
 {% block title %}Director’s desk · Kiehnema{% endblock %}
 {% block content %}
+<div class="desk-overview">
 <section class="intro">
   <p class="eyebrow">FROM WEBSITE TO THE FINAL CUT</p>
   <h1>Your brand.<br>A little more <em>motion.</em></h1>
   <p class="lede">Turn your website into a short, on-brand video.<br>Shape the story. Review the details. Make it yours.</p>
 </section>
+{% if request.state.user.can_invite %}
+<div class="desk-update" data-update-notice hidden role="status" aria-live="polite">
+  {% call info_box('Update available', 'desk-update-title') %}
+  <p class="muted" data-update-description></p>
+  <a class="button small secondary" href="/admin/updates" data-update-action>Review update <span aria-hidden="true">↗</span></a>
+  {% endcall %}
+</div>
+{% endif %}
+</div>
 <div class="create-grid">
   <section class="card new-job{% if provider_missing %} is-locked{% endif %}" aria-labelledby="new-title">
     <div class="section-heading"><h2 id="new-title">New video</h2><span class="badge">01 / THE BRIEF</span></div>
