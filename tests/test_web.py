@@ -1326,7 +1326,7 @@ async def test_directors_desk_and_video_library_navigation(review_job, live_web,
         await page.reload()
         await expect(page.get_by_role('navigation', name='Main navigation').get_by_role(
             'link', name='Backstage · Update available', exact=True)).to_be_visible()
-        await expect(tabs.get_by_role('link', name='Update available', exact=True)).to_have_attribute(
+        await expect(tabs.get_by_role('link', name='Updates', exact=True)).to_have_attribute(
             'href', '/admin/updates')
         await page.get_by_role('link', name='Your videos', exact=True).click()
         await page.screenshot(path=str(tmp_path / 'video-library-mobile.png'), full_page=True)
