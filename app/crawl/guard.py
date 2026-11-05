@@ -104,4 +104,5 @@ class UrlGuard:
         exempt = host in self.allow_hosts or (parts.scheme, host, port) == self.local_origin
         if not addresses or (not exempt and not all(_is_public(ip) for ip in addresses)):
             raise BlockedURL('Destination is not public')
-        return addresses[0], host
+        # Dual-stack sites must also work on deployments without an IPv6 route.
+        return min(addresses, key=lambda address: ipaddress.ip_address(address).version), host

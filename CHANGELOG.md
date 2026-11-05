@@ -4,6 +4,10 @@ User-facing changes, newest version first. Each version has a `## MAJOR.MINOR.PA
 heading followed by plain-text `- Change.` bullets. Release notes are taken from
 this file. Versions newer than the installed version are not shown in the app.
 
+## 0.1.8
+
+- Fixed website scanning on IPv4-only servers when a website also advertises IPv6.
+
 ## 0.1.7
 
 - Updated image processing, AI workflow and connection libraries for reliability and security.

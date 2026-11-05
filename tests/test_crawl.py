@@ -43,6 +43,23 @@ def test_guard_allows_public_hosts():
     assert guard.check("https://www.example.com/a?b=1") == "https://www.example.com/a?b=1"
 
 
+@pytest.mark.parametrize('addresses,expected', [
+    (['2606:2800:220:1::1', '93.184.216.34'], '93.184.216.34'),
+    (['93.184.216.34', '2606:2800:220:1::1'], '93.184.216.34'),
+    (['2606:2800:220:1::1'], '2606:2800:220:1::1'),
+])
+def test_pinned_destination_prefers_ipv4_when_available(addresses, expected):
+    guard = UrlGuard(resolver=lambda host, port: addresses)
+    assert guard.pinned('https://example.com/') == (expected, 'example.com')
+
+
+@pytest.mark.parametrize('private', ['10.0.0.1', '::1'])
+def test_pinned_destination_rejects_mixed_public_and_private_answers(private):
+    guard = UrlGuard(resolver=lambda host, port: ['93.184.216.34', '2606:2800:220:1::1', private])
+    with pytest.raises(BlockedURL):
+        guard.pinned('https://example.com/')
+
+
 @pytest.mark.parametrize("site", ["http://127.0.0.1:8000", "http://localhost:8000", "http://[::1]:8000"])
 def test_local_site_guard_is_scoped_to_origin(site):
     guard = UrlGuard.for_site(site)
