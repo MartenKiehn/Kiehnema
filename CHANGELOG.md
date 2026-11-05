@@ -6,6 +6,8 @@ this file. Versions newer than the installed version are not shown in the app.
 
 ## 0.1.9
 
+- Manage your username, password and two-factor authentication on a clearer account page with improved desktop and mobile layouts and a visible two-factor status.
+- Run Kiehnema on Linux with RAM-only ZRAM enabled. Disk-backed swap and swap configurations that cannot be verified remain blocked.
 - Prevented a temporary internal lock from showing a false failure message during a successful update.
 
 ## 0.1.8
