@@ -8,14 +8,14 @@ this file. Versions newer than the installed version are not shown in the app.
 
 - View the update history from What’s new in the footer, available to everyone in the workspace.
 - Enjoy a calmer AI provider page with a compact configuration summary and collapsible settings.
+- Use consistent English role names throughout the interface: Director and Assistant director.
 - Release notes now come from this change log, and releases stop early if their version has no entry.
 
 ## 0.1.5
 
-- Use consistent English role names throughout the interface: Director and Assistant director.
-- Maintenance release for the update interface.
+- See available updates directly on the Director’s desk.
+- Find update actions, release notes and credential guidance more easily on the redesigned Updates page.
 
 ## 0.1.4
 
-- See available updates directly on the Director’s desk.
-- Find update actions, release notes and credential guidance more easily on the redesigned Updates page.
+- This version was not published. Its changes were released in 0.1.5.
