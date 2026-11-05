@@ -29,7 +29,9 @@ Use pytest and pytest-asyncio; name files `test_*.py` and functions `test_*`. Re
 
 ## Commit & Pull Request Guidelines
 
-For requested branch pushes, use `python3 scripts/push.py` to push the current branch to both GitLab and GitHub. Check its exit status and report partial failures; never force-push to resolve divergence. The script does not push release tags.
+Before every commit, pull the latest changes from **both GitHub and GitLab**: fetch both repositories, inspect their branch tips, and integrate any new commits from both copies of the current branch. Do not rely on `origin` alone; it currently points only to GitLab. Use the repository URLs in `scripts/push.py`. This includes version commits created by GitHub Actions. For a new branch that does not exist remotely yet, synchronize its base branch from both repositories first. Preserve uncommitted work, prefer fast-forward updates, and merge divergent published histories without rewriting them. Resolve conflicts and run relevant checks before committing; if either repository cannot be checked, stop and report the failed synchronization.
+
+For requested branch pushes, use `python3 scripts/push.py` to push the current branch to both GitLab and GitHub. This also mirrors incorporated GitHub CI commits to GitLab. Check its exit status and report partial failures; never force-push to resolve divergence. If a remote advances after the pre-commit synchronization, fetch and integrate its new commits, then rerun the script until both repositories contain the final branch commit. The script does not push release tags.
 
 Recent commits mostly use `feat:` and `chore:` prefixes with imperative summaries. Follow that pattern. PRs should explain the behavior change, include validation commands/results, link relevant issues, and provide screenshots for UI changes.
 

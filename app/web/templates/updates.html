@@ -76,7 +76,7 @@
     {% if request.state.user.admin and not status.busy %}
       <details class="card updates-access"><summary>Update credentials <span class="optional">Usually no changes needed</span></summary>
         <p>Updates from a public GitHub repository and public container packages work without credentials. Only private repositories or container packages require a GitHub username and a token with read access. Saved credentials are reused automatically.</p>
-        <p class="help">Only a Regisseur can manage these credentials. Existing credentials are never displayed.</p>
+        <p class="help">Only a Director can manage these credentials. Existing credentials are never displayed.</p>
         <form action="/admin/updates/credentials" method="post">
           <input type="hidden" name="csrf" value="{{ request.state.csrf }}">
           <div class="field-row">

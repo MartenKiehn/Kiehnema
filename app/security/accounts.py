@@ -23,7 +23,7 @@ from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
 
 from app.config import settings
 
-ROLE_LABELS = {'admin': 'Regisseur', 'manager': 'Regieassistenz', 'user': 'Crew'}
+ROLE_LABELS = {'admin': 'Director', 'manager': 'Assistant director', 'user': 'Crew'}
 
 
 def seal(key: bytes, value: bytes, context: str) -> bytes:

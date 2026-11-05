@@ -88,7 +88,7 @@ uv run python -m app
 
 On the first start, create the administrator account in the terminal: choose a username,
 a password of 15–256 characters. Two-factor authentication is initially optional. Keep the personal recovery
-key outside the server. Under **Backstage → Users**, a **Regisseur** assigns roles; a **Regieassistenz**
+key outside the server. Under **Backstage → Users**, a **Director** assigns roles; an **Assistant director**
 can also invite users and manage updates under **Backstage → Updates**. New accounts join as **Crew**;
 each account gets its own password. Administrators can enable or disable two-factor
 authentication per user or require it for everyone, including administrators and future
@@ -268,9 +268,9 @@ uv run python -m app
 
 Beim ersten Start legst du im Terminal das Administratorkonto an: Benutzername, Passwort
 mit 15–256 Zeichen. Zwei-Faktor-Authentifizierung ist zunächst optional. Bewahre den persönlichen
-Wiederherstellungsschlüssel außerhalb des Servers auf. Unter **Backstage → Users** vergibt der **Regisseur** Rollen und verwaltet die Sicherheit.
-Die **Regieassistenz** darf ebenfalls Nutzer einladen und unter **Backstage → Updates** Updates verwalten; neue Konten starten als
-**Crew**. Nur der Regisseur aktiviert oder deaktiviert 2FA für andere Nutzer. Ein zusätzlicher Schalter
+Wiederherstellungsschlüssel außerhalb des Servers auf. Unter **Backstage → Users** vergibt der **Director** Rollen und verwaltet die Sicherheit.
+Die Rolle **Assistant director** darf ebenfalls Nutzer einladen und unter **Backstage → Updates** Updates verwalten; neue Konten starten als
+**Crew**. Nur der Director aktiviert oder deaktiviert 2FA für andere Nutzer. Ein zusätzlicher Schalter
 verlangt 2FA für alle, einschließlich Administratoren und neuer Nutzer. Betroffene Nutzer
 richten ihren eigenen Authenticator ein, bevor sie weiterarbeiten können.
 Jeder Benutzer kann unter **Your account → Change username** seinen Anmeldenamen ändern,

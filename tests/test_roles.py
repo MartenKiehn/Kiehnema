@@ -12,12 +12,12 @@ from test_security import people, headers, PASSWORD, ORIGIN
 
 def test_existing_accounts_keep_roles_and_keys(people):
     admin, member, *_ = people
-    assert a.refresh(admin).role_label == 'Regisseur'
+    assert a.refresh(admin).role_label == 'Director'
     assert a.refresh(member).role_label == 'Crew'
     assert not member.can_invite
     original_key = member.key
     a.set_role(admin, member.id, 'manager')
-    assert a.refresh(member).role_label == 'Regieassistenz'
+    assert a.refresh(member).role_label == 'Assistant director'
     assert member.can_invite and not member.admin and member.key == original_key
     a.set_role(admin, member.id, 'admin')
     assert a.refresh(member).admin
@@ -32,7 +32,7 @@ def test_manager_can_invite_only_crew_and_cannot_manage_accounts(people):
         credentials = headers(manager)
         page = web.get('/admin', headers=credentials)
         assert page.status_code == 200
-        assert 'Regieassistenz' in page.text and 'Roles &amp; permissions' in page.text
+        assert 'Assistant director' in page.text and 'Roles &amp; permissions' in page.text
         assert 'action="/admin/role"' not in page.text
         assert 'action="/admin/two-factor-policy"' not in page.text
         assert 'href="/admin/provider"' not in page.text

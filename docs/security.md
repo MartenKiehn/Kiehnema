@@ -245,16 +245,16 @@ images, tool calling and streaming; availability, output limits and charges depe
 
 ## Team roles
 
-The three roles use film titles: **Regisseur**, **Regieassistenz** and
-**Crew**. Every role creates and accesses only its own videos. A Regisseur
+The three roles use film titles: **Director**, **Assistant director** and
+**Crew**. Every role creates and accesses only its own videos. A Director
 controls roles, account access, two-factor policies, AI provider settings and updates.
-Regieassistenz has the same workspace rights as Crew plus permission to invite Crew users,
+An Assistant director has the same workspace rights as Crew plus permission to invite Crew users,
 view the team directory, and check, install or cancel updates. It cannot change roles,
 disable accounts, change security or AI settings, or manage update credentials.
 Invitation forms cannot grant elevated roles.
 
-Only a Regisseur can change other users’ roles under **Users → Security & access**.
-Under **Backstage → Users → Security & access**, a Regisseur can permanently delete
+Only a Director can change other users’ roles under **Users → Security & access**.
+Under **Backstage → Users → Security & access**, a Director can permanently delete
 another account after disabling it. The confirmation page requires the exact username.
 Deletion removes the account, its sessions and all owned encrypted jobs, previews,
 feedback and renders from the active instance; other users' workspaces and provider
@@ -266,4 +266,4 @@ Changing a role signs out that user without removing their videos. An administra
 change their own role, preventing accidental removal of the last active administrator.
 Roles are stored in the account database, refreshed when sessions are used, and preserved
 through password changes, recovery and normal updates. Existing administrators retain
-admin rights; existing members remain Crew. The team list is grouped by role (Regisseur, Regieassistenz, Crew), then sorted alphabetically by username within each role.
+admin rights; existing members remain Crew. The team list is grouped by role (Director, Assistant director, Crew), then sorted alphabetically by username within each role.

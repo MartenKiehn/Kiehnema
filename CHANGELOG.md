@@ -12,6 +12,7 @@ this file. Versions newer than the installed version are not shown in the app.
 
 ## 0.1.5
 
+- Use consistent English role names throughout the interface: Director and Assistant director.
 - Maintenance release for the update interface.
 
 ## 0.1.4

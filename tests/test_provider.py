@@ -408,7 +408,7 @@ def test_missing_provider_locks_entire_brief_and_only_admin_gets_setup_link(peop
         page = web.get('/', headers=credentials)
         assert page.status_code == 200
         assert 'class="provider-lock"' in page.text and 'AI provider required' in page.text
-        assert 'Only a Regisseur can configure the AI provider.' in page.text
+        assert 'Only a Director can configure the AI provider.' in page.text
         assert 'disabled aria-describedby="provider-lock-message"' in page.text
         assert ('href="/admin/provider"' in page.text) == (role == 'admin')
         # Direct POSTs remain blocked and their error page must keep the full form locked.

@@ -1,9 +1,9 @@
 # Linux-Installation und Updates
 
 Kiehnema prüft ungefähr alle sechs Stunden mit zufälligem Zeitversatz auf neue stabile
-GitHub-Releases. Regisseur und Regieassistenz sehen einen Hinweis und können unter
+GitHub-Releases. Director und Assistant director sehen einen Hinweis und können unter
 **Backstage → Updates** nach Updates suchen, sie installieren oder abbrechen.
-Nur der Regisseur verwaltet die Update-Zugangsdaten.
+Nur der Director verwaltet die Update-Zugangsdaten.
 Ein Release wird erst nach Tests, Image-Build und Signatur angeboten. Eine Änderung der
 Versionsnummer allein veröffentlicht noch kein Update.
 
