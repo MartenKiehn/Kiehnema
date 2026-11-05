@@ -237,6 +237,8 @@ def create_app(updater):
                             except Exception as exc:
                                 updater.record_check_error(exc)
                                 next_check = time.time() + random.uniform(300, 600)
+                except BlockingIOError:
+                    pass  # Another updater action holds the lock; retry on the next tick.
                 except Exception as exc:
                     updater.record_check_error(exc)
                 try:

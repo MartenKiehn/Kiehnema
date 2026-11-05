@@ -235,3 +235,45 @@ def test_public_status_distinguishes_recovery_from_terminal_transition(installat
     atomic_json(service.root / 'job.json', {'phase': 'failed', 'needs_repair': True})
     service.publish('failed')
     assert read_json(service.public / 'status.json')['needs_repair']
+
+
+@pytest.mark.parametrize(('method', 'lock'), [
+    ('recover_idle', 'command.lock'),
+    ('recover_idle', 'operation.lock'),
+    ('ensure_runner', 'runner-start.lock'),
+])
+def test_supervisor_retries_lock_contention_without_reporting_failure(installation, monkeypatch, method, lock):
+    import threading
+    from contextlib import ExitStack
+    from fastapi.testclient import TestClient
+    from app.updates.service import create_app
+    from app.updates.state import file_lock
+
+    service, _ = installation
+    if method == 'ensure_runner':
+        service.install('0.2.0')
+        original_inspect = service.docker.inspect
+        monkeypatch.setattr(service.docker, 'inspect', lambda role:
+                            {'State': {'Running': True}} if role == 'runner' else original_inspect(role))
+    monkeypatch.setattr(service, 'check', lambda: None)
+    contended, retried = threading.Event(), threading.Event()
+    original = getattr(service, method)
+
+    def attempt():
+        try:
+            original()
+        except BlockingIOError:
+            contended.set()
+            raise
+        else:
+            retried.set()
+
+    monkeypatch.setattr(service, method, attempt)
+    with ExitStack() as locks:
+        locks.enter_context(file_lock(service.root / lock))
+        with TestClient(create_app(service)):
+            assert contended.wait(5)
+            assert service.status()['error'] is None
+            locks.close()
+            assert retried.wait(5)
+            assert service.status()['error'] is None
