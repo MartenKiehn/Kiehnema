@@ -1216,6 +1216,8 @@ async def test_admin_provider_form_switching_and_secret_preservation(review_job,
         await page.goto(live_web + '/admin/provider')
         await expect(summary).to_be_visible()
         await expect(summary.get_by_role('status')).not_to_contain_text('Settings saved')
+        await expect(page.get_by_label('Provider', exact=True)).to_be_hidden()
+        await page.locator('summary', has_text='Edit provider settings').click()
         await page.get_by_label('Provider', exact=True).select_option('anthropic')
         await expect(summary).to_contain_text('OpenAI')
         await page.get_by_label('Provider', exact=True).select_option('openai')
@@ -1224,6 +1226,7 @@ async def test_admin_provider_form_switching_and_secret_preservation(review_job,
         await page.get_by_role('button', name='Save AI settings').click()
         await expect(summary.get_by_role('status')).to_contain_text('Settings saved')
         assert provider.load().api_key.get_secret_value() == 'synthetic-browser-key'
+        await page.locator('summary', has_text='Edit provider settings').click()
         await page.get_by_label('Provider', exact=True).select_option('bedrock')
         await page.get_by_label('AWS authentication').select_option('environment')
         await expect(page.get_by_label('AWS access key ID')).to_be_hidden()

@@ -6,6 +6,8 @@ import re
 import subprocess
 import tomllib
 
+from app.changelog import release_notes
+
 
 def version(value):
     if not re.fullmatch(r'(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})', value):
@@ -23,16 +25,14 @@ def main():
             or env.get('GITHUB_REF_PROTECTED') != 'true'):
         raise ValueError('Prepare releases only by manually running the workflow on protected main.')
     requested = env['RELEASE_VERSION']
-    notes = env['RELEASE_NOTES'].strip()
     project = Path('pyproject.toml')
     current = tomllib.loads(project.read_text())['project']['version']
     if version(requested) < version(current):
         raise ValueError('Release version must not be lower than the version on main.')
-    if not notes or len(notes) > 16000:
-        raise ValueError('Release notes must contain 1–16000 characters.')
+    release_notes(requested, Path('CHANGELOG.md'))
     print(f'Current project version: {current}; requested release version: {requested}.', flush=True)
     with Path(env['GITHUB_STEP_SUMMARY']).open('a') as summary:
-        summary.write(f'## Release preparation\n\nCurrent version: **{current}** → requested version: **{requested}**\n')
+        summary.write(f'## Release preparation\n\nCurrent version: **{current}** → requested version: **{requested}**\n\nRelease notes: `CHANGELOG.md`, entry `{requested}`.\n')
     tag = 'v' + requested
     commit = env['GITHUB_SHA']
     if (git('rev-parse', 'HEAD') != commit or git('status', '--porcelain')
@@ -50,11 +50,10 @@ def main():
         raise ValueError('Expected exactly one current-version display in README.md.')
     project.write_text(updated)
     readme.write_text(description)
-    Path('deploy/release-notes.md').write_text(notes + '\n')
     subprocess.run(['uv', 'lock'], check=True)
     git('config', 'user.name', 'github-actions[bot]')
     git('config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com')
-    git('add', '--', 'pyproject.toml', 'uv.lock', 'deploy/release-notes.md', 'README.md')
+    git('add', '--', 'pyproject.toml', 'uv.lock', 'README.md')
     git('commit', '--allow-empty', '-m', 'chore: prepare release ' + tag)
     git('tag', '-a', tag, '-m', 'Release ' + requested)
     prepared = git('rev-parse', 'HEAD')

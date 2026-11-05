@@ -3,6 +3,7 @@
 !app/**
 !pyproject.toml
 !uv.lock
+!CHANGELOG.md
 !deploy/
 !deploy/**
 !tests/

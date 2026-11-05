@@ -10,10 +10,6 @@ on:
         description: 'New version (MAJOR.MINOR.PATCH, no v). Current version is shown at the top of README.'
         required: true
         type: string
-      notes:
-        description: 'Release notes'
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -23,8 +19,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changelog:
+    name: Check update log
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.13'
+      - name: Require an update log entry for the target version
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            python -m app.changelog --version "$RELEASE_VERSION"
+          elif [ "$GITHUB_REF_TYPE" = tag ]; then
+            python -m app.changelog --version "${GITHUB_REF_NAME#v}"
+          else
+            python -m app.changelog
+          fi
+
   prepare:
     name: Prepare release on main
+    needs: changelog
     if: github.repository == 'MartenKiehn/Kiehnema' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -41,17 +61,16 @@ jobs:
           python-version: '3.13'
       - name: Install the lockfile tool
         run: python -m pip install uv==0.12.1
-      - name: Commit version and notes, then create the tag
+      - name: Commit version, then create the tag
         id: prepare
         env:
           RELEASE_VERSION: ${{ inputs.version }}
-          RELEASE_NOTES: ${{ inputs.notes }}
         run: python -m scripts.prepare_release
 
   test:
     name: Test (${{ matrix.arch }})
-    needs: prepare
-    if: ${{ !cancelled() && (needs.prepare.result == 'success' || (needs.prepare.result == 'skipped' && github.event_name == 'push')) }}
+    needs: [changelog, prepare]
+    if: ${{ !cancelled() && needs.changelog.result == 'success' && (needs.prepare.result == 'success' || (needs.prepare.result == 'skipped' && github.event_name == 'push')) }}
     strategy:
       fail-fast: false
       matrix:
@@ -140,4 +159,4 @@ jobs:
           trap 'rm -f "$KIEHNEMA_SIGNING_KEY"' EXIT
           printf '%s' "$KIEHNEMA_SIGNING_KEY_PEM" > "$KIEHNEMA_SIGNING_KEY"
           unset KIEHNEMA_SIGNING_KEY_PEM
-          uv run --no-sync python -m scripts.release publish --app-metadata app-image.json --gateway-metadata gateway-image.json --notes deploy/release-notes.md
+          uv run --no-sync python -m scripts.release publish --app-metadata app-image.json --gateway-metadata gateway-image.json

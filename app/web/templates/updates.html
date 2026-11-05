@@ -4,7 +4,7 @@
 {% block content %}
 <section class="updates-page" aria-labelledby="updates-title">
   <header class="updates-heading">
-    <div><h1 id="updates-title">Updates</h1><p class="muted">Keep your studio up to date.</p></div>
+    <div><h1 id="updates-title">Updates</h1><p class="muted">Keep your studio up to date. <a href="/changelog">View update log ↗</a></p></div>
     <dl class="updates-installed"><dt>Installed version</dt><dd>{{ version }}</dd></dl>
   </header>
   {% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}

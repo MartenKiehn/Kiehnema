@@ -233,7 +233,7 @@ def test_saved_provider_summary_uses_stored_settings_and_hides_credentials(peopl
             summary = page.text.split('<aside class="info-box"', 1)[1].split('</aside>', 1)[0]
             assert 'Your AI setup is saved.' in summary and config.model in summary
             assert '64,000 tokens' in summary
-            assert 'Test the connection again before saving any changes.' in summary
+            assert 'Running jobs keep their current settings.' in summary
             assert ('Settings saved.' in summary) == path.endswith('?saved=1')
             for field in provider.SECRET_FIELDS:
                 value = getattr(config, field).get_secret_value()
@@ -248,6 +248,23 @@ def test_saved_provider_summary_uses_stored_settings_and_hides_credentials(peopl
         summary = page.text.split('<aside class="info-box"', 1)[1].split('</aside>', 1)[0]
         assert config.model in summary and 'unsaved-model' not in summary
         assert 'Settings saved.' not in summary
+
+
+def test_provider_editor_opens_for_setup_and_errors_but_collapses_saved_settings(people, isolated):
+    with TestClient(app, base_url=ORIGIN) as web:
+        credentials = headers(people[0])
+        page = web.get('/admin/provider', headers=credentials)
+        assert '<details class="card provider-settings" open>' in page.text
+        provider.save(configuration())
+        page = web.get('/admin/provider', headers=credentials)
+        assert '<details class="card provider-settings">' in page.text
+        assert '<summary>Edit provider settings</summary>' in page.text
+        for values, status in [({'max_output_tokens': 'invalid'}, 422), ({'max_output_tokens': '64000'}, 409)]:
+            page = web.post('/admin/provider', headers=credentials, data={
+                'provider': 'openai', 'model': 'unsaved-model', **values})
+            assert page.status_code == status
+            assert '<details class="card provider-settings" open>' in page.text
+            assert 'role="alert"' in page.text and 'unsaved-model' in page.text
 
 
 def test_unreadable_provider_cannot_show_save_confirmation(people, isolated, monkeypatch):

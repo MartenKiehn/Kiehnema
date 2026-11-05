@@ -42,12 +42,14 @@ def publication(tmp_path, monkeypatch):
     monkeypatch.setattr(release.httpx, 'Client', lambda **kwargs: client(transport=httpx.MockTransport(respond), **kwargs))
     for name, digest in [('app', 'b'), ('gateway', 'c')]:
         (tmp_path / f'{name}.json').write_text(json.dumps({'containerimage.digest': 'sha256:' + digest * 64}))
-    (tmp_path / 'notes.md').write_text('Release test')
+    (tmp_path / 'CHANGELOG.md').write_text(f'# Changelog\n\n## {release.VERSION}\n\n- Release test with `code` and $(literal).\n')
+    notes_source = release.release_notes
+    monkeypatch.setattr(release, 'release_notes', lambda version, path: notes_source(version, tmp_path / path))
     return tmp_path, state, requests
 
 
 def publish(root):
-    release.publish(root / 'app.json', root / 'gateway.json', root / 'notes.md')
+    release.publish(root / 'app.json', root / 'gateway.json')
 
 
 def test_github_release_is_published_only_after_signed_asset_upload(publication):
@@ -58,9 +60,25 @@ def test_github_release_is_published_only_after_signed_asset_upload(publication)
     manifest = verify(requests[3].content, json.loads((root / 'keys.json').read_text()), 'ghcr.io/team/app')
     assert manifest.commit == 'a' * 40
     assert manifest.published_at == '2026-01-01T00:00:00Z'
+    expected_notes = '- Release test with `code` and $(literal).'
+    assert manifest.notes == expected_notes
+    assert json.loads(requests[2].content)['body'] == expected_notes
     assert requests[4].url.params['name'] == 'install.sh'
     assert b'PRIVATE KEY' not in requests[4].content
     assert json.loads(requests[5].content) == {'draft': False}
+
+
+@pytest.mark.parametrize('changelog', [
+    '# Changelog\n\n## 99.0.0\n\n- Another version.\n',
+    f'# Changelog\n\n## {release.VERSION}\n\n',
+    f'# Changelog\n\n## {release.VERSION}\n\n- One.\n\n## {release.VERSION}\n\n- Duplicate.\n',
+])
+def test_missing_or_invalid_log_prevents_any_publication_request(publication, changelog):
+    root, _, requests = publication
+    (root / 'CHANGELOG.md').write_text(changelog)
+    with pytest.raises(ValueError, match='CHANGELOG.md'):
+        publish(root)
+    assert requests == []
 
 
 @pytest.mark.parametrize('failure', ['upload_status', 'installer_status'])

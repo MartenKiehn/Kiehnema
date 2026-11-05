@@ -8,6 +8,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project && playwright install --with-deps chromium && rm -rf /var/lib/apt/lists/* /root/.cache
 RUN useradd --uid 1000 --create-home kiehnema
 COPY app ./app
+COPY CHANGELOG.md ./CHANGELOG.md
 COPY deploy ./deploy
 COPY docs/harness-contract.md ./docs/harness-contract.md
 COPY examples ./examples

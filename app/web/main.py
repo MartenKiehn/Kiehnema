@@ -23,6 +23,7 @@ from pydantic import AnyHttpUrl, BaseModel, Field, ValidationError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.crawl.guard import UrlGuard
+from app.changelog import read_entries
 from app.llm import provider
 from app.pipeline import jobs
 from app.pipeline.schemas import SceneChange
@@ -283,6 +284,14 @@ async def index(request: Request):
 @app.get("/videos", response_class=HTMLResponse)
 async def video_library(request: Request):
     return templates.TemplateResponse(request, "videos.html", {"jobs": all_jobs()})
+
+
+@app.get('/changelog', response_class=HTMLResponse)
+async def changelog(request: Request):
+    installed = tuple(map(int, VERSION.split('.')))
+    entries = [entry for entry in read_entries()
+               if tuple(map(int, entry['version'].split('.'))) <= installed]
+    return templates.TemplateResponse(request, 'changelog.html', {'entries': entries, 'version': VERSION})
 
 
 @app.get("/jobs", response_class=HTMLResponse)

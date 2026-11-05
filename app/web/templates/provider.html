@@ -7,12 +7,11 @@
   <header class="provider-page-heading">
   <p class="eyebrow">INSTANCE SETTINGS</p>
   <h1>AI provider</h1>
-  <p class="lede">Choose the provider and model used by everyone on this server. Your provider bills usage to your account.</p>
+  <p class="lede">Manage the AI provider and model used by everyone on this server.</p>
   </header>
   {% if configured %}
   {% call info_box('Your AI setup is saved.', 'provider-status-title') %}
   <div class="provider-summary">
-    <p role="status">{% if saved %}<strong>Settings saved.</strong> {% endif %}An AI provider is configured for everyone on this server.</p>
     <dl>
       <div><dt>Provider</dt><dd>{{ provider_names[configured.provider] }}</dd></div>
       <div><dt>Authentication</dt><dd>{% if configured.provider == 'bedrock' %}{{ 'Server IAM role / AWS configuration' if configured.auth == 'environment' else 'Encrypted AWS credentials' }}{% else %}Encrypted API key{% endif %}</dd></div>
@@ -20,59 +19,84 @@
       <div><dt>Output limit per request</dt><dd>{{ '{:,}'.format(configured.max_output_tokens) }} tokens</dd></div>
       {% if configured.provider == 'bedrock' %}<div><dt>AWS region</dt><dd>{{ configured.region }}</dd></div>{% endif %}
     </dl>
-    <p class="provider-summary-note">New jobs and resumed work use these settings. Running jobs keep their current settings. Test the connection again before saving any changes.</p>
+    <p class="provider-summary-note" role="status">{% if saved %}<strong>Settings saved.</strong> {% endif %}New jobs and resumed work use these settings. Running jobs keep their current settings.</p>
   </div>
   {% endcall %}
   {% endif %}
-<section class="card auth-card">
-  <h2>Provider settings</h2>
+<details class="card provider-settings"{% if not configured or error %} open{% endif %}>
+  <summary>{{ 'Edit provider settings' if configured else 'Provider settings' }}</summary>
   {% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
   <form action="/admin/provider" method="post" data-provider-form data-saved-provider="{{ configured.provider if configured else '' }}" data-saved-auth="{{ configured.auth if configured else '' }}" data-credentials-saved="{{ 'true' if configured and configured.credentials_saved else 'false' }}">
     <input type="hidden" name="csrf" value="{{ request.state.csrf }}">
+    <fieldset class="provider-fieldset">
+    <legend>Model &amp; usage</legend>
+    <div class="provider-field">
     <label for="ai-provider">Provider</label>
     <select id="ai-provider" name="provider">
       {% for value, label in provider_names.items() %}
       <option value="{{ value }}" {% if values.get('provider', 'bedrock') == value %}selected{% endif %}>{{ label }}</option>
       {% endfor %}
     </select>
+    </div>
+    <div class="provider-field">
     <label for="ai-model">Model / inference profile ID</label>
     <input id="ai-model" name="model" value="{{ values.get('model', '') }}" required maxlength="300" autocomplete="off" aria-describedby="model-help">
-    <p id="model-help" class="help">Use a model available to your account that supports images, tool calling and streaming. Availability and output limits depend on the provider and model.</p>
+    <p id="model-help" class="help">Requires image support, tool calling and streaming, and access through your provider account.</p>
+    </div>
+    <div class="provider-field">
     <label for="ai-output-limit">Maximum output tokens per request</label>
-    <input id="ai-output-limit" name="max_output_tokens" type="number" min="1024" max="128000" value="{{ values.get('max_output_tokens', 64000) }}" required>
-    <p class="help">Match your model’s limit. Long video compositions may need a large output budget.</p>
-    <div data-provider-fields="bedrock">
+    <input id="ai-output-limit" name="max_output_tokens" type="number" min="1024" max="128000" value="{{ values.get('max_output_tokens', 64000) }}" required aria-describedby="output-limit-help">
+    <p id="output-limit-help" class="help">Match your model’s limit. Long video compositions may need a large output budget.</p>
+    </div>
+    </fieldset>
+    <fieldset class="provider-fieldset">
+    <legend>Connection &amp; credentials</legend>
+    <div class="provider-fields" data-provider-fields="bedrock">
+      <div class="provider-field-row">
+      <div class="provider-field">
       <label for="ai-region">AWS region</label>
       <input id="ai-region" name="region" value="{{ values.get('region', 'eu-central-1') }}" maxlength="64">
+      </div>
+      <div class="provider-field">
       <label for="ai-auth">AWS authentication</label>
       <select id="ai-auth" name="auth">
         <option value="keys" {% if values.get('auth', 'keys') == 'keys' %}selected{% endif %}>Access key and secret key</option>
-        <option value="environment" {% if values.get('auth') == 'environment' %}selected{% endif %}>Server IAM role / existing AWS configuration</option>
+        <option value="environment" {% if values.get('auth') == 'environment' %}selected{% endif %}>Server IAM role / AWS configuration</option>
       </select>
+      </div>
+      </div>
       <p class="help">An IAM role is optional. On EC2, use IMDSv2 and response hop limit 2 for containers. AWS keys also work on other hosting providers.</p>
-      <div data-aws-keys>
+      <div class="provider-fields" data-aws-keys>
+        <div class="provider-field">
         <label for="ai-access-key">AWS access key ID</label>
         <input id="ai-access-key" name="access_key" type="text" autocomplete="off" spellcheck="false" autocapitalize="none" maxlength="8192">
+        </div>
+        <div class="provider-field">
         <label for="ai-secret-key">AWS secret access key</label>
         <input id="ai-secret-key" name="secret_key" type="password" autocomplete="new-password" maxlength="8192">
+        </div>
+        <div class="provider-field">
         <label for="ai-session-token">AWS session token <span class="optional">optional</span></label>
         <input id="ai-session-token" name="session_token" type="password" autocomplete="new-password" maxlength="8192">
+        </div>
       </div>
     </div>
     <div data-provider-fields="api">
       <label for="ai-api-key">API key</label>
       <input id="ai-api-key" name="api_key" type="password" autocomplete="new-password" maxlength="8192">
     </div>
-    {% if values.get('credentials_saved') %}<p class="help">Credentials are saved. Their values are never displayed.</p>{% endif %}
-    <p class="help">Leave all credential fields empty to keep the saved credentials for the same provider and authentication method. To replace credentials, enter the complete set, including any required session token.</p>
+    <p class="help">{% if configured and configured.credentials_saved %}Credentials are saved and never displayed. {% endif %}Leave all credential fields empty to reuse saved credentials for the same provider and authentication method. To replace them, enter the complete set, including any required session token.</p>
+    </fieldset>
+    <div class="provider-form-footer">
+    <p class="help">The connection test sends a short request billed by your provider. Changes take effect only after you click Save AI settings.</p>
     <div class="provider-actions">
       <button class="button secondary" type="button" data-provider-test>Test connection</button>
       <button class="button" type="submit" data-provider-save hidden disabled>Save AI settings</button>
     </div>
     <p class="help provider-test-status" data-provider-test-status role="status" aria-live="polite"></p>
-    <p class="help">Test connection sends a short request to the selected model and may incur a small model charge. Settings are saved only after you click Save AI settings. Changing any field requires a new test.</p>
+    </div>
   </form>
-</section>
+</details>
 </div>
 {% endblock %}
 {% block scripts %}<script src="/static/provider.js" defer></script>{% endblock %}

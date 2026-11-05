@@ -17,8 +17,7 @@ def repository(tmp_path, monkeypatch):
     (root / 'pyproject.toml').write_text('[project]\nname = "example"\nversion = "0.1.0"\n')
     (root / 'uv.lock').write_text('old lock\n')
     (root / 'README.md').write_text('# Example\n\nCurrent version / Aktuelle Version: **0.1.0**\n')
-    (root / 'deploy').mkdir()
-    (root / 'deploy/release-notes.md').write_text('Old notes\n')
+    (root / 'CHANGELOG.md').write_text('# Changelog\n\n## 0.2.0\n\n- New release with `code` and $(literal).\n\n## 0.1.0\n\n- First release.\n')
     prepare_release.git('add', '.')
     prepare_release.git('commit', '-qm', 'Initial')
     prepare_release.git('push', '-q', 'origin', 'main')
@@ -27,7 +26,7 @@ def repository(tmp_path, monkeypatch):
         'GITHUB_EVENT_NAME': 'workflow_dispatch', 'GITHUB_REF': 'refs/heads/main',
         'GITHUB_REF_PROTECTED': 'true', 'GITHUB_SHA': sha,
         'GITHUB_OUTPUT': str(tmp_path / 'outputs'), 'GITHUB_STEP_SUMMARY': str(tmp_path / 'summary'),
-        'RELEASE_VERSION': '0.2.0', 'RELEASE_NOTES': 'New release\n\nText with `code` and $(literal).',
+        'RELEASE_VERSION': '0.2.0',
     }.items():
         monkeypatch.setenv(name, value)
     original_run = subprocess.run
@@ -42,8 +41,9 @@ def repository(tmp_path, monkeypatch):
     return root, remote, sha
 
 
-def test_prepares_commit_tag_notes_lock_and_current_version_display(repository):
+def test_prepares_commit_tag_lock_and_current_version_display_without_changing_log(repository):
     root, _, before = repository
+    changelog = (root / 'CHANGELOG.md').read_text()
     prepare_release.main()
     after = prepare_release.git('rev-parse', 'HEAD')
     assert after != before
@@ -52,7 +52,8 @@ def test_prepares_commit_tag_notes_lock_and_current_version_display(repository):
     assert tomllib.loads((root / 'pyproject.toml').read_text())['project']['version'] == '0.2.0'
     assert 'Current version / Aktuelle Version: **0.2.0**' in (root / 'README.md').read_text()
     assert (root / 'uv.lock').read_text() == 'new lock for 0.2.0'
-    assert (root / 'deploy/release-notes.md').read_text() == 'New release\n\nText with `code` and $(literal).\n'
+    assert (root / 'CHANGELOG.md').read_text() == changelog
+    assert not (root / 'deploy/release-notes.md').exists()
     assert (root.parent / 'outputs').read_text() == f'commit={after}\ntag=v0.2.0\n'
     assert '**0.1.0** → requested version: **0.2.0**' in (root.parent / 'summary').read_text()
     assert prepare_release.git('status', '--porcelain') == ''
@@ -62,7 +63,7 @@ def test_prepares_commit_tag_notes_lock_and_current_version_display(repository):
     ('GITHUB_EVENT_NAME', 'push'), ('GITHUB_REF', 'refs/heads/feature/example'),
     ('GITHUB_REF_PROTECTED', 'false'), ('RELEASE_VERSION', '0.0.9'),
     ('RELEASE_VERSION', 'v0.2.0'), ('RELEASE_VERSION', '0.2.0;echo injected'),
-    ('RELEASE_NOTES', ''), ('RELEASE_NOTES', 'x' * 16001), ('GITHUB_SHA', 'a' * 40),
+    ('GITHUB_SHA', 'a' * 40),
 ])
 def test_rejects_invalid_preparation_without_changing_git(repository, monkeypatch, name, value):
     root, _, before = repository
@@ -71,6 +72,26 @@ def test_rejects_invalid_preparation_without_changing_git(repository, monkeypatc
         prepare_release.main()
     assert prepare_release.git('rev-parse', 'HEAD') == before
     assert prepare_release.git('status', '--porcelain') == ''
+    assert not (root.parent / 'outputs').exists()
+
+
+@pytest.mark.parametrize('changelog', [
+    '# Changelog\n\n## 0.1.0\n\n- Older release.\n',
+    '# Changelog\n\n## 0.2.0\n\n',
+    '# Changelog\n\n## 0.2.0\n\n- One.\n\n## 0.2.0\n\n- Duplicate.\n',
+    '# Changelog\n\n## 0.2.0\n\n- ' + 'x' * 16001,
+])
+def test_missing_or_invalid_release_log_prevents_version_and_tag_changes(repository, changelog):
+    root, _, before = repository
+    (root / 'CHANGELOG.md').write_text(changelog)
+    status = prepare_release.git('status', '--porcelain')
+    with pytest.raises(ValueError, match='CHANGELOG.md'):
+        prepare_release.main()
+    assert prepare_release.git('rev-parse', 'HEAD') == before
+    assert prepare_release.git('status', '--porcelain') == status
+    assert tomllib.loads((root / 'pyproject.toml').read_text())['project']['version'] == '0.1.0'
+    assert (root / 'uv.lock').read_text() == 'old lock\n'
+    assert prepare_release.git('ls-remote', 'origin', 'refs/tags/v0.2.0') == ''
     assert not (root.parent / 'outputs').exists()
 
 

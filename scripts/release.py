@@ -12,6 +12,7 @@ import httpx
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
+from app.changelog import release_notes
 from app.updates import DATA_SCHEMA, VERSION
 from app.updates.manifest import Release, verify
 
@@ -79,7 +80,8 @@ def installer(envelope, keys, repository):
     return (root / 'install.sh').read_text().replace('# RELEASE_PAYLOAD', payload).encode()
 
 
-def publish(app_metadata, gateway_metadata, notes):
+def publish(app_metadata, gateway_metadata):
+    notes = release_notes(VERSION, Path('CHANGELOG.md'))
     project, commit = release_context()
     env = os.environ
     repo = 'ghcr.io/' + env['GITHUB_REPOSITORY'].lower()
@@ -87,7 +89,7 @@ def publish(app_metadata, gateway_metadata, notes):
     gateway_image = repo + '/gateway@' + json.loads(gateway_metadata.read_text())['containerimage.digest']
     policy = json.loads(Path('deploy/release.json').read_text())
     manifest = Release(**policy, version=VERSION, data_schema=DATA_SCHEMA, commit=commit['sha'],
-                       published_at=commit['commit']['committer']['date'], notes=notes.read_text(),
+                       published_at=commit['commit']['committer']['date'], notes=notes,
                        images={'app': app_image, 'updater': app_image, 'gateway': gateway_image})
     key = serialization.load_pem_private_key(Path(env['KIEHNEMA_SIGNING_KEY']).read_bytes(), password=None)
     if not isinstance(key, Ed25519PrivateKey):
@@ -129,15 +131,15 @@ def main():
     release = commands.add_parser('publish')
     release.add_argument('--app-metadata', required=True, type=Path)
     release.add_argument('--gateway-metadata', required=True, type=Path)
-    release.add_argument('--notes', required=True, type=Path)
     args = parser.parse_args()
     if args.command == 'keygen':
         create_keys(args.private, args.public, args.key_id)
     elif args.command == 'check':
+        release_notes(VERSION, Path('CHANGELOG.md'))
         release_context()
         print('Protected release source and matching tested commit verified.')
     else:
-        publish(args.app_metadata, args.gateway_metadata, args.notes)
+        publish(args.app_metadata, args.gateway_metadata)
 
 
 if __name__ == '__main__':

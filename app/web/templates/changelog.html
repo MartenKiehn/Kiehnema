@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}What’s new · Kiehnema{% endblock %}
+{% block content %}
+<section class="changelog-page" aria-labelledby="changelog-title">
+  <header class="updates-heading">
+    <h1 id="changelog-title">What’s new</h1>
+    <dl class="updates-installed"><dt>Installed version</dt><dd>{{ version }}</dd></dl>
+  </header>
+  <div class="card changelog-list">
+    {% for entry in entries %}
+    <article class="changelog-entry" aria-labelledby="release-{{ entry.version }}">
+      <header><h2 id="release-{{ entry.version }}">{{ entry.version }}</h2>{% if entry.version == version %}<span class="badge">Installed</span>{% endif %}</header>
+      <ul>{% for change in entry.changes %}<li>{{ change }}</li>{% endfor %}</ul>
+    </article>
+    {% else %}<p class="muted">No change log entries are available for this version.</p>{% endfor %}
+  </div>
+</section>
+{% endblock %}

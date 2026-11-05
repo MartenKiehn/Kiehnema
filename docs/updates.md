@@ -292,13 +292,43 @@ lediglich eine lokale, authentifizierte Steuerverbindung.
 
 ## Neue Version veröffentlichen
 
+### Zentrales Update-Log
+
+`CHANGELOG.md` ist die gemeinsame Quelle für das Update-Log in der App, die GitHub-
+Release Notes und die Hinweise im signierten Update-Manifest. Angemeldete Nutzer finden
+das Log über **What's new** im Footer. Einträge neuerer, noch nicht installierter Versionen
+werden dort nicht als bereits verfügbare Funktionen angezeigt.
+
+Vor einem Release einen Eintrag mit der exakten stabilen Versionsnummer ohne `v`
+anlegen, die Änderungen als einfache Markdown-Aufzählung beschreiben und committen:
+
+```markdown
+## 0.2.0
+
+- Neue Funktion für Nutzer.
+- Korrektur eines bestehenden Problems.
+```
+
+Jede Version darf genau einmal vorkommen und benötigt mindestens einen nicht leeren
+Aufzählungspunkt. Die Release Notes dürfen höchstens 16.000 Zeichen lang sein. Die CI
+prüft dieses Log als Erstes: bei einem manuellen Release die eingegebene Version,
+bei einem Tag-Push dessen Version und bei einem normalen `main`-Push die aktuelle
+Projektversion. Fehlt der Eintrag oder ist er ungültig, bricht sie mit einem Hinweis auf
+`CHANGELOG.md` ab, bevor Tests, Versions-Commit, Tag oder Image-Builds starten.
+
+Lokal prüfen: `python -m app.changelog --version 0.2.0`. Ohne `--version` wird die aktuelle
+Projektversion geprüft. Es gibt keine zusätzliche Release-Notes-Datei und kein Notes-
+Eingabefeld mehr im Workflow.
+
 ### Über GitHub Actions
 
 1. Die aktuelle **Projektversion** steht ganz oben in der README; Quelle ist
    `pyproject.toml`. Der manuelle Release-Workflow aktualisiert beide zusammen. Die
    Projektversion ist nicht zwingend schon veröffentlicht, etwa nach fehlgeschlagenen Tests.
-2. **Actions → CI → Run workflow**, Branch **main**, öffnen. Unter `version` die gewünschte
-   stabile Version ohne `v` eingeben, beispielsweise `0.2.0`; unter `notes` die Release Notes.
+2. Den passenden Eintrag in `CHANGELOG.md` anlegen und nach `main` pushen. Dann
+   **Actions → CI → Run workflow**, Branch **main**, öffnen. Unter `version` die gewünschte
+   stabile Version ohne `v` eingeben, beispielsweise `0.2.0`. Die Release Notes kommen
+   automatisch aus genau diesem Log-Eintrag.
    Versionen kleiner als die aktuelle Projektversion und vorhandene Tags werden abgelehnt.
    Für den ersten Release darf die vorhandene Projektversion verwendet werden, solange ihr
    Tag noch nicht existiert. Auch `deploy/release.json` muss vorab zum Release passen.
@@ -306,7 +336,7 @@ lediglich eine lokale, authentifizierte Steuerverbindung.
    zeigt in den Logs und der Lauf-Zusammenfassung **aktuelle Version → gewünschte Version**.
    GitHub kann die Version aus `pyproject.toml` nicht dynamisch in den Eingabedialog laden;
    dessen Beschreibung verweist deshalb auf die Anzeige in der README.
-4. Der Workflow ändert Version, README-Anzeige und Release Notes, führt `uv lock` aus,
+4. Der Workflow ändert Version und README-Anzeige, führt `uv lock` aus,
    erstellt einen Release-Commit auf `main` und einen annotierten `vVERSION`-Tag. Beide
    Referenzen werden gemeinsam atomar nach GitHub gepusht. Hat jemand inzwischen `main`
    geändert, wird der Push abgelehnt, ohne nur eine der beiden Referenzen zu veröffentlichen.
@@ -331,8 +361,9 @@ Anhänge und Packages voraus; private Auslieferung benötigt eine gesonderte Aut
 ### Alternativ: Version lokal vorbereiten und Tag pushen
 
 1. Version in `pyproject.toml` und die Anzeige oben in `README.md` auf eine neue stabile
-   `MAJOR.MINOR.PATCH` erhöhen und `uv lock` ausführen. Änderungen in
-   `deploy/release-notes.md` beschreiben.
+   `MAJOR.MINOR.PATCH` erhöhen und `uv lock` ausführen. Änderungen unter der passenden
+   Versionsüberschrift in `CHANGELOG.md` beschreiben und mit `python -m app.changelog`
+   prüfen.
 2. `deploy/release.json` prüfen: älteste unterstützte App-/Updater-Version,
    Ausgangs-Datenschemata und Plattformen müssen tatsächlich getestet sein.
 3. Tests und Upgradeprobe durchführen, Änderungen committen und mit
