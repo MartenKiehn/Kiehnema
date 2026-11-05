@@ -459,6 +459,54 @@ main:has(#review-workspace) { max-width: 1360px; padding-top: 28px; }
 .auth-card { max-width: 640px; margin: 40px auto; }
 .auth-card h1 { font-size: clamp(2rem, 5vw, 3rem); }
 .auth-card form { display: grid; gap: 12px; margin: 24px 0; }
+.account-page { max-width: 1080px; margin: 12px auto; }
+.account-heading { display: flex; justify-content: space-between; align-items: center; gap: 32px; margin-bottom: 36px; }
+.account-heading > div { min-width: 0; }
+.account-heading .eyebrow { color: var(--muted); font-size: .6875rem; }
+.account-heading h1 { font-size: clamp(38px, 4.8vw, 56px); margin: 0 0 14px; }
+.account-profile { display: flex; align-items: center; gap: 14px; max-width: 36%; }
+.account-profile > div { min-width: 0; }
+.account-profile strong { display: block; font-size: .9375rem; line-height: 1.5; }
+.account-monogram { display: grid; place-items: center; width: 50px; height: 54px; flex-shrink: 0; background: #eae3d5; border: 1px solid #d8cdb8; border-radius: 5px; color: #75572f; font: italic 30px/1 Georgia, serif; }
+.account-role { display: block; margin-top: 4px; color: var(--muted); font: .6875rem/1.5 var(--mono); letter-spacing: .06em; }
+.account-settings { background: var(--white); border: 1px solid var(--line); border-radius: 6px; }
+.account-setting { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.85fr); gap: 44px; padding: 32px; }
+.account-setting + .account-setting { border-top: 1px solid var(--line); }
+.account-setting > * { min-width: 0; }
+.account-setting-heading .eyebrow { font-size: .625rem; color: var(--muted); letter-spacing: .12em; margin-bottom: 12px; }
+.account-setting-heading h2 { font-size: 23px; line-height: 1.25; margin-bottom: 12px; }
+.account-setting-heading > p:last-child { font-size: .875rem; line-height: 1.7; color: var(--muted); margin: 0; max-width: 30ch; }
+.account-form { display: grid; gap: 14px; margin: 0; align-content: start; }
+.account-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.account-fields > div { min-width: 0; }
+.account-form label { font-size: .8125rem; }
+.account-form input { min-height: 46px; }
+.account-form .help { margin: 0; font-size: .8125rem; }
+.account-actions { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 6px; }
+.account-actions .help { max-width: 24ch; }
+.account-page .button { font-size: .8125rem; padding: 11px 17px; max-width: 100%; }
+.account-actions .button { flex-shrink: 0; }
+.account-security { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
+.account-security > p { color: var(--muted); font-size: .875rem; margin: 0; max-width: 58ch; }
+.account-status { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 20px; padding: 3px 10px; font-size: .75rem; color: var(--muted); background: var(--paper); }
+.account-status > span { width: 5px; height: 5px; border-radius: 50%; background: #94723e; }
+.account-status.is-enabled { color: #405136; background: #edf1e8; border-color: #d7e0cc; }
+.account-status.is-enabled > span { background: #405136; }
+@media (max-width: 850px) {
+  .account-setting { gap: 28px; padding: 28px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); }
+  .account-fields { grid-template-columns: 1fr; gap: 16px; }
+  .account-actions { flex-wrap: wrap; }
+}
+@media (max-width: 600px) {
+  .account-page { margin-top: 0; }
+  .account-heading { align-items: flex-start; flex-direction: column; gap: 22px; margin-bottom: 26px; }
+  .account-profile { max-width: 100%; }
+  .account-monogram { width: 40px; height: 44px; font-size: 25px; }
+  .account-setting { grid-template-columns: 1fr; gap: 24px; padding: 24px 20px; }
+  .account-setting-heading > p:last-child { max-width: none; }
+  .account-actions { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .account-actions .help { max-width: none; }
+}
 .recovery-key { overflow-wrap: anywhere; padding: 16px; border: 1px solid currentColor; }
 .top nav form { margin: 0; }
 

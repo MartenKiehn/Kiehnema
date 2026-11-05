@@ -2,6 +2,7 @@
 
 import os
 import plistlib
+import re
 import resource
 import subprocess
 import sys
@@ -14,12 +15,36 @@ runtime_root: ContextVar[Path | None] = ContextVar("runtime_root", default=None)
 publisher: ContextVar[object | None] = ContextVar("publisher", default=None)
 
 
+def _linux_swap_is_ram_only() -> bool:
+    """Verify every active swap device, including host swap visible in containers."""
+    try:
+        lines = Path('/proc/swaps').read_text().splitlines()
+        if not lines or lines[0].split() != ['Filename', 'Type', 'Size', 'Used', 'Priority']:
+            return False
+        for line in lines[1:]:
+            fields = line.split()
+            if len(fields) != 5 or fields[1] != 'partition':
+                return False
+            device = re.fullmatch(r'/dev/(zram[0-9]+)', fields[0])
+            if device is None:
+                return False
+            # Use the kernel's virtual-device metadata: /dev/zramN need not be
+            # exposed inside Docker. ZRAM with writeback is not RAM-only.
+            backing = Path('/sys/devices/virtual/block') / device[1] / 'backing_dev'
+            if backing.read_text().strip() != 'none':
+                return False
+    except (OSError, UnicodeError):
+        return False
+    return True
+
+
 def memory_policy() -> None:
     """Unlocked keys must not leak through core dumps or unencrypted swap."""
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
     if sys.platform == 'linux':
-        if len(Path('/proc/swaps').read_text().splitlines()) > 1:
-            raise ValueError('Disable swap on the service host before unlocking user keys.')
+        if not _linux_swap_is_ram_only():
+            raise ValueError('Disable disk-backed or unverifiable swap on the service host before unlocking user keys. '
+                             'Only ZRAM with readable backing_dev=none is allowed.')
     elif sys.platform == 'darwin':
         output = subprocess.run(['/usr/sbin/sysctl', '-n', 'vm.swapusage'], capture_output=True, text=True, check=True).stdout
         if '(encrypted)' not in output:

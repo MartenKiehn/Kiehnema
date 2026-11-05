@@ -1,0 +1,73 @@
+{% from 'components/info_box.html' import info_box %}
+<header class="account-heading">
+  <div>
+    <p class="eyebrow">YOUR WORKSPACE</p>
+    <h1>Your <em>account</em></h1>
+    <p class="lede">Manage your sign-in details and account security.</p>
+  </div>
+  <div class="account-profile">
+    <span class="account-monogram" aria-hidden="true">{{ request.state.user.username[0]|upper }}</span>
+    <div><strong class="account-username">{{ request.state.user.username }}</strong><span class="account-role">{{ request.state.user.role_label }}</span></div>
+  </div>
+</header>
+
+{% if request.query_params.get('username_changed') == '1' %}
+{% call info_box('Your username is updated.', 'username-updated-title') %}
+<p role="status">Sign in as <strong class="account-username">{{ request.state.user.username }}</strong> from now on. Your other sessions have been signed out.</p>
+{% endcall %}
+{% endif %}
+
+<div class="account-settings">
+  <section class="account-setting" aria-labelledby="account-username-title">
+    <div class="account-setting-heading">
+      <p class="eyebrow" aria-hidden="true">01 / PROFILE</p>
+      <h2 id="account-username-title">Change username</h2>
+      <p>Choose how you sign in. Your videos, password and authenticator stay the same.</p>
+    </div>
+    <form class="account-form" action="/account/username" method="post" aria-label="Change username">
+      <input type="hidden" name="csrf" value="{{ request.state.csrf }}">
+      <div class="account-fields">
+        <div><label for="new-username">New username</label><input id="new-username" name="username" value="{{ new_username|default(request.state.user.username) }}" required minlength="3" maxlength="64" autocomplete="username" autocapitalize="none" spellcheck="false" aria-describedby="username-help"></div>
+        <div><label for="username-password">Current password</label><input id="username-password" name="password" type="password" required autocomplete="current-password" maxlength="256"></div>
+      </div>
+      <p id="username-help" class="help">3–64 characters: letters, numbers, dots, underscores or hyphens. Saved in lowercase.</p>
+      {% if totp_enabled %}<div><label for="username-code">Authenticator code</label><input id="username-code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code"></div>{% endif %}
+      <div class="account-actions"><p class="help">Signs out your other sessions.</p><button class="button" type="submit">Change username</button></div>
+    </form>
+  </section>
+
+  <section class="account-setting" aria-labelledby="account-security-title">
+    <div class="account-setting-heading">
+      <p class="eyebrow" aria-hidden="true">02 / SECURITY</p>
+      <h2 id="account-security-title">Two-factor authentication</h2>
+      <p>An extra layer of protection for your private workspace.</p>
+    </div>
+    <div class="account-security">
+      <span class="account-status{{ ' is-enabled' if totp_enabled else '' }}"><span aria-hidden="true"></span>{{ 'Enabled' if totp_enabled else 'Not enabled' }}</span>
+      {% if totp_enabled %}
+      <p>Your authenticator is active. You’ll use a code alongside your password to sign in. Contact an administrator to disable it.</p>
+      {% else %}
+      <p>Add a code from your authenticator app alongside your password when you sign in.</p>
+      <a class="button secondary" href="/account/two-factor">Set up two-factor authentication <span aria-hidden="true">↗</span></a>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="account-setting" aria-labelledby="account-password-title">
+    <div class="account-setting-heading">
+      <p class="eyebrow" aria-hidden="true">03 / PASSWORD</p>
+      <h2 id="account-password-title">Change password</h2>
+      <p>Keep your account secure with a strong, unique password.</p>
+    </div>
+    <form class="account-form" action="/account/password" method="post" aria-label="Change password">
+      <input type="hidden" name="csrf" value="{{ request.state.csrf }}">
+      <div class="account-fields">
+        <div><label for="old-password">Current password</label><input id="old-password" name="old_password" type="password" required autocomplete="current-password" maxlength="256"></div>
+        <div><label for="password">New password</label><input id="password" name="password" type="password" required minlength="15" maxlength="256" autocomplete="new-password" aria-describedby="password-help"></div>
+      </div>
+      <p id="password-help" class="help">Use at least 15 characters. Your videos are preserved and started jobs keep running.</p>
+      {% if totp_enabled %}<div><label for="code">Authenticator code</label><input id="code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code"></div>{% endif %}
+      <div class="account-actions"><p class="help">Signs out all your sessions.</p><button class="button" type="submit">Change password</button></div>
+    </form>
+  </section>
+</div>

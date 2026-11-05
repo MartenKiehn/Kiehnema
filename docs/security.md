@@ -106,7 +106,7 @@ Operators do not need to create a separate RAM disk. The requirements below also
 when preparing a Linux host manually or running directly from source.
 
 The app refuses ordinary disk scratch directories. Outside the managed container, `MG_WORK_DIR` defaults
-to `/dev/shm/kiehnema`: use a sufficiently sized tmpfs, disable swap, and run the service as
+to `/dev/shm/kiehnema`: use a sufficiently sized tmpfs, disable disk-backed swap, and run the service as
 a dedicated unprivileged OS account without interactive SSH access. The directory must
 be owned by that account with mode `0700`. Generation runs Chromium's sandbox; do not run
 the service as root or disable the browser sandbox to work around deployment errors.
@@ -128,6 +128,14 @@ The app verifies RAM backing with `hdiutil` and requires encrypted macOS swap. R
 must be recreated after reboot. Stop the app before ejecting one. Core dumps are disabled.
 The application process does not create mounts or change host swap; the Linux server
 installer performs the server preparation separately.
+
+Linux also permits active ZRAM swap when every swap entry is a `/dev/zramN` block device
+and its kernel metadata at `/sys/devices/virtual/block/zramN/backing_dev` reads `none`.
+This keeps swapped pages compressed in RAM. ZRAM with a writeback device, other swap
+types, and missing or unreadable metadata are rejected, even when no swap pages are in use.
+Containers inspect the host's swap list too; setting a container swap limit does not
+bypass this check. The managed server installer still disables swap during provisioning.
+See the [kernel ZRAM documentation](https://www.kernel.org/doc/html/latest/admin-guide/blockdev/zram.html#writeback).
 
 ### Worker lifecycle
 

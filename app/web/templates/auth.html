@@ -1,7 +1,6 @@
 {% extends "base.html" %}
-{% from 'components/info_box.html' import info_box %}
 {% block content %}
-<section class="{{ 'users-page' if mode == 'admin' else 'card auth-card' }}">
+<section class="{{ 'users-page' if mode == 'admin' else 'account-page' if mode == 'account' else 'card auth-card' }}">
 {% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
 {% if mode == 'login' %}
 <h1>Sign in</h1><p>Your videos and feedback stay in your private workspace.</p>
@@ -36,28 +35,7 @@
 <label class="checkbox"><input type="checkbox" required><span>I saved my recovery key.</span></label>
 <button class="button" type="submit">{{ 'Restore access' if recovering else 'Create account' }}</button></form>
 {% elif mode == 'account' %}
-<h1>Your account</h1><p class="badge">{{ request.state.user.role_label }}</p>
-{% if request.query_params.get('username_changed') == '1' %}
-{% call info_box('Your username is updated.', 'username-updated-title') %}
-<p role="status">Sign in as <strong class="account-username">{{ request.state.user.username }}</strong> from now on. Your other sessions have been signed out.</p>
-{% endcall %}
-{% endif %}
-<h2>Change username</h2>
-<p>Your videos, password and authenticator stay the same. Changing your username signs out your other sessions.</p>
-<form action="/account/username" method="post" aria-label="Change username"><input type="hidden" name="csrf" value="{{ request.state.csrf }}">
-<label for="new-username">New username</label><input id="new-username" name="username" value="{{ new_username|default(request.state.user.username) }}" required minlength="3" maxlength="64" autocomplete="username" autocapitalize="none" spellcheck="false" aria-describedby="username-help">
-<p id="username-help" class="help">3–64 characters: letters, numbers, dots, underscores or hyphens. Usernames are saved in lowercase.</p>
-<label for="username-password">Current password</label><input id="username-password" name="password" type="password" required autocomplete="current-password" maxlength="256">
-{% if totp_enabled %}<label for="username-code">Authenticator code</label><input id="username-code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code">{% endif %}
-<button class="button" type="submit">Change username</button></form>
-<h2>Two-factor authentication</h2>
-{% if totp_enabled %}<p>Your authenticator is active. Contact an administrator to disable it.</p>{% else %}<p>Your account uses a password. You can add an authenticator for extra protection.</p><a class="button secondary" href="/account/two-factor">Set up two-factor authentication</a>{% endif %}
-<h2>Change password</h2><p>Changing your password preserves your videos and signs out your existing sessions. Started jobs keep running.</p>
-<form action="/account/password" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}">
-<label for="old-password">Current password</label><input id="old-password" name="old_password" type="password" required autocomplete="current-password" maxlength="256">
-<label for="password">New password</label><input id="password" name="password" type="password" required minlength="15" maxlength="256" autocomplete="new-password">
-{% if totp_enabled %}<label for="code">Authenticator code</label><input id="code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code">{% endif %}
-<button class="button" type="submit">Change password</button></form>
+{% include 'account.html' %}
 {% elif mode == 'two_factor' %}
 <h1>Set up two-factor authentication</h1>
 <p>Add this setup key to your authenticator app as a time-based account named Kiehnema. Confirm your password and the current code to finish setup.</p>
