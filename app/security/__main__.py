@@ -106,10 +106,12 @@ async def import_legacy(source: Path):
                     async with checkpoint(job) as saver:
                         await saver.setup()
                         for table in ('checkpoints', 'writes'):
+                            columns = ','.join('"' + row[1].replace('"', '""') + '"'
+                                               for row in old.execute(f'PRAGMA table_info({table})'))
                             rows = old.execute(f'SELECT * FROM {table} WHERE thread_id=?', (directory.name,)).fetchall()
                             if rows:
                                 placeholders = ','.join('?' for _ in rows[0])
-                                await saver.conn.executemany(f'INSERT INTO {table} VALUES({placeholders})', rows)
+                                await saver.conn.executemany(f'INSERT INTO {table} ({columns}) VALUES({placeholders})', rows)
                         await saver.conn.commit()
                         await saver.persist()
             for item in job.entries():

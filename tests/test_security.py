@@ -421,7 +421,8 @@ def test_memory_policy_fails_closed_and_coordinator_lock_is_exclusive(people, mo
                 pass
 
 
-async def test_legacy_import_verifies_without_deleting_source(people, tmp_path):
+@pytest.mark.parametrize('legacy_schema', [False, True])
+async def test_legacy_import_verifies_without_deleting_source(people, tmp_path, legacy_schema):
     from app.security.__main__ import import_legacy
     from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
     source = tmp_path / 'legacy'
@@ -436,6 +437,13 @@ async def test_legacy_import_verifies_without_deleting_source(people, tmp_path):
     async with AsyncSqliteSaver.from_conn_string(str(source / 'jobs.sqlite')) as saver:
         await builder.compile(checkpointer=saver).ainvoke({'content': SECRET}, {'configurable': {'thread_id': 'legacy-job'}})
         await builder.compile(checkpointer=saver).ainvoke({'content': 'other private job'}, {'configurable': {'thread_id': 'not-imported'}})
+    with sqlite3.connect(source / 'jobs.sqlite') as old:
+        if legacy_schema:
+            old.execute('ALTER TABLE writes DROP COLUMN task_path')
+        columns = [row[1] for row in old.execute('PRAGMA table_info(writes)')]
+        writes = old.execute('SELECT * FROM writes WHERE thread_id=? ORDER BY checkpoint_id, task_id, idx',
+                             ('legacy-job',)).fetchall()
+        assert writes
     token = a.current_identity.set(people[0])
     try:
         await import_legacy(source)
@@ -444,6 +452,10 @@ async def test_legacy_import_verifies_without_deleting_source(people, tmp_path):
         async with checkpoint(job) as saver:
             state = await builder.compile(checkpointer=saver).aget_state({'configurable': {'thread_id': 'legacy-job'}})
             assert state.values['content'] == SECRET
+            imported = await saver.conn.execute_fetchall(
+                f'SELECT {",".join(columns)} FROM writes WHERE thread_id=? ORDER BY checkpoint_id, task_id, idx',
+                ('legacy-job',))
+            assert imported == writes
             assert not (await saver.conn.execute_fetchall('SELECT 1 FROM checkpoints WHERE thread_id=?', ('not-imported',)))
         assert SECRET in (old_job / 'request.json').read_text()
         await import_legacy(source)
