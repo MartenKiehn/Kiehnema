@@ -4,7 +4,7 @@ User-facing changes, newest version first. Each version has a `## MAJOR.MINOR.PA
 heading followed by plain-text `- Change.` bullets. Release notes are taken from
 this file. Versions newer than the installed version are not shown in the app.
 
-## 0.2.0
+## 0.2.1
 
 - Create videos from uploaded images and PDFs as well as websites, with a source selector and private source downloads.
 - Upload up to 10 files totalling 100 MB; a single file can use the full allowance. PDFs have no page-count limit, with an in-app confirmation before processing more than 20 pages in total.
