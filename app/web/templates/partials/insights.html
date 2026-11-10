@@ -5,7 +5,7 @@
   {% if item.url and item.url|safe_url != '#' %}<a href="{{ item.url|safe_url }}" target="_blank" rel="noopener noreferrer">Read on your website ↗</a>{% endif %}
 </li>{% endfor %}</ul>
 {% endmacro %}
-<section class="discoveries" aria-label="Discoveries from your website">
+<section class="discoveries" aria-label="Discoveries from your source material">
   {% for card in insights|default([]) %}
   <article class="insight-card" id="{{ card.id }}" hx-preserve="true">
     <p class="eyebrow">{{ card.label }}</p><h3 id="{{ card.id }}-title">{{ card.title }}</h3>
@@ -20,6 +20,6 @@
     {% endif %}
   </article>
   {% else %}
-  <p class="insights-empty">The first discoveries will appear here as we read your website.</p>
+  <p class="insights-empty">The first discoveries will appear here as we read your source material.</p>
   {% endfor %}
 </section>

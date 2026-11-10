@@ -33,7 +33,7 @@
     {% if request.state.user and request.state.user.can_invite and (path == '/admin' or path.startswith('/admin/')) %}{% include 'components/backstage_tabs.html' %}{% endif %}
     {% block content %}{% endblock %}
   </main>
-  <footer class="footer"><span>Made from your website. Directed by you.</span><span class="footer-links">{% if request.state.user %}<a href="/changelog" {% if path == '/changelog' %}aria-current="page"{% endif %}>What’s new</a>{% endif %}<span class="local"><i aria-hidden="true"></i> Private workspace</span></span></footer>
+  <footer class="footer"><span>Your source material. Directed by you.</span><span class="footer-links">{% if request.state.user %}<a href="/changelog" {% if path == '/changelog' %}aria-current="page"{% endif %}>What’s new</a>{% endif %}<span class="local"><i aria-hidden="true"></i> Private workspace</span></span></footer>
 {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -4,6 +4,14 @@ User-facing changes, newest version first. Each version has a `## MAJOR.MINOR.PA
 heading followed by plain-text `- Change.` bullets. Release notes are taken from
 this file. Versions newer than the installed version are not shown in the app.
 
+## 0.1.10
+
+- Create videos from uploaded images and PDFs as well as websites, with a source selector and private source downloads.
+- Upload up to 10 files totalling 100 MB; a single file can use the full allowance. PDFs have no page-count limit, with an in-app confirmation before processing more than 20 pages in total.
+- Read native PDF text and additional text inside scanned images together, retaining page references for reviewing the resulting facts.
+- Use individually extracted PDF images in video scenes, with motif descriptions, preserved transparency and duplicate-image detection. Full-page references remain available for scans and layouts.
+- Follow file-processing progress, review source-backed facts and build imagery-led videos even when the uploaded material contains little or no text.
+
 ## 0.1.9
 
 - Manage your username, password and two-factor authentication on a clearer account page with improved desktop and mobile layouts and a visible two-factor status.

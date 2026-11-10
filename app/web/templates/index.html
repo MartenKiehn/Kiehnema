@@ -4,9 +4,9 @@
 {% block content %}
 <div class="desk-overview">
 <section class="intro">
-  <p class="eyebrow">FROM WEBSITE TO THE FINAL CUT</p>
+  <p class="eyebrow">FROM SOURCE TO THE FINAL CUT</p>
   <h1>Your brand.<br>A little more <em>motion.</em></h1>
-  <p class="lede">Turn your website into a short, on-brand video.<br>Shape the story. Review the details. Make it yours.</p>
+  <p class="lede">Turn your website, images or PDFs into a short, on-brand video.<br>Shape the story. Review the details. Make it yours.</p>
 </section>
 {% if request.state.user.can_invite %}
 <div class="desk-update" data-update-notice hidden role="status" aria-live="polite">
@@ -33,8 +33,17 @@
     </div>
     {% endif %}
     {% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
-    <form action="/jobs" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}">
+    <form action="/jobs" method="post" data-source-form><input type="hidden" name="csrf" value="{{ request.state.csrf }}">
       <fieldset class="brief-fields" {% if provider_missing %}disabled aria-describedby="provider-lock-message"{% endif %}>
+      <fieldset class="source-modes" aria-describedby="source-mode-help">
+        <legend>Source mode</legend>
+        <div class="source-switch">
+          <label><input type="radio" name="source_mode" value="url" checked><span>↗ &nbsp; Website</span></label>
+          <label><input type="radio" name="source_mode" value="files"><span>▧ &nbsp; Files</span></label>
+        </div>
+      </fieldset>
+      <p id="source-mode-help" class="help">Choose a website, or bring your own images and PDFs.</p>
+      <div data-source-panel="url">
       <label for="website">Website URL</label>
       <input id="website" name="url" type="url" required maxlength="2048" placeholder="https://your-company.com" value="{{ values.get('url', '') }}" aria-describedby="url-help">
       <p id="url-help" class="help">We’ll find your colours, fonts, imagery and the story behind your brand. Use a publicly accessible website.</p>
@@ -52,6 +61,19 @@
         </div>
         <p class="help">We follow links within the same website. These are upper limits; the scan stops after about 4 minutes. More pages can increase processing time and model costs.</p>
       </details>
+      </div>
+      <div data-source-panel="files" hidden>
+        <div class="source-upload">
+          <svg class="source-art" width="80" height="60" viewBox="0 0 80 60" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M36 41V5h25l13 13v34H52M60 5v14h14"/><rect x="5" y="23" width="45" height="32" rx="3"/><path d="m6 48 12-13 11 11 6-7 14 14M44 28h19m-8 8h8"/><circle cx="37" cy="31" r="3"/></svg>
+          <label for="source-files">Choose images or PDFs</label>
+          <input id="source-files" type="file" accept="image/png,image/jpeg,image/webp,application/pdf,.png,.jpg,.jpeg,.webp,.pdf" multiple disabled aria-describedby="files-help">
+          <p id="files-help" class="help">PNG, JPG, WebP or PDF. Up to 10 files and 100 MB in total. A single file can use the full 100 MB. Images up to 20 megapixels. PDFs have no page limit; we’ll ask for confirmation above 20 pages in total.</p>
+        </div>
+        <ul class="source-file-list" data-source-list aria-label="Selected source files"></ul>
+        <p class="help">Include brand material, product images or a brochure. Scanned PDFs work too. Add context in your creative direction for images with little text.</p>
+      </div>
+      <p class="notice error" data-source-error role="alert" hidden></p>
+      <p class="help" data-source-status role="status" hidden></p>
       <div class="field-row">
         <div><label for="duration">Duration <span class="optional">seconds</span></label>
           <input id="duration" name="duration" type="number" min="15" max="60" step="1" required value="{{ values.get('duration', 30) }}" aria-describedby="duration-help">
@@ -61,8 +83,8 @@
       </div>
       <label for="description">Creative direction <span class="optional">optional</span></label>
       <textarea id="description" name="description" rows="4" maxlength="4000" placeholder="Who’s it for? What should they remember? A hook, a mood, a must-have message…">{{ values.get('description', '') }}</textarea>
-      <p class="help">The video follows your website’s language unless you ask for another.</p>
-      <label class="checkbox"><input name="allow_client_logos" type="checkbox" value="true" {% if values.get('allow_client_logos') %}checked{% endif %}><span>Show client logos found on the website</span></label>
+      <p class="help">The video follows your source material’s language unless you ask for another.</p>
+      <label class="checkbox" data-source-panel="url"><input name="allow_client_logos" type="checkbox" value="true" {% if values.get('allow_client_logos') %}checked{% endif %}><span>Show client logos found on the website</span></label>
       <button class="button wide" type="submit" {% if provider_missing %}disabled{% endif %}>Create preview <span aria-hidden="true">↗</span></button>
       <p class="help centered">You’ll review everything before the final render.</p>
       </fieldset>
@@ -78,8 +100,20 @@
       <div class="film-caption"><span>A STORY IN EVERY FRAME</span><span>▶</span></div>
     </div>
     <p class="eyebrow">A SMALL BRIEF. A FULL STORY.</p>
-    <ol class="process-list"><li><span>01</span><div><b>Give us the starting point</b><p>Your website and a little direction.</p></div></li><li><span>02</span><div><b>Put your eye on it</b><p>Preview both formats, edit copy, leave feedback.</p></div></li><li><span>03</span><div><b>Ready for the feed</b><p>Two MP4s with original music, ready to share.</p></div></li></ol>
+    <ol class="process-list"><li><span>01</span><div><b>Give us the starting point</b><p>Your website or files, and a little direction.</p></div></li><li><span>02</span><div><b>Put your eye on it</b><p>Preview both formats, edit copy, leave feedback.</p></div></li><li><span>03</span><div><b>Ready for the feed</b><p>Two MP4s with original music, ready to share.</p></div></li></ol>
     <p class="cost-note">Processing time and model costs depend on your provider, model and video.<br>Your provider bills usage to the account configured by your administrator.</p>
   </aside>
 </div>
+<dialog id="source-confirm" class="source-confirm" aria-labelledby="source-confirm-title" aria-describedby="source-confirm-description">
+  {% call info_box('A little more to read.', 'source-confirm-title') %}
+  <p class="source-confirm-total"><strong data-confirm-pages></strong> PDF pages in total</p>
+  <p id="source-confirm-description" class="muted">We can work with all of them. Reading more pages can take longer and increase your AI provider’s costs.</p>
+  <div class="actions">
+    <button class="button secondary" type="button" data-confirm-cancel autofocus>Keep editing</button>
+    <button class="button" type="button" data-confirm-continue>Process all pages <span aria-hidden="true">↗</span></button>
+  </div>
+  {% endcall %}
+</dialog>
 {% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', path='sources.js') }}" defer></script>{% endblock %}

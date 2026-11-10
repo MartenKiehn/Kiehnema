@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% from "components/info_box.html" import info_box %}
-{% block title %}{{ concept.title|default(job.url) }} · Kiehnema{% endblock %}
+{% block title %}{{ concept.title|default(job.source_label) }} · Kiehnema{% endblock %}
 {% block content %}
 <a class="back-link" href="/videos">← All videos</a>
-<header class="job-heading"><div><p class="eyebrow">{% if job.status == 'review' %}02 / YOUR DIRECTOR’S CHAIR{% elif job.status == 'done' %}03 / READY TO SHARE{% else %}YOUR VIDEO{% endif %}</p><h1>{{ concept.title|default('From website to motion', true) }}</h1><p class="muted"><a href="{{ job.url|safe_url }}" target="_blank" rel="noopener noreferrer">{{ job.url }}</a> <span>· {{ job.duration }} seconds · 4:5 + 9:16</span></p></div><span class="cost-pill" id="job-cost">{% if job.cost_usd is defined and job.cost_usd is none %}Cost unavailable{% else %}${{ '%.2f'|format(job.cost_usd|default(0)) }} <small>estimated</small>{% endif %}</span></header>
+<header class="job-heading"><div><p class="eyebrow">{% if job.status == 'review' %}02 / YOUR DIRECTOR’S CHAIR{% elif job.status == 'done' %}03 / READY TO SHARE{% else %}YOUR VIDEO{% endif %}</p><h1>{{ concept.title|default('From source to motion' if job.source_mode == 'files' else 'From website to motion', true) }}</h1><p class="muted">{% if job.source_mode == 'files' %}{% for file in job.source_files %}<a href="/jobs/{{ job.id }}/files/{{ file.file }}" download>{{ file.name }}</a>{{ ', ' if not loop.last }}{% endfor %}{% else %}<a href="{{ job.url|safe_url }}" target="_blank" rel="noopener noreferrer">{{ job.url }}</a>{% endif %} <span>· {{ job.duration }} seconds · 4:5 + 9:16</span></p></div><span class="cost-pill" id="job-cost">{% if job.cost_usd is defined and job.cost_usd is none %}Cost unavailable{% else %}${{ '%.2f'|format(job.cost_usd|default(0)) }} <small>estimated</small>{% endif %}</span></header>
 {% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
 {% if job.poll %}
   {% include "partials/progress.html" %}
@@ -19,7 +19,7 @@
   {% if job.status == 'review' and job.outputs %}
   <details class="card rendered-downloads"><summary>Last rendered videos</summary><p class="help">These downloads show your last export. Render again to include new edits.</p><div class="actions">{% for fmt, label in [('feed', '4:5 · Feed'), ('story', '9:16 · Story')] %}{% if job.outputs.get(fmt) %}<a class="button secondary small" href="/jobs/{{ job.id }}/files/{{ job.outputs[fmt] }}?download=true" download>Download {{ label }} ↓</a>{% endif %}{% endfor %}</div></details>
   {% endif %}
-  {% if board %}<details class="card brand-board"><summary>Your brand board <span class="muted">Colours, typography & imagery</span></summary><img src="/jobs/{{ job.id }}/files/brand/board.png" alt="Extracted brand colours, fonts, logo and website imagery" loading="lazy"></details>{% endif %}
+  {% if board %}<details class="card brand-board"><summary>Your brand board <span class="muted">Colours, typography & imagery</span></summary><img src="/jobs/{{ job.id }}/files/brand/board.png" alt="Extracted brand colours, fonts, logo and source imagery" loading="lazy"></details>{% endif %}
   {% if job.status == 'review' %}
   <form id="review-form" action="/jobs/{{ job.id }}/review" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}">
     <input type="hidden" name="revision" value="{{ revision }}">

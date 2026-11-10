@@ -36,6 +36,7 @@ from app.pipeline import prompts
 from app.pipeline.files import COMPOSITION_FILES, apply_edits, parse_files, theme_for, write_composition
 from app.pipeline.llm import LLM, estimate_cost, image_block, messages
 from app.pipeline.schemas import CompanyProfile, Concept, ConceptText, QAReport, SceneChange
+from app.pipeline.sources import file_brand, file_profile_prompt, read_sources, verify_file_profile
 from app.pipeline.design import DesignDraft
 from app.pipeline.status import write_status
 from app.pipeline.verify import lint_composition, validate_concept, verify_profile
@@ -53,6 +54,8 @@ class JobState(TypedDict, total=False):
     job_id: str
     job_dir: str
     url: str
+    source_mode: str
+    source_files: list[dict]
     duration: float
     description: str
     allow_client_logos: bool
@@ -182,6 +185,10 @@ def _save_files(state: JobState, files: dict[str, str]) -> list[str]:
 # ---------------------------------------------------------------- nodes
 
 async def n_crawl(state: JobState, config: RunnableConfig) -> dict:
+    if state.get("source_mode") == "files":
+        await read_sources(_dir(state), state["source_files"], _llm(config),
+                           lambda message: _status(state, "crawl", message, config))
+        return {**_status(state, "crawl", "Uploaded sources ready", config), **_usage(config)}
     _status(state, "crawl", f"Crawling {state['url']}")
     out = _dir(state) / "crawl"
     result = await crawl(state["url"], out, _guard(config),
@@ -196,24 +203,29 @@ async def n_crawl(state: JobState, config: RunnableConfig) -> dict:
 async def n_brand(state: JobState, config: RunnableConfig) -> dict:
     _status(state, "brand", "Extracting brand colours, fonts, logo and images")
     out = _dir(state) / "brand"
-    await extract_brand(CrawlResult.load(_dir(state) / "crawl"), out, _guard(config))
+    if state.get("source_mode") == "files":
+        file_brand(_dir(state))
+    else:
+        await extract_brand(CrawlResult.load(_dir(state) / "crawl"), out, _guard(config))
     await render_board(out)
     return _status(state, "brand", "Brand kit ready")
 
 
 async def n_distill(state: JobState, config: RunnableConfig) -> dict:
-    _status(state, "distill", "Reading the website (facts with verbatim sources)", config)
+    files = state.get("source_mode") == "files"
+    _status(state, "distill", "Reading uploaded text and visual observations" if files else "Reading the website (facts with verbatim sources)", config)
     site_md = (_dir(state) / "crawl" / "site.md").read_text()
     profile = await _llm(config).structured(
-        "distill", CompanyProfile, messages(prompts.DISTILL_SYSTEM, prompts.distill_user(site_md)),
+        "distill", CompanyProfile, messages(prompts.FILE_DISTILL_SYSTEM if files else prompts.DISTILL_SYSTEM,
+                                           file_profile_prompt(_dir(state)) if files else prompts.distill_user(site_md)),
         effort="low", max_tokens=32_000)
     pages = {p.url for p in CrawlResult.load(_dir(state) / "crawl").pages}
-    profile, notes = verify_profile(profile, site_md, pages)
+    profile, notes = verify_file_profile(profile, _dir(state)) if files else verify_profile(profile, site_md, pages)
     (_dir(state) / "profile.json").write_text(profile.model_dump_json(indent=1))
-    if len(profile.facts) < 5:
+    if not files and len(profile.facts) < 5:
         return {"error": f"only {len(profile.facts)} verifiable facts found on the website", "status": "failed",
                 "profile_notes": notes, **_usage(config)}
-    _status(state, "distill", f"{len(profile.facts)} verified facts ({len(notes)} dropped)", config)
+    _status(state, "distill", f"{len(profile.facts)} source-backed facts and observations" if files else f"{len(profile.facts)} verified facts ({len(notes)} dropped)", config)
     return {"profile_notes": notes, **_usage(config)}
 
 
@@ -223,8 +235,11 @@ async def n_concept(state: JobState, config: RunnableConfig) -> dict:
     profile = CompanyProfile.model_validate_json((_dir(state) / "profile.json").read_text())
     allow = state.get("allow_client_logos", False)
     assets = _asset_list(brand, allow)
+    brand_summary = _brand_summary(brand)
+    if state.get("source_mode") == "files":
+        brand_summary.update(name=profile.company_name, language=profile.language)
     user = prompts.concept_user(url=state["url"], duration=state["duration"], description=state.get("description", ""),
-                                profile=profile.model_dump(), brand=_brand_summary(brand), assets=assets,
+                                profile=profile.model_dump(), brand=brand_summary, assets=assets,
                                 allow_client_logos=allow)
     errors: list[str] = []
     concept: Concept | None = None

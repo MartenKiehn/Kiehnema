@@ -53,14 +53,22 @@ def _model(job_dir: Path, usage: dict | None = None) -> ProviderLLM:
 
 
 def create_job(url: str, duration: float, description: str = "", *, allow_client_logos: bool = False,
-               max_pages: int = 20, max_depth: int = 2, job_id: str | None = None) -> str:
+               max_pages: int = 20, max_depth: int = 2, job_id: str | None = None,
+               source_files: list[tuple[str, bytes]] | None = None, confirm_pdf_pages: bool = False) -> str:
     """Persist a job before scheduling it, so it is immediately reloadable."""
+    from app.pipeline.sources import validate_sources
+    sources = validate_sources(source_files, confirm_pdf_pages=confirm_pdf_pages) if source_files is not None else []
     job_id = job_id or time.strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(3)
     job_dir = jobs_dir() / job_id
     job_dir.mkdir(parents=True)
     (job_dir / "request.json").write_text(json.dumps(
         {"url": url, "duration": duration, "description": description, "allow_client_logos": allow_client_logos,
-         "max_pages": max_pages, "max_depth": max_depth}, ensure_ascii=False))
+         "max_pages": max_pages, "max_depth": max_depth,
+         "source_mode": "files" if sources else "url", "source_files": [meta for meta, _ in sources]}, ensure_ascii=False))
+    for meta, content in sources:
+        path = job_dir / meta["file"]
+        path.parent.mkdir(exist_ok=True)
+        path.write_bytes(content)
     write_status(job_dir, "queued", "Waiting to start")
     return job_id
 
@@ -74,8 +82,10 @@ async def run_job(job_id: str, *, llm: LLM | None = None, guard: UrlGuard | None
 
 
 async def start_job(url: str, duration: float, description: str = "", *, allow_client_logos: bool = False,
-                    llm: LLM | None = None, guard: UrlGuard | None = None, job_id: str | None = None) -> tuple[str, dict]:
-    job_id = create_job(url, duration, description, allow_client_logos=allow_client_logos, job_id=job_id)
+                    llm: LLM | None = None, guard: UrlGuard | None = None, job_id: str | None = None,
+                    source_files: list[tuple[str, bytes]] | None = None, confirm_pdf_pages: bool = False) -> tuple[str, dict]:
+    job_id = create_job(url, duration, description, allow_client_logos=allow_client_logos, job_id=job_id,
+                        source_files=source_files, confirm_pdf_pages=confirm_pdf_pages)
     return job_id, await run_job(job_id, llm=llm, guard=guard)
 
 

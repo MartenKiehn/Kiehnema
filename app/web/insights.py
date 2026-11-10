@@ -18,7 +18,7 @@ COLOUR_NAMES = {
 
 def job_insights(path: Path) -> list[dict]:
     saved = {}
-    for name in ("crawl/crawl", "brand/brand", "profile", "concept"):
+    for name in ("request", "crawl/crawl", "brand/brand", "profile", "concept"):
         try:
             data = json.loads((path / f"{name}.json").read_text())
             saved[name] = data if isinstance(data, dict) else {}
@@ -26,11 +26,13 @@ def job_insights(path: Path) -> list[dict]:
             # A result may still be getting written; pick it up on the next poll.
             saved[name] = {}
 
+    files = saved["request"].get("source_mode") == "files"
     cards = []
     facts = saved["profile"].get("facts", [])
     if facts:
-        cards.append({"title": "What your website tells us", "label": "THE FACTS",
-                      "items": [{"text": fact["text"], "url": fact["source_url"]} for fact in facts]})
+        cards.append({"title": "What your sources tell us" if files else "What your website tells us", "label": "THE FACTS",
+                      "items": [{"text": fact["text"], "url": fact["source_url"],
+                                 "label": "Image observation" if fact.get("evidence") == "visual" else ""} for fact in facts]})
     else:
         excerpts = []
         for page in saved["crawl/crawl"].get("pages", []):
@@ -43,7 +45,7 @@ def job_insights(path: Path) -> list[dict]:
             if len(excerpts) == 6:
                 break
         if excerpts:
-            cards.append({"title": "In your own words", "label": "FROM YOUR WEBSITE", "items": excerpts})
+            cards.append({"title": "In your own words", "label": "FROM YOUR FILES" if files else "FROM YOUR WEBSITE", "items": excerpts})
 
     colours = []
     for colour in saved["brand/brand"].get("colors", []):
@@ -58,7 +60,7 @@ def job_insights(path: Path) -> list[dict]:
             break
     if colours:
         cards.append({"title": "A look that feels like you", "label": "YOUR COLOURS", "colours": colours,
-                      "items": [], "description": "These colours come from your website and help your video feel familiar."})
+                      "items": [], "description": "These colours come from your source material and help your video feel familiar."})
 
     scenes = []
     for number, scene in enumerate(saved["concept"].get("scenes", []), 1):

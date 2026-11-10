@@ -25,12 +25,25 @@ def jobs_dir():
 
 
 def create_job(url: str, duration: float, description: str = "", *, allow_client_logos: bool = False,
-               max_pages: int = 20, max_depth: int = 2, job_id: str | None = None) -> str:
+               max_pages: int = 20, max_depth: int = 2, job_id: str | None = None,
+               source_files: list[tuple[str, bytes]] | None = None, confirm_pdf_pages: bool = False) -> str:
+    from app.pipeline.sources import validate_sources
+    sources = validate_sources(source_files, confirm_pdf_pages=confirm_pdf_pages) if source_files is not None else []
     job = vault.create(job_id)
     path = vault.VaultPath(job)
-    (path / "request.json").write_text(json.dumps({"url": url, "duration": duration, "description": description,
-        "allow_client_logos": allow_client_logos, "max_pages": max_pages, "max_depth": max_depth}))
-    write_status(path, "queued", "Waiting to start")
+    try:
+        for metadata, content in sources:
+            (path / metadata['file']).write_bytes(content)
+        (path / "request.json").write_text(json.dumps({"url": "" if sources else url, "duration": duration, "description": description,
+            "allow_client_logos": allow_client_logos, "max_pages": max_pages, "max_depth": max_depth,
+            "source_mode": "files" if sources else "url", "source_files": [meta for meta, _ in sources]}))
+        write_status(path, "queued", "Waiting to start")
+    except BaseException:
+        with database() as con:
+            con.execute("DELETE FROM jobs WHERE id=?", (job.id,))
+        if job.directory.exists():
+            shutil.rmtree(job.directory)
+        raise
     return job.id
 
 

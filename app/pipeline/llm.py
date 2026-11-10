@@ -35,7 +35,10 @@ def estimate_cost(usage: Usage) -> float | None:
 
 
 def image_block(path: Path, max_side: int = 540) -> dict:
-    img = Image.open(path).convert("RGB")
+    with Image.open(path) as source:
+        rgba = source.convert("RGBA")
+        img = Image.new("RGB", source.size, "white")
+        img.paste(rgba, mask=rgba.getchannel("A"))
     img.thumbnail((max_side, max_side * 2))
     import io
 

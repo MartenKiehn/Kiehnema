@@ -15,9 +15,10 @@ FactKind = Literal[
 class Fact(BaseModel):
     id: str = Field(description="f1, f2, ... unique")
     kind: FactKind
-    text: str = Field(description="concise statement in the website's language")
-    quote: str = Field(description="VERBATIM excerpt from the website text that supports the fact (max ~300 chars)")
-    source_url: str = Field(description="URL of the page the quote is from (one of the PAGE urls)")
+    text: str = Field(description="concise statement in the source's language")
+    quote: str = Field(description="VERBATIM excerpt from the source text or visible-image description supporting this fact (max ~300 chars)")
+    source_url: str = Field(description="Exact supplied source identifier: page URL or uploaded file path including its PDF page fragment")
+    evidence: Literal["text", "visual"] = Field(default="text", description="text for a source quotation; visual only for a directly visible observation in an uploaded image")
     attribution: str | None = Field(None, description="for kind=quote: person and role, exactly as on the site")
 
 

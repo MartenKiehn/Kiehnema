@@ -25,6 +25,11 @@
                 "Your updated video workspace will open automatically."),
 } %}
 {% set progress_copy = phase_copy.get(job.status, phase_copy.working) %}
+{% if job.source_mode == 'files' and job.status == 'crawl' %}
+{% set progress_copy = ('Reading your files', 'Reading images and PDF pages to find the words and visuals that tell your story.', 'Build your brand board with colours and imagery.') %}
+{% elif job.source_mode == 'files' and job.status == 'distill' %}
+{% set progress_copy = ('Finding your story', 'Linking text and visible details to your source files. Image observations are marked for your review.', 'Turn your source material into a scene-by-scene storyboard.') %}
+{% endif %}
 {% set current_step = "compose" if job.status == "fix" else job.status %}
 {% set step_keys = steps|map(attribute=0)|list %}
 {% set current_index = step_keys.index(current_step) if current_step in step_keys else -1 %}

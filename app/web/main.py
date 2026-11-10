@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import contextvars
 import hashlib
 import hmac
@@ -26,6 +28,7 @@ from app.crawl.guard import UrlGuard
 from app.changelog import read_entries
 from app.llm import provider
 from app.pipeline import jobs
+from app.pipeline.sources import MAX_TOTAL_BYTES, PDFConfirmationRequired
 from app.pipeline.schemas import SceneChange
 from app.pipeline.design import DesignDraft
 from app.pipeline.status import write_status
@@ -185,7 +188,9 @@ def job_summary(path: Path) -> dict:
         app.state.interrupted.discard(path.name)
     if active and status["status"] in TERMINAL:
         status = {**status, "status": "working", "message": "Finishing this step…"}
-    return {**read_json(path / "request.json"), **status, "id": path.name,
+    brief = read_json(path / "request.json")
+    source_label = ', '.join(item['name'] for item in brief.get('source_files', [])) or brief.get('url', '')
+    return {**brief, **status, "id": path.name, "source_label": source_label,
             "active": active, "poll": status["status"] not in TERMINAL}
 
 
@@ -201,7 +206,8 @@ def revision(path: Path) -> str:
 async def job_context(job_id: str) -> dict:
     path = job_path(job_id)
     job = job_summary(path)
-    context = {"job": job, "steps": STEPS, "seen": {h["status"] for h in job.get("history", [])},
+    steps = [(key, 'Files' if key == 'crawl' and job.get('source_mode') == 'files' else label) for key, label in STEPS]
+    context = {"job": job, "steps": steps, "seen": {h["status"] for h in job.get("history", [])},
                "insights": job_insights(path) if job["poll"] else [],
                "concept": {}, "frames": {}, "facts": {}, "check": {}, "qa": {}, "can_approve": False}
     if job["status"] in {"review", "done"}:
@@ -259,13 +265,26 @@ def enqueue(job_id: str, decision: dict | None = None):
     app.state.tasks[job_id] = asyncio.create_task(run_background(job_id, decision, capability), context=contextvars.Context())
 
 
-class JobRequest(BaseModel):
-    url: AnyHttpUrl = Field(max_length=2048)
+class BriefRequest(BaseModel):
     duration: int = Field(default=30, ge=15, le=60)
     description: str = Field(default="", max_length=4000)
     allow_client_logos: bool = False
     max_pages: int = Field(default=20, ge=1, le=50)
     max_depth: int = Field(default=2, ge=0, le=5)
+
+
+class JobRequest(BriefRequest):
+    url: AnyHttpUrl = Field(max_length=2048)
+
+
+class SourceUpload(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    content: str = Field(max_length=4 * ((MAX_TOTAL_BYTES + 2) // 3))
+
+
+class FileJobRequest(BriefRequest):
+    confirm_pdf_pages: bool = Field(default=False, strict=True)
+    files: list[SourceUpload] = Field(min_length=1, max_length=10)
 
 
 def ai_setup_required() -> bool:
@@ -301,6 +320,30 @@ async def job_list(request: Request):
 
 @app.post("/jobs")
 async def create_job(request: Request):
+    if request.headers.get('content-type', '').startswith('application/json'):
+        content = bytearray()
+        async for chunk in request.stream():
+            content.extend(chunk)
+            if len(content) > (MAX_TOTAL_BYTES * 4 + 2) // 3 + 1024 * 1024:
+                return JSONResponse({'error': 'Choose at most 100 MB of source files.'}, status_code=413)
+        try:
+            provider.require()
+            data = FileJobRequest.model_validate_json(content)
+            sources = [(item.name, base64.b64decode(item.content, validate=True)) for item in data.files]
+            job_id = await asyncio.to_thread(jobs.create_job, '', data.duration, data.description,
+                                            allow_client_logos=data.allow_client_logos, source_files=sources,
+                                            confirm_pdf_pages=data.confirm_pdf_pages)
+        except PDFConfirmationRequired as exc:
+            return JSONResponse({'confirmation_required': True, 'pdf_pages': exc.pages}, status_code=409)
+        except (ValidationError, ValueError, binascii.Error) as exc:
+            error = '; '.join(e['msg'] for e in exc.errors()) if isinstance(exc, ValidationError) else str(exc)
+            return JSONResponse({'error': error}, status_code=422)
+        try:
+            enqueue(job_id)
+        except HTTPException:
+            await jobs.delete_job(job_id)
+            raise
+        return JSONResponse({'location': f'/jobs/{job_id}'}, status_code=201)
     form = dict(await request.form())
     try:
         data = JobRequest.model_validate(form)
@@ -572,10 +615,15 @@ def private_file(request: Request, path, *, download: bool = False, headers=None
 
 @app.api_route("/jobs/{job_id}/files/{name:path}", methods=['GET', 'HEAD'])
 async def artifact(request: Request, job_id: str, name: str, download: bool = False):
+    root = job_path(job_id)
+    if re.fullmatch(r'sources/[0-9]{2}\.(png|pdf)', name):
+        if name not in {item['file'] for item in read_json(root / 'request.json').get('source_files', [])}:
+            raise HTTPException(404, 'File not found.')
+        return private_file(request, confined_file(root, name), download=True)
     if not (re.fullmatch(r"review-assets/[a-f0-9]{32}\.png", name) or name == "brand/board.png" or re.fullmatch(r"keyframes/r\d+/(feed|story)-[\d.]+s\.png", name)
             or re.fullmatch(r"renders/(feed-1080x1350|story-1080x1920)\.mp4", name)):
         raise HTTPException(404, "File not found.")
-    path = confined_file(job_path(job_id), name)
+    path = confined_file(root, name)
     return private_file(request, path, download=download)
 
 

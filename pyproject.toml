@@ -1,6 +1,6 @@
 [project]
 name = "kiehnema"
-version = "0.1.9"
+version = "0.1.10"
 requires-python = ">=3.13"
 dependencies = [
     "cryptography>=45",
@@ -21,6 +21,7 @@ dependencies = [
     "pydantic>=2.13.5",
     "pydantic-settings>=2.15.0",
     "pyotp>=2.9",
+    "pypdfium2>=5.15.1",
     "python-multipart>=0.0.32",
     "scipy>=1.18.1",
     "tink>=1.12",

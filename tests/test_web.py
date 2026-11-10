@@ -1,6 +1,8 @@
 """Web workflow and boundaries, without Bedrock calls."""
 
 import asyncio
+import base64
+import io
 import json
 import re
 from pathlib import Path
@@ -109,7 +111,12 @@ def test_index_validation_and_static_assets(client):
     assert "Director’s desk · Kiehnema" in html and 'aria-label="Kiehnema home"' in html
     assert "Motion Studio" not in html and "kiehnema.svg" in html
     assert "New video" in html and 'name="url"' in html and 'name="duration"' in html and 'name="description"' in html
-    assert 'name="allow_client_logos"' in html and "checked" not in html
+    assert 'name="allow_client_logos"' in html
+    assert 'checked' not in re.search(r'<input[^>]*name="allow_client_logos"[^>]*>', html)[0]
+    assert 'name="source_mode" value="url" checked' in html
+    assert 'name="source_mode" value="files"' in html and 'id="source-files"' in html
+    assert '<dialog id="source-confirm"' in html and 'aria-labelledby="source-confirm-title"' in html
+    assert 'data-confirm-cancel autofocus' in html and 'Process all pages' in html
     assert 'name="max_pages"' in html and 'name="max_depth"' in html
     assert client.get("/static/vendor/htmx.min.js").status_code == 200
     assert client.get("/static/kiehnema.svg").headers["content-type"].startswith("image/svg+xml")
@@ -120,6 +127,151 @@ def test_index_validation_and_static_assets(client):
         response = client.post("/jobs", data=data)
         assert response.status_code == 422 and 'role="alert"' in response.text
     assert not list(jobs.jobs_dir().iterdir())
+
+
+def source_upload(name='Campaign.png', format='PNG'):
+    from PIL import Image
+    buffer = io.BytesIO()
+    Image.new('RGB', (32, 24), '#c8a565').save(buffer, format)
+    return {'name': name, 'content': base64.b64encode(buffer.getvalue()).decode()}
+
+
+def test_file_job_upload_stores_private_sources_and_displays_names(client, monkeypatch):
+    queued = []
+    monkeypatch.setattr('app.web.main.enqueue', queued.append)
+    monkeypatch.setattr('app.web.main.UrlGuard.check', lambda *args: pytest.fail('Files must not crawl a URL'))
+    uploaded = [source_upload('../Campaign.png'), source_upload('Brand guide.pdf', 'PDF')]
+    response = client.post('/jobs', json={'files': uploaded, 'duration': 25,
+                                         'description': 'Private launch brief', 'allow_client_logos': True})
+    assert response.status_code == 201, response.text
+    location = response.json()['location']
+    job_id = location.rsplit('/', 1)[1]
+    assert queued == [job_id]
+    path = jobs.jobs_dir() / job_id
+    brief = json.loads((path / 'request.json').read_text())
+    assert brief['source_mode'] == 'files' and brief['url'] == ''
+    assert brief['duration'] == 25 and brief['allow_client_logos'] is True
+    assert brief['description'] == 'Private launch brief'
+    assert [item['name'] for item in brief['source_files']] == ['Campaign.png', 'Brand guide.pdf']
+    assert [item['file'] for item in brief['source_files']] == ['sources/01.png', 'sources/02.pdf']
+    assert (path / 'sources/01.png').read_bytes().startswith(b'\x89PNG')
+    assert (path / 'sources/02.pdf').read_bytes() == base64.b64decode(uploaded[1]['content'])
+    for source in brief['source_files']:
+        download = client.get(location + '/files/' + source['file'])
+        assert download.status_code == 200
+        assert download.headers['content-disposition'].startswith('attachment;')
+        assert download.content == (path / source['file']).read_bytes()
+    (path / 'sources/99.pdf').write_bytes(b'%PDF-unlisted')
+    assert client.get(location + '/files/sources/99.pdf').status_code == 404
+    for blob in path.job.directory.iterdir():
+        encrypted = blob.read_bytes()
+        assert not encrypted.startswith((b'\x89PNG', b'%PDF-'))
+        assert b'Private launch brief' not in encrypted and b'Brand guide.pdf' not in encrypted
+    for page in ('/jobs', location):
+        html = client.get(page).text
+        assert 'Campaign.png' in html and 'Brand guide.pdf' in html
+    write_status(path, 'crawl', 'Reading uploaded sources')
+    assert 'Reading your files' in client.get(location + '/progress').text
+
+
+@pytest.mark.parametrize('files', [
+    [],
+    [{'name': 'broken.png', 'content': 'not-base64!'}],
+    [{'name': 'empty.png', 'content': ''}],
+    [{'name': 'fake.pdf', 'content': base64.b64encode(b'not a PDF').decode()}],
+    [{'name': 'fake.png', 'content': base64.b64encode(b'not an image').decode()}],
+])
+def test_file_job_rejects_invalid_upload_without_creating_job(client, monkeypatch, files):
+    queued = []
+    monkeypatch.setattr('app.web.main.enqueue', queued.append)
+    response = client.post('/jobs', json={'files': files})
+    assert response.status_code == 422 and response.json()['error']
+    assert not queued and not list(jobs.jobs_dir().iterdir())
+
+
+def test_file_job_rejects_entire_batch_and_invalid_brief(client, monkeypatch):
+    monkeypatch.setattr('app.web.main.enqueue', lambda _: pytest.fail('Invalid uploads must not be queued'))
+    valid = source_upload()
+    invalid = {'name': 'script.svg', 'content': base64.b64encode(b'<svg/>').decode()}
+    for payload in ({'files': [valid, invalid]}, {'files': [valid] * 11},
+                    {'files': [valid], 'duration': 61}, {'files': [valid], 'description': 'x' * 4001}):
+        response = client.post('/jobs', json=payload)
+        assert response.status_code == 422 and response.json()['error']
+        assert not list(jobs.jobs_dir().iterdir())
+
+
+def test_file_upload_requires_session_csrf_and_same_origin(client, monkeypatch):
+    monkeypatch.setattr('app.web.main.enqueue', lambda _: pytest.fail('Rejected requests must not be queued'))
+    payload = {'files': [source_upload()]}
+    for headers in ({'X-CSRF-Token': ''}, {'X-CSRF-Token': 'invalid'}, {'Origin': 'https://elsewhere.example'}):
+        assert client.post('/jobs', json=payload, headers=headers).status_code == 403
+    client.cookies.clear()
+    assert client.post('/jobs', json=payload).status_code == 401
+    assert not list(jobs.jobs_dir().iterdir())
+
+
+def test_file_job_queue_rejection_cleans_saved_upload(client, monkeypatch):
+    from fastapi import HTTPException
+    from app.security import accounts
+
+    def full_queue(_):
+        raise HTTPException(429, 'The job queue is full.')
+
+    monkeypatch.setattr('app.web.main.enqueue', full_queue)
+    response = client.post('/jobs', json={'files': [source_upload()]})
+    assert response.status_code == 429
+    assert not list(jobs.jobs_dir().iterdir())
+    with accounts.database() as con:
+        assert con.execute('SELECT COUNT(*) FROM files').fetchone()[0] == 0
+    assert not list((settings.data_dir / 'secure/objects').iterdir())
+
+
+def test_uploaded_sources_remain_bound_to_their_owner(client, monkeypatch):
+    import pyotp
+    from app.security import accounts
+
+    monkeypatch.setattr('app.web.main.enqueue', lambda _: None)
+    response = client.post('/jobs', json={'files': [source_upload()]})
+    location = response.json()['location']
+    invitation = accounts.invite_user(accounts.identity(), 'another-editor')
+    draft = accounts.enrollment('another-editor', 'Another synthetic password!', two_factor=True)
+    person = accounts.finish_enrollment(draft, pyotp.TOTP(draft['totp']).now(), invite=invitation)
+    session_token = accounts.new_session(person)
+    session = accounts.get_session(session_token)
+    client.cookies.clear()
+    client.cookies.set('kiehnema-local', session_token)
+    client.headers['X-CSRF-Token'] = session.csrf
+    assert client.get(location).status_code == 404
+    assert client.get(location + '/files/sources/01.png').status_code == 404
+    assert 'Campaign.png' not in client.get('/jobs').text
+
+
+def test_file_upload_body_limit_is_enforced_before_parsing(client, monkeypatch):
+    monkeypatch.setattr('app.web.main.enqueue', lambda _: pytest.fail('Oversized requests must not be queued'))
+    from app.pipeline.sources import MAX_TOTAL_BYTES
+    response = client.post('/jobs', content=b' ' * ((MAX_TOTAL_BYTES * 4 + 2) // 3 + 1024 * 1024 + 1),
+                           headers={'Content-Type': 'application/json'})
+    assert response.status_code == 413
+    assert not list(jobs.jobs_dir().iterdir())
+
+
+def test_file_job_storage_failure_cleans_partial_sources(workspace, monkeypatch):
+    from app.security import vault, accounts
+    original = vault.VaultPath.write_bytes
+
+    def failing_write(path, content):
+        if path.relative == 'sources/02.png':
+            raise OSError('Synthetic write failure')
+        return original(path, content)
+
+    monkeypatch.setattr(vault.VaultPath, 'write_bytes', failing_write)
+    image = base64.b64decode(source_upload()['content'])
+    with pytest.raises(OSError, match='Synthetic write failure'):
+        jobs.create_job('', 30, source_files=[('one.png', image), ('two.png', image)])
+    assert not list(jobs.jobs_dir().iterdir())
+    with accounts.database() as con:
+        assert con.execute('SELECT COUNT(*) FROM files').fetchone()[0] == 0
+    assert not list((settings.data_dir / 'secure/objects').iterdir())
 
 
 @pytest.mark.parametrize("url", ["http://127.0.0.1:8000/", "http://localhost:3000/", "http://[::1]:8000/"])
@@ -355,6 +507,7 @@ def test_reopen_completed_job_and_reject_stale_requests(review_job, client, monk
     assert client.post(url, data=form).status_code == 409
 
 
+@pytest.mark.browser
 async def test_reopen_button_returns_to_editor_in_browser(review_job, live_web, monkeypatch, tmp_path):
     from playwright.async_api import async_playwright, expect
 
@@ -1435,3 +1588,41 @@ async def test_blocked_review_feedback_jump_and_mobile_layout(review_job, live_w
             await expect(page.get_by_role('button', name='Approve & render')).to_be_enabled()
         finally:
             await browser.close()
+
+
+@pytest.mark.parametrize('pages', [20, 21])
+def test_pdf_page_confirmation_precedes_job_creation(client, monkeypatch, pages):
+    import pypdfium2 as pdfium
+    from app.pipeline.sources import PDF_LOCK
+    buffer = io.BytesIO()
+    with PDF_LOCK, pdfium.PdfDocument.new() as pdf:
+        for _ in range(pages):
+            pdf.new_page(100, 100).close()
+        pdf.save(buffer)
+    queued = []
+    monkeypatch.setattr('app.web.main.enqueue', queued.append)
+    payload = {'files': [{'name': 'guide.pdf', 'content': base64.b64encode(buffer.getvalue()).decode()}]}
+    response = client.post('/jobs', json=payload)
+    if pages > 20:
+        assert response.status_code == 409
+        assert response.json() == {'confirmation_required': True, 'pdf_pages': pages}
+        assert not queued and not list(jobs.jobs_dir().iterdir())
+        assert client.post('/jobs', json={**payload, 'confirm_pdf_pages': False}).status_code == 409
+        assert client.post('/jobs', json={**payload, 'confirm_pdf_pages': 'false'}).status_code == 422
+        response = client.post('/jobs', json={**payload, 'confirm_pdf_pages': True})
+    assert response.status_code == 201
+    assert len(queued) == 1
+    brief = json.loads((jobs.jobs_dir() / queued[0] / 'request.json').read_text())
+    assert brief['source_files'][0]['pages'] == pages
+
+
+def test_single_source_file_can_use_entire_100_mb(client, monkeypatch):
+    from app.pipeline.sources import MAX_TOTAL_BYTES
+    queued = []
+    monkeypatch.setattr('app.web.main.enqueue', queued.append)
+    pdf = base64.b64decode(source_upload('large.pdf', 'PDF')['content']).ljust(MAX_TOTAL_BYTES, b' ')
+    response = client.post('/jobs', json={'files': [{'name': 'large.pdf', 'content': base64.b64encode(pdf).decode()}]})
+    assert response.status_code == 201, response.text
+    assert len(queued) == 1
+    path = jobs.jobs_dir() / queued[0]
+    assert path.job.entry('sources/01.pdf')['size'] == MAX_TOTAL_BYTES

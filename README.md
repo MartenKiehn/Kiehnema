@@ -2,7 +2,7 @@
 
 **Your website. Your brand. Your video.**
 
-Current version / Aktuelle Version: **0.1.9**
+Current version / Aktuelle Version: **0.1.10**
 
 [English](#english) · [Deutsch](#deutsch)
 
@@ -12,20 +12,32 @@ Current version / Aktuelle Version: **0.1.9**
 
 ## English
 
-Kiehnema turns a website into animated social videos that match its brand.
+Kiehnema turns websites, images and PDFs into animated social videos that match your brand.
 The app reads content, colors, fonts and images, develops a storyboard and creates an
 animated preview. You review and edit the result before the final videos are rendered.
 The video above uses Kiehnema itself as the example.
 
-### From URL to finished video
+### From source to finished video
 
-1. **Enter a website and brief.** Set a public website URL, video length and creative direction.
-2. **Develop the brand and story.** Kiehnema analyzes the website and generates a brand overview, storyboard and animation.
+1. **Choose your source and brief.** Select Website or Files at the top, then enter a public URL or upload images/PDFs, set video length and creative direction.
+2. **Develop the brand and story.** Kiehnema analyzes your source material and generates a brand overview, storyboard and animation.
 3. **Shape the preview.** Watch both formats, change scene copy, order and duration, add comments or contribute visual ideas using text and images.
 4. **Approve and download.** **Approve & render** produces both MP4s with music. **Continue editing** lets you return to the video later.
 
 **Director’s desk** is the starting point for new projects. **Your videos** opens a separate
 page with only your own previews and finished videos.
+
+File sources support PNG, JPEG, WebP and PDFs, including scans: up to 10 files,
+100 MB total (also available to a single file) and 20 megapixels per image. PDFs have no page limit; more than 20 pages
+in total require confirmation before processing.
+Images are oriented, resized to at most 2048 pixels and stored as metadata-free PNGs;
+PDFs retain their original bytes. Sources are encrypted with the job and available
+as private downloads. Image text and visual observations use your configured AI
+provider and need review; file-mode typography uses system fonts.
+Embedded PDF images are extracted as separate PNG assets with individual visual descriptions
+for scene planning. Repeated images are deduplicated; full-page previews remain available.
+Flattened scans retain their page image; individual motifs within a scan and vector-only artwork
+are not segmented into separate assets. Images above 20 megapixels remain in the page preview.
 
 | Output | Resolution | Designed for |
 |---|---|---|
@@ -188,20 +200,33 @@ repository publishes the commits and their history.
 
 **Deine Website. Deine Marke. Dein Video.**
 
-Kiehnema macht aus einer Website animierte Social-Media-Videos im passenden Markenlook.
+Kiehnema macht aus Websites, Bildern und PDFs animierte Social-Media-Videos im passenden Markenlook.
 Die Anwendung liest Inhalte, Farben, Schriften und Bilder, entwickelt daraus ein Storyboard
 und erstellt eine animierte Vorschau. Du prüfst und bearbeitest das Ergebnis, bevor die
 fertigen Videos gerendert werden. Das Video oben zeigt Kiehnema selbst als Beispiel.
 
-### Von der URL zum fertigen Video
+### Von der Quelle zum fertigen Video
 
-1. **Website und Briefing eingeben.** Öffentliche Website-URL, Videolänge und kreative Richtung festlegen.
-2. **Marke und Geschichte entwickeln.** Kiehnema analysiert die Website und erzeugt Markenübersicht, Storyboard und Animation.
+1. **Quelle und Briefing wählen.** Oben Website oder Files auswählen, eine öffentliche URL eingeben oder Bilder/PDFs hochladen, Videolänge und kreative Richtung festlegen.
+2. **Marke und Geschichte entwickeln.** Kiehnema analysiert das Quellmaterial und erzeugt Markenübersicht, Storyboard und Animation.
 3. **Vorschau gestalten.** Beide Formate ansehen, Szenentexte, Reihenfolge und Dauer ändern, Kommentare setzen oder visuelle Ideen mit Texten und Bildern ergänzen.
 4. **Freigeben und herunterladen.** Mit **Approve & render** entstehen beide MP4s inklusive Musik. **Continue editing** öffnet das Video später erneut zur Bearbeitung.
 
 Unter **Director’s desk** beginnst du neue Projekte. **Your videos** öffnet eine eigene
 Seite mit ausschließlich deinen Vorschauen und fertigen Videos.
+
+Dateiquellen unterstützen PNG, JPEG, WebP und PDFs inklusive Scans: maximal 10 Dateien,
+insgesamt 100 MB (auch für eine einzelne Datei nutzbar) und 20 Megapixel pro Bild. PDFs haben keine Seitenbegrenzung;
+bei insgesamt mehr als 20 Seiten wird vor der Verarbeitung nachgefragt.
+Bilder werden ausgerichtet, auf maximal 2048 Pixel verkleinert und ohne Metadaten als
+PNG gespeichert; PDFs bleiben im Original erhalten. Die Quellen werden mit dem Job
+verschlüsselt und stehen als private Downloads bereit. Bildtexte und sichtbare Details
+werden vom konfigurierten KI-Anbieter ausgewertet und müssen geprüft werden;
+im Dateimodus kommen Systemschriften zum Einsatz.
+Eingebettete PDF-Bilder werden als eigene PNG-Dateien mit individuellen Motivbeschreibungen
+für die Szenenplanung extrahiert. Wiederholte Bilder werden zusammengeführt; Seitenansichten bleiben erhalten.
+Bei flachen Scans bleibt das Seitenbild erhalten; einzelne Motive innerhalb eines Scans und reine
+Vektorgrafiken werden nicht separat ausgeschnitten. Bilder über 20 Megapixel bleiben in der Seitenansicht.
 
 | Ausgabe | Auflösung | Geeignet für |
 |---|---|---|
