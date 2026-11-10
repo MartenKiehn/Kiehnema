@@ -4,6 +4,10 @@ User-facing changes, newest version first. Each version has a `## MAJOR.MINOR.PA
 heading followed by plain-text `- Change.` bullets. Release notes are taken from
 this file. Versions newer than the installed version are not shown in the app.
 
+## 0.2.2
+
+- Show image thumbnails beside selected PNG, JPG and WebP files in the video brief.
+
 ## 0.2.1
 
 - Create videos from uploaded images and PDFs as well as websites, with a source selector and private source downloads.
