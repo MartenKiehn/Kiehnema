@@ -1494,6 +1494,8 @@ async def test_directors_desk_and_video_library_navigation(review_job, live_web,
         await page.get_by_role('link', name='New video', exact=True).click()
         await expect(page.get_by_role('heading', name='New video', exact=True)).to_be_visible()
         await expect(page.get_by_role('link', name='Director’s desk', exact=True)).to_be_visible()
+        # Visible HTML can precede the stylesheet after a navigation.
+        await page.wait_for_load_state('load')
         assert await page.evaluate('document.documentElement.scrollWidth <= innerWidth')
         await browser.close()
 
