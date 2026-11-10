@@ -164,7 +164,7 @@ async def local_boundary(request: Request, call_next):
         # no-referrer turns native form POST Origins into "null", tripping our own guard.
         response.headers["Referrer-Policy"] = "same-origin"
         response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; "
             "connect-src 'self'; frame-src 'self'; media-src 'self'; object-src 'none'; "
             "base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
     return response

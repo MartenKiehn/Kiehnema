@@ -6,9 +6,11 @@ import {runInNewContext} from 'node:vm';
 for (const action of ['cancel', 'confirm', 'escape']) {
   const accept = action === 'confirm';
   test(`large PDF confirmation: ${action}`, async () => {
-    const node = () => ({
+    const node = (tag) => ({
+      tag, children: [],
       events: {}, addEventListener(name, callback) { this.events[name] = callback; },
-      append() {}, replaceChildren() {}, setAttribute() {}, focus() { this.focused = true; },
+      append(...children) { this.children.push(...children); }, replaceChildren() { this.children = []; },
+      setAttribute() {}, focus() { this.focused = true; },
     });
     const picker = node(), list = node(), error = node(), status = node(), button = node();
     const modes = [node(), node()];
@@ -33,7 +35,13 @@ for (const action of ['cancel', 'confirm', 'escape']) {
         else (accept ? proceed : cancel).events.click();
       },
     };
+    const previews = new Map();
+    let previewId = 0;
     runInNewContext(readFileSync(new URL('../app/static/sources.js', import.meta.url), 'utf8'), {
+      URL: {
+        createObjectURL(file) { const url = `blob:test-${++previewId}`; previews.set(url, file); return url; },
+        revokeObjectURL(url) { assert.ok(previews.delete(url)); },
+      },
       document: {querySelector: (selector) => selector === '#source-confirm' ? dialog : form,
         querySelectorAll: (selector) => {
           assert.equal(selector, '[data-source-showcase]');
@@ -54,8 +62,24 @@ for (const action of ['cancel', 'confirm', 'escape']) {
     fields['[name="source_mode"]:checked'].value = 'files';
     modes[1].events.change();
     assert.deepEqual(showcases.map((panel) => panel.hidden), [true, false]);
+    const images = ['beach.webp', 'portrait.PNG', 'logo.jpg'].map((name) => ({name, size: 1024}));
+    picker.files = images;
+    picker.events.change();
+    assert.equal(list.children.length, 3);
+    list.children.forEach((row, index) => {
+      assert.equal(row.children[0].tag, 'img');
+      assert.equal(previews.get(row.children[0].src), images[index]);
+      assert.equal(row.children[0].alt, '');
+      assert.equal(row.children[1].children[0].textContent, images[index].name);
+    });
+    list.children[0].children[0].events.error();
+    assert.equal(list.children[0].children[0].hidden, true);
+    while (list.children.length) list.children[0].children.at(-1).events.click();
+    assert.equal(previews.size, 0);
+    assert.equal(picker.required, true);
     picker.files = [{name: 'guide.pdf', size: 100 * 1024 * 1024}];
     picker.events.change();
+    assert.equal(list.children[0].children[0].tag, 'span');
     await form.events.submit({preventDefault() {}});
     assert.equal(prompts.length, 1);
     assert.equal(prompts[0], 42);

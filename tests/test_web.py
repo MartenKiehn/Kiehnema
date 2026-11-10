@@ -107,7 +107,9 @@ def review_form(client):
 
 
 def test_index_validation_and_static_assets(client):
-    html = client.get("/").text
+    response = client.get("/")
+    assert "img-src 'self' data: blob:;" in response.headers['Content-Security-Policy']
+    html = response.text
     assert "Director’s desk · Kiehnema" in html and 'aria-label="Kiehnema home"' in html
     assert "Motion Studio" not in html and "kiehnema.svg" in html
     assert "New video" in html and 'name="url"' in html and 'name="duration"' in html and 'name="description"' in html

@@ -16,6 +16,7 @@ if (sourceForm) {
     confirmation.showModal();
   });
   let files = [];
+  let previewUrls = [];
   let busy = false;
   const fileMode = () => sourceForm.querySelector('[name="source_mode"]:checked').value === 'files';
   const showError = (message) => {
@@ -36,9 +37,20 @@ if (sourceForm) {
   };
   modes.forEach((mode) => mode.addEventListener('change', updateMode));
   const renderFiles = () => {
+    previewUrls.forEach((url) => URL.revokeObjectURL(url));
+    previewUrls = [];
     list.replaceChildren();
     files.forEach((file, index) => {
       const row = document.createElement('li');
+      if (/\.(png|jpe?g|webp)$/i.test(file.name)) {
+        const preview = document.createElement('img');
+        preview.src = URL.createObjectURL(file);
+        previewUrls.push(preview.src);
+        preview.alt = '';
+        preview.className = 'source-file-preview';
+        preview.addEventListener('error', () => { preview.hidden = true; });
+        row.append(preview);
+      }
       const label = document.createElement('span');
       const name = document.createElement('strong');
       name.textContent = file.name;

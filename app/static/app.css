@@ -790,7 +790,8 @@ main:has(#review-workspace) { max-width: 1360px; padding-top: 28px; }
 .source-upload input::file-selector-button { background: var(--white); color: var(--ink); border: 1px solid var(--line); border-radius: 3px; padding: 9px 12px; margin-right: 8px; cursor: pointer; }
 .source-file-list { list-style: none; padding: 0; margin: 12px 0; }
 .source-file-list li { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 10px 12px; border: 1px solid var(--line); border-radius: 4px; margin-bottom: 7px; }
-.source-file-list li > span { min-width: 0; }
+.source-file-list li > span { min-width: 0; flex: 1; }
+.source-file-preview { width: 64px; height: 64px; flex-shrink: 0; object-fit: contain; border: 1px solid var(--line); border-radius: 3px; background: var(--paper); }
 .source-file-list strong { display: block; overflow-wrap: anywhere; font-size: .9375rem; font-weight: 500; }
 .source-file-list small { display: block; font: .75rem var(--mono); color: var(--muted); margin-top: 4px; }
 .source-file-list button { flex-shrink: 0; font-size: 1.25rem; }
