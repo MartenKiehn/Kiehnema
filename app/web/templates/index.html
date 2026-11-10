@@ -1,5 +1,13 @@
 {% extends "base.html" %}
 {% from 'components/info_box.html' import info_box %}
+{% macro film_edge(position) -%}
+<div class="showcase-film-edge showcase-film-edge-{{ position }}" aria-hidden="true">
+  <span>KIEHNEMA 400</span>
+  <span class="showcase-film-index"><i></i>01 <b>▸</b></span>
+  <span class="showcase-film-index"><i></i>02 <b>▸</b></span>
+  <span class="showcase-film-index"><i></i>03</span>
+</div>
+{%- endmacro %}
 {% block title %}Director’s desk · Kiehnema{% endblock %}
 {% block content %}
 <div class="desk-overview">
@@ -91,16 +99,81 @@
     </form>
   </section>
   <aside class="process-card">
-    <div class="format-art" aria-hidden="true">
-      <div class="film-caption"><span>KIEHNEMA / COLOR</span><span>01 — 02</span></div>
-      <div class="film-frames">
-        <div class="art-feed"><span>Your<br>brand.<br><em>In motion.</em></span><b>01 / 4:5 FEED</b></div>
-        <div class="art-story"><span>Make<br>your<br><em>move.</em></span><b>02 / 9:16 STORY</b></div>
+    <figure class="source-showcase website-showcase" data-source-showcase="url" aria-labelledby="website-showcase-title">
+      <figcaption>
+        <p class="showcase-eyebrow">FROM WEBSITE TO VIDEO</p>
+        <h2 id="website-showcase-title">Everything that makes <em>you, you.</em></h2>
+      </figcaption>
+      {{ film_edge('top') }}
+      <div class="showcase-browser" role="img" aria-label="Example NORTH website with a golden hillside photograph and editorial typography">
+        <div class="showcase-browser-bar" aria-hidden="true"><span>● ● ●</span>north.example</div>
+        <div class="showcase-browser-nav" aria-hidden="true"><span>NORTH</span><small>Explore &nbsp; · &nbsp; Our story</small></div>
+        <div class="showcase-browser-hero" aria-hidden="true"><span>A Mediterranean<br><em>state of mind.</em></span></div>
       </div>
-      <div class="film-caption"><span>A STORY IN EVERY FRAME</span><span>▶</span></div>
-    </div>
-    <p class="eyebrow">A SMALL BRIEF. A FULL STORY.</p>
+      <p class="showcase-stage">YOUR BRAND INGREDIENTS</p>
+      <div class="showcase-ingredients">
+        <figure>
+          <div class="showcase-swatches" role="img" aria-label="Ochre, cream and olive colour palette"><i></i><i></i><i></i></div>
+          <figcaption>COLOUR</figcaption>
+        </figure>
+        <figure>
+          <div class="showcase-type" aria-hidden="true">Aa</div>
+          <figcaption>TYPE</figcaption>
+        </figure>
+        <figure>
+          <img src="{{ url_for('static', path='source-landscape.webp') }}" width="1536" height="1024" alt="Golden hills from the example website">
+          <figcaption>IMAGERY</figcaption>
+        </figure>
+      </div>
+      <svg class="showcase-connector" viewBox="0 0 360 62" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M60 3v21h240V3M180 24v30m-6-6 6 6 6-6"/></svg>
+      <p class="showcase-stage showcase-stage-output">YOUR BRAND IN MOTION</p>
+      <div class="showcase-outputs">
+        <figure class="showcase-output">
+          <div class="showcase-frame showcase-feed" aria-hidden="true"><span>A Mediterranean<br><em>state of mind.</em></span><small>NORTH / THE FEED</small></div>
+          <figcaption>Feed video<small>MP4 · 4:5</small></figcaption>
+        </figure>
+        <figure class="showcase-output">
+          <div class="showcase-frame showcase-story" aria-hidden="true"><span>A Mediterranean<br><em>state of mind.</em></span><small>NORTH / THE STORY</small></div>
+          <figcaption>Story video<small>MP4 · 9:16</small></figcaption>
+        </figure>
+      </div>
+      <p class="showcase-example">Illustrative website and videos. Your brand sets the direction.</p>
+      {{ film_edge('bottom') }}
+    </figure>
+    <figure class="source-showcase" data-source-showcase="files" aria-labelledby="showcase-title" hidden>
+      <figcaption>
+        <p class="showcase-eyebrow">FROM FILES TO VIDEO</p>
+        <h2 id="showcase-title">Turn your existing materials into <em>on-brand video.</em></h2>
+      </figcaption>
+      {{ film_edge('top') }}
+      <div class="showcase-sources">
+        <figure class="showcase-source">
+          <div class="showcase-photo"><img src="{{ url_for('static', path='source-landscape.webp') }}" width="1536" height="1024" alt="Golden hills in the evening light"></div>
+          <figcaption>Campaign.jpg<small>IMAGE / JPG</small></figcaption>
+        </figure>
+        <figure class="showcase-source">
+          <div class="showcase-guide" aria-hidden="true"><span>Brand<br>Guide</span><span class="guide-edition">A POINT OF VIEW / 01</span></div>
+          <figcaption>Brand guide.pdf<small>DOCUMENT / PDF</small></figcaption>
+        </figure>
+      </div>
+      <svg class="showcase-connector" viewBox="0 0 360 62" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M65 3v5q0 16 16 16h198q16 0 16-16V3M180 24v30m-6-6 6 6 6-6"/></svg>
+      <div class="showcase-outputs">
+        <figure class="showcase-output">
+          <div class="showcase-frame showcase-feed" aria-hidden="true"><span>Your brand.<br><em>In motion.</em></span><small>01 / THE FEED</small></div>
+          <figcaption>Feed video<small>MP4 · 4:5</small></figcaption>
+        </figure>
+        <figure class="showcase-output">
+          <div class="showcase-frame showcase-story" aria-hidden="true"><span>Your<br>brand.<br><em>In motion.</em></span><small>02 / THE STORY</small></div>
+          <figcaption>Story video<small>MP4 · 9:16</small></figcaption>
+        </figure>
+      </div>
+      <p class="showcase-example">Example materials. Your story takes the spotlight.</p>
+      {{ film_edge('bottom') }}
+    </figure>
+    <details class="process-details">
+    <summary>How it works</summary>
     <ol class="process-list"><li><span>01</span><div><b>Give us the starting point</b><p>Your website or files, and a little direction.</p></div></li><li><span>02</span><div><b>Put your eye on it</b><p>Preview both formats, edit copy, leave feedback.</p></div></li><li><span>03</span><div><b>Ready for the feed</b><p>Two MP4s with original music, ready to share.</p></div></li></ol>
+    </details>
     <p class="cost-note">Processing time and model costs depend on your provider, model and video.<br>Your provider bills usage to the account configured by your administrator.</p>
   </aside>
 </div>

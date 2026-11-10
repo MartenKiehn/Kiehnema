@@ -23,6 +23,9 @@ if (sourceForm) {
     error.hidden = !message;
   };
   const updateMode = () => {
+    document.querySelectorAll('[data-source-showcase]').forEach((panel) => {
+      panel.hidden = (panel.dataset.sourceShowcase === 'files') !== fileMode();
+    });
     sourceForm.querySelectorAll('[data-source-panel]').forEach((panel) => {
       const active = (panel.dataset.sourcePanel === 'files') === fileMode();
       panel.hidden = !active;

@@ -11,6 +11,7 @@ this file. Versions newer than the installed version are not shown in the app.
 - Read native PDF text and additional text inside scanned images together, retaining page references for reviewing the resulting facts.
 - Use individually extracted PDF images in video scenes, with motif descriptions, preserved transparency and duplicate-image detection. Full-page references remain available for scans and layouts.
 - Follow file-processing progress, review source-backed facts and build imagery-led videos even when the uploaded material contains little or no text.
+- Redesigned website and file previews with cinematic film frames, consistent typography and responsive layouts.
 
 ## 0.1.9
 

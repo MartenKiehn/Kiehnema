@@ -115,6 +115,10 @@ def test_index_validation_and_static_assets(client):
     assert 'checked' not in re.search(r'<input[^>]*name="allow_client_logos"[^>]*>', html)[0]
     assert 'name="source_mode" value="url" checked' in html
     assert 'name="source_mode" value="files"' in html and 'id="source-files"' in html
+    assert 'data-source-showcase="url" aria-labelledby="website-showcase-title"' in html
+    assert 'data-source-showcase="files" aria-labelledby="showcase-title" hidden' in html
+    assert 'YOUR BRAND INGREDIENTS' in html and 'FROM FILES TO VIDEO' in html
+    assert client.get('/static/source-landscape.webp').status_code == 200
     assert '<dialog id="source-confirm"' in html and 'aria-labelledby="source-confirm-title"' in html
     assert 'data-confirm-cancel autofocus' in html and 'Process all pages' in html
     assert 'name="max_pages"' in html and 'name="max_depth"' in html

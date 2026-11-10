@@ -11,12 +11,15 @@ for (const action of ['cancel', 'confirm', 'escape']) {
       append() {}, replaceChildren() {}, setAttribute() {}, focus() { this.focused = true; },
     });
     const picker = node(), list = node(), error = node(), status = node(), button = node();
+    const modes = [node(), node()];
+    const showcases = ['url', 'files'].map((mode) => ({dataset: {sourceShowcase: mode}}));
     const fields = {
       '#source-files': picker, '[data-source-list]': list, '[data-source-error]': error,
       '[data-source-status]': status, 'button[type="submit"]': button,
-      '[name="source_mode"]:checked': {value: 'files'},
+      '[name="source_mode"]:checked': {value: 'url'},
     };
-    const form = {...node(), querySelector: (selector) => fields[selector], querySelectorAll: () => [],
+    const form = {...node(), querySelector: (selector) => fields[selector],
+      querySelectorAll: (selector) => selector === '[name="source_mode"]' ? modes : [],
       elements: {csrf: {value: 'token'}, duration: {value: '30'}, description: {value: 'A brief'}}};
     const requests = [], prompts = [], destinations = [];
     const cancel = node(), proceed = node(), pageCount = node();
@@ -31,7 +34,11 @@ for (const action of ['cancel', 'confirm', 'escape']) {
       },
     };
     runInNewContext(readFileSync(new URL('../app/static/sources.js', import.meta.url), 'utf8'), {
-      document: {querySelector: (selector) => selector === '#source-confirm' ? dialog : form, createElement: node},
+      document: {querySelector: (selector) => selector === '#source-confirm' ? dialog : form,
+        querySelectorAll: (selector) => {
+          assert.equal(selector, '[data-source-showcase]');
+          return showcases;
+        }, createElement: node},
       FileReader: class { readAsDataURL() { this.result = 'data:application/pdf;base64,cGRm'; this.onload(); } },
       location: {assign: (url) => destinations.push(url)},
       fetch: async (url, options) => {
@@ -43,6 +50,10 @@ for (const action of ['cancel', 'confirm', 'escape']) {
           : {status: 201, ok: true, json: async () => ({location: '/jobs/created'})};
       },
     });
+    assert.deepEqual(showcases.map((panel) => panel.hidden), [false, true]);
+    fields['[name="source_mode"]:checked'].value = 'files';
+    modes[1].events.change();
+    assert.deepEqual(showcases.map((panel) => panel.hidden), [true, false]);
     picker.files = [{name: 'guide.pdf', size: 100 * 1024 * 1024}];
     picker.events.change();
     await form.events.submit({preventDefault() {}});
@@ -61,5 +72,8 @@ for (const action of ['cancel', 'confirm', 'escape']) {
     assert.equal(picker.required, false); // Selection survives cancelling the prompt.
     assert.equal(status.hidden, true);
     assert.equal(error.hidden, true);
+    fields['[name="source_mode"]:checked'].value = 'url';
+    modes[0].events.change();
+    assert.deepEqual(showcases.map((panel) => panel.hidden), [false, true]);
   });
 }

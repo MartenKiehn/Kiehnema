@@ -5,7 +5,19 @@ Two design studies generated with the built-in image generation tool before impl
 - `website.png`: URL mode, retaining scan settings.
 - `files.png`: file mode, with a file picker and selected-file list.
 
-Implementation keeps the existing app typography, navigation, format illustration and 4:5 / 9:16 outputs. Generated mockup copy and incidental format labels are illustrative.
+Implementation keeps the existing app typography, navigation and 4:5 / 9:16 outputs. The right-hand showcase follows the dark panel in `files.png`, with responsive HTML captions, a CSS document cover and a shared scenic image. Generated mockup copy and incidental format labels are illustrative; the implemented previews use the actual portrait output ratios.
+
+## Showcase image asset
+
+Both source modes share a decorative contact-sheet frame via the accessibility-hidden `film_edge` macro.
+
+Website mode illustrates colour, typography and imagery extraction; Files mode shows images and PDFs becoming video. `sources.js` hides the inactive figure, including from the accessibility tree. The NORTH website is fictitious.
+
+`app/static/source-landscape.webp` was generated with the built-in image generation tool, then encoded as WebP for local serving. No external image requests are needed. The HTML/CSS panel reuses the image in both example output formats; these are labelled illustrations, not playable videos.
+
+Generation prompt:
+
+Create a single landscape photograph to be used as a small website demo asset. Wide 3:2 composition, realistic editorial travel photography of layered rolling Mediterranean hills and distant mountain ridges at golden hour. Warm muted sand, ochre, hazy peach sky, dark olive and charcoal foothills. Fine natural texture, elegant quiet cinematic atmosphere, no people, no buildings, no branding, no text, no frames, no collage, no UI. The central composition must also work when cropped to a portrait 4:5 or 9:16 frame. Keep softly lit sky in upper half and textured golden hills below. This is only the scenic image background; typography will be added separately in HTML.
 
 ## Generation prompts
 
