@@ -257,11 +257,14 @@ def enqueue(job_id: str, decision: dict | None = None):
     if len(app.state.tasks) >= 20:
         raise HTTPException(429, 'The job queue is full. Try again later.')
     capability = vault.get_job(job_id)
+    write_status(job_path(job_id), "queued", "Queued for rendering" if decision and decision["action"] == "approve"
+                 else "Waiting for the local worker")
     with accounts.database() as con:
         if not con.execute('UPDATE jobs SET active=1 WHERE id=? AND active=0', (job_id,)).rowcount:
             raise HTTPException(409, 'This job already has work in progress.')
-    write_status(job_path(job_id), "queued", "Queued for rendering" if decision and decision["action"] == "approve"
-                 else "Waiting for the local worker")
+        if decision is None:  # Review decisions resume existing work, not a new request.
+            con.execute('INSERT INTO video_requests(user_id, requested_at) VALUES(?, ?)',
+                        (capability.owner, time.time()))
     app.state.tasks[job_id] = asyncio.create_task(run_background(job_id, decision, capability), context=contextvars.Context())
 
 

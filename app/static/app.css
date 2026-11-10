@@ -565,6 +565,30 @@ main:has(#review-workspace) { max-width: 1360px; padding-top: 28px; }
 
 /* Account management uses the full workspace width, with individual access controls tucked away. */
 .users-page { max-width: 1080px; margin: 12px auto; }
+.request-log { max-width: 1000px; margin-inline: auto; }
+.request-log h1 { font-family: Georgia, serif; font-style: italic; font-weight: 400; }
+.request-log .request-log-card { padding: 0 28px; }
+.request-log-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.request-log-table th, .request-log-table td { padding: 20px 0; text-align: left; border-bottom: 1px solid var(--line); }
+.request-log-table thead th { color: var(--muted); font: .75rem/1.5 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+.request-log-table th:first-child { width: 56%; padding-right: 24px; }
+.request-log-table tbody th { font-weight: 500; }
+.request-log-table tbody tr:last-child > * { border-bottom: 0; }
+.request-log-person { display: flex; align-items: center; gap: 16px; overflow-wrap: anywhere; }
+.request-log-person .users-avatar { width: 36px; height: 36px; font: italic 1.125rem Georgia, serif; }
+.request-log-table time { font-variant-numeric: tabular-nums; }
+.request-log-table time span { display: inline-block; }
+.request-log-pagination { justify-content: center; }
+.request-log-empty { padding-block: 48px; }
+@media (max-width: 600px) {
+  .request-log .request-log-card { padding-inline: 16px; }
+  .request-log-table th:first-child { width: 50%; padding-right: 16px; }
+  .request-log-table th, .request-log-table td { padding-block: 18px; }
+  .request-log-person { gap: 10px; }
+  .request-log-person .users-avatar { display: none; }
+  .request-log-table time { font-size: .875rem; }
+  .request-log-table time span { display: block; color: var(--muted); }
+}
 .users-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 32px; }
 .users-heading h1 { margin-bottom: 12px; }
 .users-heading .badge { flex-shrink: 0; }

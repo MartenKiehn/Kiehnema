@@ -7,9 +7,10 @@ import sqlite3
 import time
 import pyotp
 from contextvars import ContextVar
+from datetime import datetime, timezone
 from urllib.parse import parse_qs
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -302,6 +303,15 @@ def admin_users(*, allow_invites=False):
 @router.get('/admin')
 async def admin_page(request: Request):
     return form(request, mode='admin', users=admin_users(allow_invites=True))
+
+
+@router.get('/admin/video-requests')
+async def video_requests_page(request: Request, page: int = Query(default=1, ge=1, le=1_000_000)):
+    entries = a.video_requests(page)
+    return form(request, template='video_requests.html', page=page, has_more=len(entries) > 50,
+                entries=[{'username': entry['username'],
+                          'requested_at': datetime.fromtimestamp(entry['requested_at'], timezone.utc)}
+                         for entry in entries[:50]])
 
 
 @router.post('/admin/role')

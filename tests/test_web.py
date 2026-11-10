@@ -1404,6 +1404,7 @@ async def test_admin_provider_form_switching_and_secret_preservation(review_job,
 @pytest.mark.parametrize(('route', 'active'), [
     ('/', '/'), ('/videos', '/videos'), ('/jobs/' + JOB, '/videos'), ('/account', '/account'),
     ('/admin', '/admin'), ('/admin/provider', '/admin/provider'), ('/admin/updates', '/admin/updates'),
+    ('/admin/video-requests', '/admin/video-requests'),
 ])
 def test_navigation_identifies_one_current_section(review_job, client, route, active):
     response = client.get(route)
@@ -1596,6 +1597,8 @@ async def test_blocked_review_feedback_jump_and_mobile_layout(review_job, live_w
 
 @pytest.mark.parametrize('pages', [20, 21])
 def test_pdf_page_confirmation_precedes_job_creation(client, monkeypatch, pages):
+    from app.security import accounts
+    from app.web.main import enqueue
     import pypdfium2 as pdfium
     from app.pipeline.sources import PDF_LOCK
     buffer = io.BytesIO()
@@ -1604,7 +1607,11 @@ def test_pdf_page_confirmation_precedes_job_creation(client, monkeypatch, pages)
             pdf.new_page(100, 100).close()
         pdf.save(buffer)
     queued = []
-    monkeypatch.setattr('app.web.main.enqueue', queued.append)
+    def queue(job_id):
+        enqueue(job_id)
+        queued.append(job_id)
+    monkeypatch.setattr('app.web.main.enqueue', queue)
+    monkeypatch.setattr(jobs, 'run_job', AsyncMock(return_value={}))
     payload = {'files': [{'name': 'guide.pdf', 'content': base64.b64encode(buffer.getvalue()).decode()}]}
     response = client.post('/jobs', json=payload)
     if pages > 20:
@@ -1613,9 +1620,11 @@ def test_pdf_page_confirmation_precedes_job_creation(client, monkeypatch, pages)
         assert not queued and not list(jobs.jobs_dir().iterdir())
         assert client.post('/jobs', json={**payload, 'confirm_pdf_pages': False}).status_code == 409
         assert client.post('/jobs', json={**payload, 'confirm_pdf_pages': 'false'}).status_code == 422
+        assert accounts.video_requests() == []
         response = client.post('/jobs', json={**payload, 'confirm_pdf_pages': True})
     assert response.status_code == 201
     assert len(queued) == 1
+    assert len(accounts.video_requests()) == 1
     brief = json.loads((jobs.jobs_dir() / queued[0] / 'request.json').read_text())
     assert brief['source_files'][0]['pages'] == pages
 

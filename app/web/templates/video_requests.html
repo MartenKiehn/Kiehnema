@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block title %}Video requests · Kiehnema{% endblock %}
+{% block content %}
+<section class="request-log" aria-labelledby="request-log-title">
+  <header class="users-heading">
+    <div><p class="eyebrow">DIRECTOR ONLY</p><h1 id="request-log-title">Video requests</h1><p class="lede">Who requested a video, and when.</p></div>
+  </header>
+  {% if entries %}
+  <div class="card request-log-card">
+    <table class="request-log-table" aria-label="Video requests, newest first">
+      <thead><tr><th scope="col">User</th><th scope="col">Requested at · UTC</th></tr></thead>
+      <tbody>
+        {% for entry in entries %}
+        <tr>
+          <th scope="row"><span class="request-log-person"><span class="users-avatar" aria-hidden="true">{{ entry.username[0]|upper }}</span><span>{{ entry.username }}</span></span></th>
+          <td><time datetime="{{ entry.requested_at.isoformat() }}">{{ entry.requested_at.strftime('%d %b %Y') }} <span>{{ entry.requested_at.strftime('%H:%M:%S') }}</span></time></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card request-log-empty"><h2>{{ 'No more requests.' if page > 1 else 'No video requests yet.' }}</h2><p class="lede">New video requests will appear here with a username and timestamp.</p></div>
+  {% endif %}
+  {% if page > 1 or has_more %}
+  <nav class="request-log-pagination" aria-label="Video request pages">
+    {% if page > 1 %}<a class="button small secondary" href="/admin/video-requests?page={{ page - 1 }}" rel="prev">← Newer</a>{% endif %}
+    {% if has_more %}<a class="button small secondary" href="/admin/video-requests?page={{ page + 1 }}" rel="next">Older →</a>{% endif %}
+  </nav>
+  {% endif %}
+</section>
+{% endblock %}

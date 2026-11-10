@@ -77,6 +77,9 @@ def database():
         CREATE TABLE IF NOT EXISTS jobs (
             id TEXT PRIMARY KEY, owner TEXT NOT NULL REFERENCES users(id), key BLOB NOT NULL,
             active INTEGER NOT NULL DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS video_requests (
+            id INTEGER PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            requested_at REAL NOT NULL);
         CREATE TABLE IF NOT EXISTS files (
             job TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE, tag TEXT NOT NULL,
             name BLOB NOT NULL, blob TEXT NOT NULL, size INTEGER NOT NULL,
@@ -154,6 +157,16 @@ def identity() -> Identity:
     if person is None:
         raise PermissionError("Sign in to unlock your workspace.")
     return refresh(person)
+
+
+def video_requests(page: int = 1) -> list[dict]:
+    if not identity().admin:
+        raise PermissionError('Administrator access required.')
+    with database() as con:
+        return [dict(row) for row in con.execute('''
+            SELECT users.username, video_requests.requested_at FROM video_requests
+            JOIN users ON users.id = video_requests.user_id
+            ORDER BY video_requests.id DESC LIMIT 51 OFFSET ?''', ((page - 1) * 50,))]
 
 
 def set_role(person: Identity, uid: str, role: str) -> None:
