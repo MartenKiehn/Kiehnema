@@ -17,7 +17,7 @@ Website mode illustrates colour, typography and imagery extraction; Files mode s
 
 Generation prompt:
 
-Create a single landscape photograph to be used as a small website demo asset. Wide 3:2 composition, realistic editorial travel photography of layered rolling Mediterranean hills and distant mountain ridges at golden hour. Warm muted sand, ochre, hazy peach sky, dark olive and charcoal foothills. Fine natural texture, elegant quiet cinematic atmosphere, no people, no buildings, no branding, no text, no frames, no collage, no UI. The central composition must also work when cropped to a portrait 4:5 or 9:16 frame. Keep softly lit sky in upper half and textured golden hills below. This is only the scenic image background; typography will be added separately in HTML.
+Use case: photorealistic-natural. Asset type: shared scenic photograph for the Kiehnema website and file-to-video demo cards. Create a realistic editorial photograph of a northern German North Sea beach: pale sand dunes with windblown marram grass in the foreground, a broad empty sandy beach, gentle blue-grey sea and a flat distant horizon. Quiet coastal atmosphere, soft late-afternoon light, muted natural sand, straw, sage and sea-blue colours. Wide 3:2 composition. Keep the sea and beach clearly recognizable in centered portrait crops of 4:5 and 9:16, as well as a shallow wide website hero crop. Natural fine photographic texture. No people, buildings, mountains, tropical vegetation, text, logos, watermarks, frames, collage or UI. Typography will be added in HTML.
 
 ## Generation prompts
 
