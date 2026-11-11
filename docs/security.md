@@ -261,6 +261,36 @@ view the team directory, and check, install or cancel updates. It cannot change 
 disable accounts, change security or AI settings, or manage update credentials.
 Invitation forms cannot grant elevated roles.
 
+### Administrative activity log
+
+Only Directors can open **Backstage → Activity log** (`/admin/activity`), including by
+direct URL. Assistant directors can perform their permitted administrative actions,
+but cannot read this log. Filters cover Team, Security, AI provider and Updates;
+pages show up to 50 events, newest first, with UTC timestamps.
+
+The log records the acting account and username at the time, affected username where
+applicable, action, safe change details and request result. It covers invitations,
+roles, username changes (old → new) by any role, account access/deletion, administrative two-factor settings, AI configuration
+saves, and update checks, installation/cancellation requests and registry credential
+changes. It excludes passwords, keys, invitation codes, raw errors, provider payloads
+and all private job content. The existing Video requests log stays separate.
+Renames retain the previous username as the actor snapshot; older events remain unchanged.
+
+Account changes and their events share a database transaction. External operations
+are recorded before calling the provider-settings store or updater. **Saved** confirms
+a local save; **Accepted** confirms the updater accepted a request, not that an
+installation succeeded. **Failed** means a local save failed or the updater rejected
+the request. **Requested** means no confirmed result was recorded, for example after
+a connection failure or process interruption. The Updates page supplies actual
+installation progress. Read-only status polling and connection tests are not logged.
+
+Events begin when this feature is installed; historical changes are not backfilled.
+The additive `audit_events` table lives in the account database and is included in
+its backups. Username snapshots remain after renaming or deleting an account, so
+the administrative history remains attributable. There is no edit/delete endpoint
+in the app. This is not a tamper-proof external audit service: a server administrator
+can alter the database, and restoring a backup restores its earlier history.
+
 **Backstage → Users** shows active and disabled account counts, plus pending and
 expired invitations with their expiry time in UTC. Directors and Assistant directors
 can renew an invitation: this issues a new single-use code valid for 24 hours and

@@ -13,6 +13,7 @@ from pydantic import ValidationError
 
 from app.llm import provider
 from app.llm.client import LLMError, test_connection
+from app.security import audit
 from app.security.accounts import identity, throttle
 from app.web.auth import current_session
 
@@ -52,12 +53,14 @@ async def save(request: Request):
     if testing:
         session.provider_test = None
     form = await request.form()
+    administrator()
     values = {name: str(form.get(name, '')).strip() for name in ('provider', 'model', 'region', 'auth', 'max_output_tokens')}
     if values['provider'] != 'bedrock':
         values['auth'] = 'keys'
         values['region'] = 'eu-central-1'
     credentials = {name: str(form.get(name, '')).strip() for name in provider.SECRET_FIELDS}
     existing = None
+    event = None
     try:
         existing = provider.load()
         if (not any(credentials.values()) and existing is not None
@@ -74,6 +77,7 @@ async def save(request: Request):
             return templates.TemplateResponse(request, 'provider.html', {
                 'values': values, 'configured': existing.public() if existing else None,
                 'error': 'Test the connection successfully with these settings before saving.'}, status_code=409)
+        event = audit.record(identity(), 'provider.configuration_saved', result='requested')
         provider.save(configured)
     except ValidationError as exc:
         message = '; '.join(error['msg'] for error in exc.errors(include_input=False))
@@ -84,9 +88,12 @@ async def save(request: Request):
     except LLMError as exc:
         return JSONResponse({'error': str(exc)}, status_code=422)
     except (ValueError, OSError):
+        if event is not None:
+            audit.finish(event, 'failed')
         if testing:
             return JSONResponse({'error': 'The test could not start. Check the saved configuration or wait before trying again.'}, status_code=409)
         return templates.TemplateResponse(request, 'provider.html', {
             'values': values, 'configured': existing.public() if existing else None,
             'error': 'AI settings could not be saved. Check the configuration key and storage permissions.'}, status_code=409)
+    audit.finish(event, 'saved')
     return RedirectResponse('/admin/provider?saved=1', status_code=303)

@@ -80,6 +80,10 @@ def database():
         CREATE TABLE IF NOT EXISTS video_requests (
             id INTEGER PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             requested_at REAL NOT NULL);
+        CREATE TABLE IF NOT EXISTS audit_events (
+            id INTEGER PRIMARY KEY, occurred_at REAL NOT NULL,
+            actor_id TEXT NOT NULL, actor_name TEXT NOT NULL, action TEXT NOT NULL,
+            target TEXT NOT NULL DEFAULT '', detail TEXT NOT NULL DEFAULT '', result TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS files (
             job TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE, tag TEXT NOT NULL,
             name BLOB NOT NULL, blob TEXT NOT NULL, size INTEGER NOT NULL,
@@ -170,6 +174,8 @@ def video_requests(page: int = 1) -> list[dict]:
 
 
 def set_role(person: Identity, uid: str, role: str) -> None:
+    from app.security import audit
+
     if role not in ROLE_LABELS:
         raise ValueError('Choose a valid role.')
     with database() as con:
@@ -178,27 +184,42 @@ def set_role(person: Identity, uid: str, role: str) -> None:
             raise PermissionError('Administrator access required.')
         if uid == person.id:
             raise ValueError('You cannot change your own administrator role.')
-        if not con.execute('UPDATE users SET admin=? WHERE id=?', (int(role == 'admin'), uid)).rowcount:
+        target = con.execute('''SELECT username,admin,
+            id IN (SELECT user_id FROM invitation_managers) AS manager FROM users WHERE id=?''', (uid,)).fetchone()
+        if target is None:
             raise ValueError('Account unavailable.')
+        previous = 'admin' if target['admin'] else 'manager' if target['manager'] else 'user'
+        con.execute('UPDATE users SET admin=? WHERE id=?', (int(role == 'admin'), uid))
         con.execute('DELETE FROM invitation_managers WHERE user_id=?', (uid,))
         if role == 'manager':
             con.execute('INSERT INTO invitation_managers VALUES(?)', (uid,))
+        if previous != role:
+            audit.record(person, 'team.role_changed', target=target['username'],
+                         detail=f'{ROLE_LABELS[previous]} → {ROLE_LABELS[role]}', con=con)
     revoke(uid)
 
 
 def set_disabled(person: Identity, uid: str, disabled: bool) -> None:
+    from app.security import audit
+
     with database() as con:
         con.execute('BEGIN IMMEDIATE')
         if not con.execute('SELECT 1 FROM users WHERE id=? AND admin=1 AND disabled=0', (person.id,)).fetchone():
             raise PermissionError('Administrator access required.')
         if uid == person.id:
             raise ValueError('You cannot disable your own administrator account.')
-        if not con.execute('UPDATE users SET disabled=? WHERE id=?', (int(disabled), uid)).rowcount:
+        target = con.execute('SELECT username,disabled FROM users WHERE id=?', (uid,)).fetchone()
+        if target is None:
             raise ValueError('Account unavailable.')
+        con.execute('UPDATE users SET disabled=? WHERE id=?', (int(disabled), uid))
+        if bool(target['disabled']) != disabled:
+            audit.record(person, 'team.account_disabled' if disabled else 'team.account_enabled',
+                         target=target['username'], con=con)
     revoke(uid)
 
 
 def delete_user(person: Identity, uid: str, confirmation: str) -> list[str]:
+    from app.security import audit
     from app.security.vault import valid_id
 
     with database() as con:
@@ -223,6 +244,7 @@ def delete_user(person: Identity, uid: str, confirmation: str) -> list[str]:
         paths = [objects / valid_id(row['id']) for row in rows]
         if any(path.is_symlink() or (path.exists() and not path.is_dir()) for path in paths):
             raise ValueError('Invalid encrypted video directory.')
+        audit.record(person, 'team.account_deleted', target=target['username'], con=con)
         # Remove files first so failed cleanup leaves a disabled account that can be retried.
         try:
             for path in paths:
@@ -251,11 +273,19 @@ def all_two_factor_required() -> bool:
 
 
 def require_all_two_factor(person: Identity, required: bool) -> None:
-    if not refresh(person).admin:
-        raise PermissionError('Administrator access required.')
+    from app.security import audit
+
     with database() as con:
+        con.execute('BEGIN IMMEDIATE')
+        if not con.execute('SELECT 1 FROM users WHERE id=? AND admin=1 AND disabled=0', (person.id,)).fetchone():
+            raise PermissionError('Administrator access required.')
+        previous = con.execute('SELECT 1 FROM security_policy WHERE require_totp=1').fetchone() is not None
+        if previous == required:
+            return
         con.execute('INSERT INTO security_policy VALUES(1,?) ON CONFLICT(id) DO UPDATE SET require_totp=excluded.require_totp',
                     (int(required),))
+        audit.record(person, 'security.policy_changed', target='All accounts',
+                     detail='Two-factor authentication required' if required else 'Two-factor authentication optional', con=con)
 
 
 def two_factor_required(person: Identity) -> bool:
@@ -274,11 +304,15 @@ def two_factor_enabled(person: Identity) -> bool:
 
 
 def require_two_factor(person: Identity, uid: str, required: bool) -> None:
-    if not refresh(person).admin:
-        raise PermissionError('Administrator access required.')
+    from app.security import audit
+
     with database() as con:
         con.execute('BEGIN IMMEDIATE')
-        if not con.execute('SELECT 1 FROM users WHERE id=?', (uid,)).fetchone():
+        if not con.execute('SELECT 1 FROM users WHERE id=? AND admin=1 AND disabled=0', (person.id,)).fetchone():
+            raise PermissionError('Administrator access required.')
+        target = con.execute('''SELECT username,length(totp)>0 AS enabled,
+            id IN (SELECT user_id FROM two_factor_policy) AS required FROM users WHERE id=?''', (uid,)).fetchone()
+        if target is None:
             raise ValueError('Account unavailable.')
         if required:
             con.execute('INSERT OR IGNORE INTO two_factor_policy VALUES(?)', (uid,))
@@ -287,6 +321,9 @@ def require_two_factor(person: Identity, uid: str, required: bool) -> None:
                 raise ValueError('Turn off the requirement for all users before disabling an individual authenticator.')
             con.execute('DELETE FROM two_factor_policy WHERE user_id=?', (uid,))
             con.execute('UPDATE users SET totp=?,last_totp=-1 WHERE id=?', (b'', uid))
+        if (required and not target['required']) or (not required and (target['required'] or target['enabled'])):
+            audit.record(person, 'security.two_factor_changed', target=target['username'],
+                         detail='Two-factor authentication required' if required else 'Two-factor authentication disabled', con=con)
     if not required:
         revoke(uid)
 
@@ -425,6 +462,8 @@ def change_password(person: Identity, password: str) -> None:
 
 
 def change_username(person: Identity, name: str) -> None:
+    from app.security import audit
+
     name = username(name)
     try:
         with database() as con:
@@ -436,6 +475,8 @@ def change_username(person: Identity, name: str) -> None:
                 raise ValueError('You are already using this username.')
             if con.execute('SELECT 1 FROM invites WHERE username=? AND expires>?', (name, time.time())).fetchone():
                 raise ValueError('This username is reserved by a pending invitation.')
+            audit.record(person, 'team.username_changed', target=row['username'],
+                         detail=f"{row['username']} → {name}", con=con)
             con.execute('UPDATE users SET username=? WHERE id=? AND disabled=0', (name, person.id))
     except sqlite3.IntegrityError:
         raise ValueError('This username already exists.') from None
@@ -502,6 +543,8 @@ def recovery_text(draft: dict) -> str:
 
 
 def invite_user(person: Identity, name: str) -> str:
+    from app.security import audit
+
     name = username(name)
     token = secrets.token_urlsafe(32)
     with database() as con:
@@ -511,8 +554,9 @@ def invite_user(person: Identity, name: str) -> str:
             raise PermissionError('An administrator or manager is required to invite users.')
         if con.execute("SELECT 1 FROM users WHERE username=?", (name,)).fetchone():
             raise ValueError("This username already exists.")
-        con.execute("DELETE FROM invites WHERE username=?", (name,))
+        renewed = con.execute("DELETE FROM invites WHERE username=?", (name,)).rowcount
         con.execute("INSERT INTO invites VALUES(?,?,?)", (digest(token), name, time.time() + 86400))
+        audit.record(person, 'team.invite_renewed' if renewed else 'team.invite_created', target=name, con=con)
     return token
 
 
@@ -524,8 +568,13 @@ def invitations(person: Identity) -> list[dict]:
 
 
 def revoke_invitation(person: Identity, token: str) -> None:
+    from app.security import audit
+
     with database() as con:
         con.execute('BEGIN IMMEDIATE')
         if not con.execute('SELECT 1 FROM users WHERE id=? AND admin=1 AND disabled=0', (person.id,)).fetchone():
             raise PermissionError('Administrator access required.')
-        con.execute('DELETE FROM invites WHERE token=?', (token,))
+        target = con.execute('SELECT username FROM invites WHERE token=?', (token,)).fetchone()
+        if target:
+            con.execute('DELETE FROM invites WHERE token=?', (token,))
+            audit.record(person, 'team.invite_revoked', target=target['username'], con=con)

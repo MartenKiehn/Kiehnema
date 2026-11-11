@@ -69,14 +69,14 @@ def test_backstage_navigation_and_tabs_follow_role_permissions(people, role):
         assert ('>Backstage</a>' in nav) == (role != 'user')
         assert 'href="/admin/provider"' not in nav and 'href="/admin/updates"' not in nav
         assert re.findall(r'<a href="([^"]+)"', nav)[-1] == '/account'
-        for path in ('/admin', '/admin/video-requests', '/admin/provider', '/admin/updates'):
+        for path in ('/admin', '/admin/video-requests', '/admin/activity', '/admin/provider', '/admin/updates'):
             page = web.get(path, headers=credentials)
             allowed = role == 'admin' or (role == 'manager' and path in ('/admin', '/admin/updates'))
             assert page.status_code == (200 if allowed else 403)
             if allowed:
                 tabs = re.search(r'<nav class="backstage-tabs".*?</nav>', page.text, re.S)[0]
                 assert re.findall(r'<a href="([^"]+)"', tabs) == (
-                    ['/admin', '/admin/video-requests', '/admin/provider', '/admin/updates'] if role == 'admin' else ['/admin', '/admin/updates'])
+                    ['/admin', '/admin/video-requests', '/admin/activity', '/admin/provider', '/admin/updates'] if role == 'admin' else ['/admin', '/admin/updates'])
                 assert re.findall(r'<a href="([^"]+)" aria-current="page"', tabs) == [path]
 
 

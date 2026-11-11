@@ -7,6 +7,7 @@ this file. Versions newer than the installed version are not shown in the app.
 ## 0.3.0
 
 - See active and disabled accounts alongside pending and expired invitations in Users; renew invitations or revoke them as a Director.
+- Directors can review who changed usernames, team access, security settings, AI configuration or updates in a private activity log, with category filters and timestamps.
 
 ## 0.2.2
 

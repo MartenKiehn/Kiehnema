@@ -1407,6 +1407,7 @@ async def test_admin_provider_form_switching_and_secret_preservation(review_job,
     ('/', '/'), ('/videos', '/videos'), ('/jobs/' + JOB, '/videos'), ('/account', '/account'),
     ('/admin', '/admin'), ('/admin/provider', '/admin/provider'), ('/admin/updates', '/admin/updates'),
     ('/admin/video-requests', '/admin/video-requests'),
+    ('/admin/activity', '/admin/activity'),
 ])
 def test_navigation_identifies_one_current_section(review_job, client, route, active):
     response = client.get(route)

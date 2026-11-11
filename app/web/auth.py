@@ -16,6 +16,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.config import settings
 from app.security import accounts as a
+from app.security import audit
 from pathlib import Path
 
 router = APIRouter()
@@ -315,6 +316,16 @@ async def video_requests_page(request: Request, page: int = Query(default=1, ge=
     return form(request, template='video_requests.html', page=page, has_more=len(entries) > 50,
                 entries=[{'username': entry['username'],
                           'requested_at': datetime.fromtimestamp(entry['requested_at'], timezone.utc)}
+                         for entry in entries[:50]])
+
+
+@router.get('/admin/activity')
+async def activity_page(request: Request, category: str = Query(default='all', pattern='^(all|team|security|provider|updates)$'),
+                        page: int = Query(default=1, ge=1, le=1_000_000)):
+    entries = audit.entries(category, page)
+    return form(request, template='activity.html', category=category, categories=audit.CATEGORIES,
+                actions=audit.ACTIONS, results=audit.RESULTS, page=page, has_more=len(entries) > 50,
+                entries=[dict(entry, occurred_at=datetime.fromtimestamp(entry['occurred_at'], timezone.utc))
                          for entry in entries[:50]])
 
 

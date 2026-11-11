@@ -6,7 +6,7 @@ import pyotp
 import pytest
 from fastapi.testclient import TestClient
 
-from app.security import accounts as a
+from app.security import accounts as a, audit
 from app.pipeline import jobs
 from app.web import auth
 from app.web.main import app
@@ -66,6 +66,12 @@ def test_rename_preserves_content_access_and_role_and_replaces_sessions(people, 
         assert web.get(f'/preview/{jid}/_/{grant}/index.html').status_code == 401
         with a.database() as con:
             after = dict(con.execute('SELECT * FROM users WHERE id=?', (person.id,)).fetchone())
+            events = con.execute("SELECT * FROM audit_events WHERE action='team.username_changed'").fetchall()
+            assert len(events) == 1
+            event = events[0]
+            assert (event['actor_id'], event['actor_name'], event['target'], event['detail'], event['result']) == (
+                person.id, original_name, original_name, f'{original_name} → new.name-7', 'saved')
+            assert event['occurred_at'] <= a.time.time()
             job = con.execute('SELECT owner,active FROM jobs WHERE id=?', (jid,)).fetchone()
             assert tuple(job) == (person.id, 2)
             assert con.execute('SELECT username FROM users WHERE id=?', (other.id,)).fetchone()[0] == other.username
@@ -97,6 +103,40 @@ def test_invalid_taken_and_invited_names_preserve_existing_account_and_sessions(
     assert a.get_session(token).person.username == 'alice'
     with a.database() as con:
         assert con.execute('SELECT username FROM users WHERE id=?', (alice.id,)).fetchone()[0] == 'alice'
+        assert con.execute("SELECT COUNT(*) FROM audit_events WHERE action='team.username_changed'").fetchone()[0] == 0
+
+
+def test_rename_audit_failure_preserves_name_sessions_and_history(people, monkeypatch):
+    alice = people[1]
+    token = a.new_session(alice)
+    original = audit.record
+
+    def fail(*args, **kwargs):
+        original(*args, **kwargs)
+        raise OSError('Audit storage failure')
+
+    monkeypatch.setattr(audit, 'record', fail)
+    with pytest.raises(OSError, match='Audit storage failure'):
+        a.change_username(alice, 'new-alice')
+    assert alice.username == 'alice'
+    assert a.get_session(token).person.username == 'alice'
+    with a.database() as con:
+        assert con.execute('SELECT username FROM users WHERE id=?', (alice.id,)).fetchone()[0] == 'alice'
+        assert con.execute("SELECT COUNT(*) FROM audit_events WHERE action='team.username_changed'").fetchone()[0] == 0
+
+
+def test_crew_can_only_record_own_username_change_and_cannot_read_log(people):
+    alice = people[1]
+    with pytest.raises(PermissionError):
+        audit.record(alice, 'team.username_changed', target='admin', detail='admin → different')
+    with pytest.raises(PermissionError):
+        audit.record(alice, 'team.role_changed', target='alice')
+    a.change_username(alice, 'new-alice')
+    with TestClient(app, base_url=ORIGIN) as web:
+        assert web.get('/admin/activity', headers=headers(alice)).status_code == 403
+        page = web.get('/admin/activity?category=team', headers=headers(people[0]))
+        assert page.status_code == 200
+        assert 'Changed username' in page.text and 'alice → new-alice' in page.text
 
 
 def test_expired_invitation_does_not_reserve_name_and_refresh_updates_stale_identities(people):

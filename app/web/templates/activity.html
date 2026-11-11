@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% from 'components/info_box.html' import info_box %}
+{% block title %}Activity log · Kiehnema{% endblock %}
+{% block content %}
+<section class="activity-log" aria-labelledby="activity-title">
+  <header class="users-heading">
+    <div><p class="eyebrow">DIRECTOR ONLY</p><h1 id="activity-title">Activity log</h1><p class="activity-subtitle">Who changed what, and when.</p></div>
+    <span class="badge">Read only</span>
+  </header>
+  <nav class="activity-filters" aria-label="Activity categories">
+    {% for value, label in categories.items() %}<a class="button small {{ 'secondary' if value != category else '' }}" href="/admin/activity?category={{ value }}" {% if value == category %}aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}
+  </nav>
+  <div class="card activity-card">
+    {% if entries %}
+    <table class="activity-table" role="table" aria-label="Administrative activity, newest first">
+      <thead role="rowgroup"><tr role="row"><th scope="col">When · UTC</th><th scope="col">Who</th><th scope="col">Activity</th><th scope="col">Result</th></tr></thead>
+      <tbody role="rowgroup">
+        {% for entry in entries %}
+        <tr role="row">
+          <td role="cell" data-label="When · UTC"><time datetime="{{ entry.occurred_at.isoformat() }}">{{ entry.occurred_at.strftime('%d %b %Y') }}<span>{{ entry.occurred_at.strftime('%H:%M:%S') }}</span></time></td>
+          <td role="cell" data-label="Who"><span class="activity-person"><span class="activity-avatar" aria-hidden="true">{{ entry.actor_name[0]|upper }}</span><span>{{ entry.actor_name }}</span></span></td>
+          <td role="cell" data-label="Activity"><span class="activity-description">{{ actions.get(entry.action, 'Administrative change') }}{% if entry.target %}<span class="activity-target">{{ entry.target }}</span>{% endif %}</span>{% if entry.detail %}<span class="activity-detail">{{ entry.detail }}</span>{% endif %}<span class="activity-category">{{ categories.get(entry.action.split('.')[0], 'Activity') }}</span></td>
+          <td role="cell" data-label="Result"><span class="activity-result {{ 'is-failed' if entry.result == 'failed' else '' }}">{{ results.get(entry.result, 'Recorded') }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="activity-empty"><h2>{{ 'No more activity.' if page > 1 else 'No activity recorded yet.' }}</h2><p>{{ 'Choose another category to explore the log.' if category != 'all' else 'Administrative changes will appear here from now on. Earlier changes are not reconstructed.' }}</p></div>
+    {% endif %}
+    <footer class="activity-pagination">
+      <span>Newest first · UTC</span>
+      {% if page > 1 or has_more %}<nav aria-label="Activity log pages">
+        {% if page > 1 %}<a href="/admin/activity?category={{ category }}&amp;page={{ page - 1 }}" rel="prev">← Newer</a>{% endif %}
+        {% if has_more %}<a href="/admin/activity?category={{ category }}&amp;page={{ page + 1 }}" rel="next">Older →</a>{% endif %}
+      </nav>{% endif %}
+    </footer>
+  </div>
+  {% call info_box('A record, not a window into private work.', 'activity-notes-title') %}
+    <p>Administrative changes only. No passwords, API keys, invitation codes or video content. Names are recorded as they were at the time of the action.</p>
+    <p>For updates, “Accepted” means the update service accepted the request, not that installation finished. “Requested” means no final response was recorded. Check Updates for installation progress.</p>
+  {% endcall %}
+</section>
+{% endblock %}

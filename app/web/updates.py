@@ -2,6 +2,7 @@
 
 from datetime import datetime, timezone
 from pathlib import Path
+import re
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
@@ -9,6 +10,8 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.config import settings
+from app.changelog import VERSION_PATTERN
+from app.security import audit
 from app.security.accounts import identity
 from app.updates import VERSION
 from app.updates import client
@@ -31,6 +34,8 @@ async def call(method, path, body=None):
     try:
         return await client.request(method, path, body)
     except httpx.HTTPStatusError as exc:
+        if exc.response.status_code >= 500:
+            raise HTTPException(503, 'The update service is unavailable. Your current application can keep running.') from None
         try:
             detail = exc.response.json().get('error', 'The updater rejected this action.')
         except ValueError:
@@ -38,6 +43,25 @@ async def call(method, path, body=None):
         raise HTTPException(409, detail) from None
     except (httpx.RequestError, OSError, ValueError):
         raise HTTPException(503, 'The update service is unavailable. Your current application can keep running.') from None
+
+
+async def change(path, action, body=None):
+    if path == '/credentials':
+        administrator()
+    else:
+        update_operator()
+    version = str(body.get('version', '')) if path == '/install' else ''
+    detail = version if re.fullmatch(VERSION_PATTERN, version) else ''
+    # Persist before the updater can stop the app or snapshot its data.
+    event = audit.record(identity(), action, detail=detail, result='requested')
+    try:
+        await call('POST', path, body)
+    except HTTPException as exc:
+        # A transport failure cannot tell us whether the updater accepted the request.
+        if exc.status_code == 409:
+            audit.finish(event, 'failed')
+        raise
+    audit.finish(event, 'accepted')
 
 
 @router.get('')
@@ -66,7 +90,7 @@ async def status():
 @router.post('/check')
 async def check():
     update_operator()
-    await call('POST', '/check')
+    await change('/check', 'updates.check_requested')
     return RedirectResponse('/admin/updates', status_code=303)
 
 
@@ -74,14 +98,14 @@ async def check():
 async def install(request: Request):
     update_operator()
     form = await request.form()
-    await call('POST', '/install', {'version': form.get('version', '')})
+    await change('/install', 'updates.install_requested', {'version': form.get('version', '')})
     return RedirectResponse('/admin/updates', status_code=303)
 
 
 @router.post('/cancel')
 async def cancel():
     update_operator()
-    await call('POST', '/cancel')
+    await change('/cancel', 'updates.cancel_requested')
     return RedirectResponse('/admin/updates', status_code=303)
 
 
@@ -89,5 +113,6 @@ async def cancel():
 async def credentials(request: Request):
     administrator()
     form = await request.form()
-    await call('POST', '/credentials', {'username': form.get('username', '').strip(), 'token': form.get('token', '').strip()})
+    await change('/credentials', 'updates.credentials_changed',
+                 {'username': form.get('username', '').strip(), 'token': form.get('token', '').strip()})
     return RedirectResponse('/admin/updates', status_code=303)
