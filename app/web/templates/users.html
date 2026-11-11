@@ -3,10 +3,16 @@
   <div><p class="eyebrow">ADMINISTRATION</p><h1>Users</h1><p class="lede">Manage your team’s access. Everyone’s videos and feedback stay private.</p></div>
   <span class="badge">{{ users|length }} {{ 'account' if users|length == 1 else 'accounts' }}</span>
 </header>
+{% set pending_count = invitations|rejectattr('expired')|list|length %}
+<nav class="users-overview" aria-label="Team overview">
+  <a class="users-status is-active" href="#accounts-title">{{ users|rejectattr('disabled')|list|length }} active</a>
+  <a class="users-status is-disabled" href="#accounts-title">{{ users|selectattr('disabled')|list|length }} disabled</a>
+  <a class="users-status" href="#invitations-title">{{ pending_count }} pending {{ 'invitation' if pending_count == 1 else 'invitations' }}</a>
+</nav>
 <div class="users-settings{{ ' users-settings-single' if not request.state.user.admin else '' }}">
   <section class="card" aria-labelledby="invite-title">
     <p class="eyebrow">GROW YOUR TEAM</p><h2 id="invite-title">Invite a user</h2>
-    <p class="help">New users join as <strong>Crew</strong> and choose their own password.</p>
+    <p class="help">New users join as <strong>Crew</strong> and choose their own password. Invitation codes expire after 24 hours and can be used once.</p>
     <form class="users-invite" action="/admin/invite" method="post">
       <input type="hidden" name="csrf" value="{{ request.state.csrf }}">
       <div><label for="username">New username</label><input id="username" name="username" required minlength="3" maxlength="64" autocomplete="off" placeholder="e.g. alex" aria-describedby="username-help"></div>
@@ -26,10 +32,28 @@
     </form>
   </section>{% endif %}
 </div>
+<section class="card users-accounts" aria-labelledby="invitations-title">
+  <div class="section-heading"><div><p class="eyebrow">JOINING YOUR TEAM</p><h2 id="invitations-title">Invitations</h2></div></div>
+  <p class="help">Renewing creates a new code and invalidates the old one. Share the new code privately. Accepted invitations leave this list and appear under Accounts.</p>
+  {% if invitations %}<ul class="users-list">
+    {% for entry in invitations %}
+    <li class="users-account">
+      <div class="users-account-summary">
+        <div class="users-person"><span class="users-avatar" aria-hidden="true">{{ entry.username[0]|upper }}</span><div><h3>{{ entry.username }}</h3><p class="help">{{ 'Expired' if entry.expired else 'Expires' }} <time datetime="{{ entry.expires_at.isoformat() }}">{{ entry.expires_at.strftime('%d %b %Y · %H:%M') }} UTC</time></p></div></div>
+        <span class="users-status {{ 'is-disabled' if entry.expired else '' }}">{{ 'Expired' if entry.expired else 'Pending' }}</span>
+      </div>
+      <div class="users-invitation-actions">
+        <form action="/admin/invite" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><input type="hidden" name="username" value="{{ entry.username }}"><button class="button small secondary" type="submit" aria-label="Renew invitation for {{ entry.username }}">Renew invitation</button></form>
+        {% if request.state.user.admin %}<form action="/admin/invite/revoke" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><input type="hidden" name="token" value="{{ entry.token }}"><button class="button small secondary" type="submit" aria-label="{{ 'Remove expired invitation' if entry.expired else 'Revoke invitation' }} for {{ entry.username }}">{{ 'Remove expired invitation' if entry.expired else 'Revoke invitation' }}</button></form>{% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>{% else %}<p>No invitations awaiting acceptance.</p>{% endif %}
+</section>
 {% call info_box('Roles & permissions', 'roles-title') %}
 <div class="users-roles">
   <dl>
-    <div><dt>Director</dt><dd>Creates videos, sees who requested a video and when, invites users, manages roles and account access, deletes disabled accounts, and manages security, AI settings and updates.</dd></div>
+    <div><dt>Director</dt><dd>Creates videos, sees who requested a video and when, invites users, revokes invitations, manages roles and account access, deletes disabled accounts, and manages security, AI settings and updates.</dd></div>
     <div><dt>Assistant director</dt><dd>Creates videos, invites Crew members and manages updates. Roles, account access, security, AI settings and update credentials stay with the Director.</dd></div>
     <div><dt>Crew</dt><dd>Creates, edits and downloads their own videos. Cannot invite users or manage other accounts.</dd></div>
   </dl>

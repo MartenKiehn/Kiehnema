@@ -41,6 +41,10 @@ def form(request, template='auth.html', **context):
     if context.get('mode') == 'admin':
         context['require_all_totp'] = a.all_two_factor_required()
         context['role_labels'] = a.ROLE_LABELS
+        now = time.time()
+        context['invitations'] = [dict(entry, expired=entry['expires'] <= now,
+                                     expires_at=datetime.fromtimestamp(entry['expires'], timezone.utc))
+                                  for entry in a.invitations(a.identity())]
     if context.get('mode') == 'account':
         context['totp_enabled'] = a.two_factor_enabled(a.identity())
     return templates.TemplateResponse(request, template, context)
@@ -355,16 +359,25 @@ async def invite(request: Request):
         return form(request, mode='admin', users=users, error=str(exc))
 
 
+@router.post('/admin/invite/revoke')
+async def revoke_invitation(request: Request):
+    admin_users()
+    values = await request.form()
+    a.revoke_invitation(a.identity(), str(values.get('token', '')))
+    return RedirectResponse('/admin', status_code=303)
+
+
 @router.post('/admin/disable')
 async def disable(request: Request):
     admin_users()
     values = await request.form()
     uid = str(values.get('user_id', ''))
-    if uid == a.identity().id:
-        return form(request, mode='admin', users=admin_users(), error='You cannot disable your own administrator account.')
-    with a.database() as con:
-        con.execute('UPDATE users SET disabled=? WHERE id=?', (int(values.get('disabled') == '1'), uid))
-    a.revoke(uid)
+    try:
+        if values.get('disabled') not in {'0', '1'}:
+            raise ValueError('Choose whether to enable or disable this account.')
+        a.set_disabled(a.identity(), uid, values.get('disabled') == '1')
+    except ValueError as exc:
+        return form(request, mode='admin', users=admin_users(), error=str(exc))
     if values.get('disabled') == '1':
         from app.web.main import app
         with a.database() as con:

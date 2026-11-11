@@ -4,6 +4,10 @@ User-facing changes, newest version first. Each version has a `## MAJOR.MINOR.PA
 heading followed by plain-text `- Change.` bullets. Release notes are taken from
 this file. Versions newer than the installed version are not shown in the app.
 
+## 0.3.0
+
+- See active and disabled accounts alongside pending and expired invitations in Users; renew invitations or revoke them as a Director.
+
 ## 0.2.2
 
 - Show image thumbnails beside selected PNG, JPG and WebP files in the video brief.

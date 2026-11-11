@@ -261,6 +261,18 @@ view the team directory, and check, install or cancel updates. It cannot change 
 disable accounts, change security or AI settings, or manage update credentials.
 Invitation forms cannot grant elevated roles.
 
+**Backstage → Users** shows active and disabled account counts, plus pending and
+expired invitations with their expiry time in UTC. Directors and Assistant directors
+can renew an invitation: this issues a new single-use code valid for 24 hours and
+immediately invalidates the old code, including account setup already in progress.
+Only Directors can revoke invitations or remove expired entries. Accepted invitations
+disappear from the list; the new account appears under Accounts.
+
+Disabling an account immediately revokes all its sessions and preview access, blocks
+sign-in and new video requests, and cancels its queued and running jobs. Saved videos
+and encryption keys are kept. Re-enabling permits a fresh sign-in; old sessions remain
+invalid. Directors cannot disable their own account.
+
 Only a Director can change other users’ roles under **Users → Security & access**.
 Under **Backstage → Users → Security & access**, a Director can permanently delete
 another account after disabling it. The confirmation page requires the exact username.

@@ -592,6 +592,8 @@ main:has(#review-workspace) { max-width: 1360px; padding-top: 28px; }
 .users-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 32px; }
 .users-heading h1 { margin-bottom: 12px; }
 .users-heading .badge { flex-shrink: 0; }
+.users-overview { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
+.users-invitation-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
 .users-settings { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
 .users-settings > .card { min-width: 0; }
 .users-settings h2 { font-size: 24px; }

@@ -186,6 +186,18 @@ def set_role(person: Identity, uid: str, role: str) -> None:
     revoke(uid)
 
 
+def set_disabled(person: Identity, uid: str, disabled: bool) -> None:
+    with database() as con:
+        con.execute('BEGIN IMMEDIATE')
+        if not con.execute('SELECT 1 FROM users WHERE id=? AND admin=1 AND disabled=0', (person.id,)).fetchone():
+            raise PermissionError('Administrator access required.')
+        if uid == person.id:
+            raise ValueError('You cannot disable your own administrator account.')
+        if not con.execute('UPDATE users SET disabled=? WHERE id=?', (int(disabled), uid)).rowcount:
+            raise ValueError('Account unavailable.')
+    revoke(uid)
+
+
 def delete_user(person: Identity, uid: str, confirmation: str) -> list[str]:
     from app.security.vault import valid_id
 
@@ -502,3 +514,18 @@ def invite_user(person: Identity, name: str) -> str:
         con.execute("DELETE FROM invites WHERE username=?", (name,))
         con.execute("INSERT INTO invites VALUES(?,?,?)", (digest(token), name, time.time() + 86400))
     return token
+
+
+def invitations(person: Identity) -> list[dict]:
+    if not refresh(person).can_invite:
+        raise PermissionError('Administrator or manager access required.')
+    with database() as con:
+        return [dict(row) for row in con.execute('SELECT token,username,expires FROM invites ORDER BY expires DESC,username')]
+
+
+def revoke_invitation(person: Identity, token: str) -> None:
+    with database() as con:
+        con.execute('BEGIN IMMEDIATE')
+        if not con.execute('SELECT 1 FROM users WHERE id=? AND admin=1 AND disabled=0', (person.id,)).fetchone():
+            raise PermissionError('Administrator access required.')
+        con.execute('DELETE FROM invites WHERE token=?', (token,))
