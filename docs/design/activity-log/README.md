@@ -8,3 +8,7 @@ activity table and production-notes box, reusing Kiehnema's navigation and share
 The concept contains illustrative events, not real administrative activity. The
 implementation distinguishes requested, accepted, saved and failed operations;
 accepted update requests do not imply a completed installation.
+
+`pagination.png` is the built-in Imagegen concept for the page-size selector and
+Previous/Next buttons. The controls are implemented as accessible HTML navigation,
+with 44px targets, disabled boundaries and the selected size in ochre.

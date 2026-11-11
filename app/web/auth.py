@@ -321,12 +321,14 @@ async def video_requests_page(request: Request, page: int = Query(default=1, ge=
 
 @router.get('/admin/activity')
 async def activity_page(request: Request, category: str = Query(default='all', pattern='^(all|team|security|provider|updates)$'),
-                        page: int = Query(default=1, ge=1, le=1_000_000)):
-    entries = audit.entries(category, page)
+                        page: int = Query(default=1, ge=1, le=1_000_000), per_page: int = Query(default=25)):
+    if per_page not in (5, 25, 50):
+        raise HTTPException(422, 'Choose 5, 25 or 50 entries per page.')
+    entries = audit.entries(category, page, per_page)
     return form(request, template='activity.html', category=category, categories=audit.CATEGORIES,
-                actions=audit.ACTIONS, results=audit.RESULTS, page=page, has_more=len(entries) > 50,
+                actions=audit.ACTIONS, results=audit.RESULTS, page=page, per_page=per_page, has_more=len(entries) > per_page,
                 entries=[dict(entry, occurred_at=datetime.fromtimestamp(entry['occurred_at'], timezone.utc))
-                         for entry in entries[:50]])
+                         for entry in entries[:per_page]])
 
 
 @router.post('/admin/role')

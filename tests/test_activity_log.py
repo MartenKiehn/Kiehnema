@@ -56,8 +56,8 @@ def test_activity_filters_pagination_and_empty_states(people):
         audit.record(admin, 'provider.configuration_saved')
         event = audit.record(admin, 'updates.install_requested', detail='0.3.0', result='requested')
         audit.finish(event, 'accepted')
-        first = web.get('/admin/activity?category=team', headers=credentials)
-        second = web.get('/admin/activity?category=team&page=2', headers=credentials)
+        first = web.get('/admin/activity?category=team&per_page=50', headers=credentials)
+        second = web.get('/admin/activity?category=team&page=2&per_page=50', headers=credentials)
         assert first.text.count('<time datetime=') == 50
         assert second.text.count('<time datetime=') == 1
         assert 'member-50' in first.text and 'member-00' not in first.text
@@ -71,11 +71,43 @@ def test_activity_filters_pagination_and_empty_states(people):
             assert 'member-50' not in page.text
         latest = web.get('/admin/activity', headers=credentials)
         assert latest.text.index('Requested update installation') < latest.text.index('Updated AI configuration')
-        assert 'No more activity.' in web.get('/admin/activity?page=3', headers=credentials).text
-        for query in ('page=0', 'page=1000001', 'category=secret', 'category=team%27'):
+        assert 'No more activity.' in web.get('/admin/activity?page=3&per_page=50', headers=credentials).text
+        for query in ('page=0', 'page=1000001', 'category=secret', 'category=team%27',
+                      'per_page=0', 'per_page=10', 'per_page=51', 'per_page=abc'):
             assert web.get('/admin/activity?' + query, headers=credentials).status_code == 422
         for method in ('post', 'delete', 'patch'):
             assert getattr(web, method)('/admin/activity', headers=credentials).status_code == 405
+
+
+@pytest.mark.parametrize('size', [5, 25, 50])
+def test_activity_page_sizes_keep_filters_and_navigation_boundaries(people, size):
+    admin, *_ = people
+    with a.database() as con:
+        con.execute('DELETE FROM audit_events')
+    for i in range(51):
+        audit.record(admin, 'team.invite_created', target=f'row-{i:02}')
+    with TestClient(app, base_url=ORIGIN) as web:
+        credentials = headers(admin)
+        assert web.get('/admin/activity', headers=credentials).text.count('<time datetime=') == 25
+        base = f'/admin/activity?category=team&per_page={size}'
+        first = web.get(base, headers=credentials).text
+        assert first.count('<time datetime=') == size
+        assert 'rel="prev"' not in first and 'disabled>← Previous' in first
+        assert f'page=2&amp;per_page={size}" rel="next"' in first
+        assert f'category=security&amp;per_page={size}' in first
+        assert f'per_page={size}" aria-current="true"' in first
+        second = web.get(base + '&page=2', headers=credentials).text
+        assert second.count('<time datetime=') == min(size, 51 - size)
+        assert f'row-{50-size:02}' in second and 'row-50' not in second
+        assert f'page=1&amp;per_page={size}" rel="prev"' in second
+        last = web.get(base + f'&page={51 // size + 1}', headers=credentials).text
+        assert last.count('<time datetime=') == 1
+        assert 'rel="next"' not in last and 'disabled>Next →' in last
+        sizes = re.search(r'<nav class="activity-size-options".*?</nav>', second, re.S)[0]
+        assert 'page=' not in sizes.replace('per_page=', '')
+        assert all(f'category=team&amp;per_page={value}' in sizes for value in (5, 25, 50))
+        empty = web.get(base + f'&page={51 // size + 2}', headers=credentials).text
+        assert 'No more activity.' in empty and 'rel="next"' not in empty
 
 
 def test_activity_escapes_metadata_and_has_no_edit_actions(people):

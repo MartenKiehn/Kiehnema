@@ -53,12 +53,12 @@ def finish(event_id: int, result: str) -> None:
         con.execute("UPDATE audit_events SET result=? WHERE id=? AND result='requested'", (result, event_id))
 
 
-def entries(category: str = 'all', page: int = 1) -> list[dict]:
+def entries(category: str = 'all', page: int = 1, per_page: int = 25) -> list[dict]:
     if not accounts.identity().admin:
         raise PermissionError('Only Directors can view the activity log.')
-    if category not in CATEGORIES or not 1 <= page <= 1_000_000:
-        raise ValueError('Choose a valid category and page.')
+    if category not in CATEGORIES or not 1 <= page <= 1_000_000 or per_page not in (5, 25, 50):
+        raise ValueError('Choose a valid category, page and page size.')
     with accounts.database() as con:
         return [dict(row) for row in con.execute('''SELECT * FROM audit_events
-            WHERE (?='all' OR action LIKE ?) ORDER BY id DESC LIMIT 51 OFFSET ?''',
-            (category, category + '.%', (page - 1) * 50))]
+            WHERE (?='all' OR action LIKE ?) ORDER BY id DESC LIMIT ? OFFSET ?''',
+            (category, category + '.%', per_page + 1, (page - 1) * per_page))]

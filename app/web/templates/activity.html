@@ -8,7 +8,7 @@
     <span class="badge">Read only</span>
   </header>
   <nav class="activity-filters" aria-label="Activity categories">
-    {% for value, label in categories.items() %}<a class="button small {{ 'secondary' if value != category else '' }}" href="/admin/activity?category={{ value }}" {% if value == category %}aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}
+    {% for value, label in categories.items() %}<a class="button small {{ 'secondary' if value != category else '' }}" href="/admin/activity?category={{ value }}&amp;per_page={{ per_page }}" {% if value == category %}aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}
   </nav>
   <div class="card activity-card">
     {% if entries %}
@@ -29,11 +29,17 @@
     <div class="activity-empty"><h2>{{ 'No more activity.' if page > 1 else 'No activity recorded yet.' }}</h2><p>{{ 'Choose another category to explore the log.' if category != 'all' else 'Administrative changes will appear here from now on. Earlier changes are not reconstructed.' }}</p></div>
     {% endif %}
     <footer class="activity-pagination">
-      <span>Newest first · UTC</span>
-      {% if page > 1 or has_more %}<nav aria-label="Activity log pages">
-        {% if page > 1 %}<a href="/admin/activity?category={{ category }}&amp;page={{ page - 1 }}" rel="prev">← Newer</a>{% endif %}
-        {% if has_more %}<a href="/admin/activity?category={{ category }}&amp;page={{ page + 1 }}" rel="next">Older →</a>{% endif %}
-      </nav>{% endif %}
+      <div class="activity-page-size">
+        <span id="activity-page-size-label">Rows per page</span>
+        <nav class="activity-size-options" aria-labelledby="activity-page-size-label">
+          {% for size in (5, 25, 50) %}<a href="/admin/activity?category={{ category }}&amp;per_page={{ size }}" {% if size == per_page %}aria-current="true"{% endif %}>{{ size }}</a>{% endfor %}
+        </nav>
+      </div>
+      <span class="activity-page-number">Page {{ page }}</span>
+      <nav class="activity-page-buttons" aria-label="Activity log pages">
+        {% if page > 1 %}<a class="button small secondary" href="/admin/activity?category={{ category }}&amp;page={{ page - 1 }}&amp;per_page={{ per_page }}" rel="prev">← Previous</a>{% else %}<button class="button small secondary" disabled>← Previous</button>{% endif %}
+        {% if has_more %}<a class="button small activity-next" href="/admin/activity?category={{ category }}&amp;page={{ page + 1 }}&amp;per_page={{ per_page }}" rel="next">Next →</a>{% else %}<button class="button small secondary" disabled>Next →</button>{% endif %}
+      </nav>
     </footer>
   </div>
   {% call info_box('A record, not a window into private work.', 'activity-notes-title') %}

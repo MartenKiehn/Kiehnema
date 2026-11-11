@@ -266,7 +266,8 @@ Invitation forms cannot grant elevated roles.
 Only Directors can open **Backstage → Activity log** (`/admin/activity`), including by
 direct URL. Assistant directors can perform their permitted administrative actions,
 but cannot read this log. Filters cover Team, Security, AI provider and Updates;
-pages show up to 50 events, newest first, with UTC timestamps.
+pages show 5, 25 (default) or 50 events, newest first, with UTC timestamps. Previous
+and Next preserve the category and page size; changing either filter starts at page 1.
 
 The log records the acting account and username at the time, affected username where
 applicable, action, safe change details and request result. It covers invitations,
