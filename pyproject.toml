@@ -1,6 +1,6 @@
 [project]
 name = "kiehnema"
-version = "0.2.2"
+version = "0.3.0"
 requires-python = ">=3.13"
 dependencies = [
     "cryptography>=45",
