@@ -257,7 +257,7 @@ def test_all_private_web_routes_enforce_ownership_and_csrf(people):
         assert client.post(f'/jobs/{jid}/delete', headers=headers(admin)).status_code == 404
         assert client.get('/admin', headers=credentials).status_code == 403
         assert client.get('/admin', headers=headers(admin)).status_code == 200
-        for endpoint in ('review', 'comments', 'design-assets', 'reopen'):
+        for endpoint in ('review', 'comments', 'design-assets', 'reopen', 'retry'):
             assert client.post(f'/jobs/{jid}/{endpoint}', headers=headers(admin), json={}).status_code in (404, 422)
 
 
@@ -633,3 +633,38 @@ async def test_background_preserves_private_worker_failure(people, monkeypatch, 
     assert status['message'] == (detail if worker_wrote_failure else generic)
     assert len([item for item in status['history'] if item['status'] == 'failed']) == 1
     assert detail.encode() not in b''.join(p.read_bytes() for p in job.directory.iterdir())
+
+
+@pytest.mark.parametrize(("published", "exit_code", "expected"), [
+    ("review", 0, "review"), ("done", 0, "done"), ("check", 0, "failed"), ("done", 1, "failed"),
+])
+async def test_result_read_error_preserves_completed_worker_status(people, tmp_path, monkeypatch, published, exit_code, expected):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    from app.pipeline.status import write_status
+    from app.web import main as web
+
+    jid = jobs.create_job('https://example.com', 30)
+    job = vault.get_job(jid)
+    path = vault.VaultPath(job)
+    async def worker(payload):
+        assert json.loads(payload)['id'] == jid
+        write_status(path, published, 'Published by worker')
+    process = SimpleNamespace(returncode=exit_code, pid=None, communicate=worker)
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", AsyncMock(return_value=process))
+    monkeypatch.setattr(jobs.os, "killpg", lambda *args: None)
+    monkeypatch.setattr(jobs, "ram_root", lambda: tmp_path)
+    monkeypatch.setattr(jobs, "provider_configuration", lambda: SimpleNamespace(private=lambda: {}))
+    inspect = AsyncMock(side_effect=ImportError("checkpoint reader unavailable"))
+    monkeypatch.setattr(jobs, 'job_state', inspect)
+    monkeypatch.setattr(app.state, 'worker_lock', asyncio.Lock(), raising=False)
+    monkeypatch.setattr(app.state, 'tasks', {}, raising=False)
+
+    await web.run_background(jid, None, job)
+    status = json.loads((path / 'status.json').read_text())
+    assert status['status'] == expected
+    if expected == published:
+        assert status['message'] == 'Published by worker'
+    assert inspect.await_count == (1 if exit_code == 0 else 0)
+    with a.database() as con:
+        assert con.execute('SELECT active FROM jobs WHERE id=?', (jid,)).fetchone()[0] == 0

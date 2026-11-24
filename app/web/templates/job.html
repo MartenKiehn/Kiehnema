@@ -8,7 +8,14 @@
 {% if job.poll %}
   {% include "partials/progress.html" %}
 {% elif job.status in ['failed', 'interrupted'] %}
-  <section class="card"><p class="eyebrow">{{ job.status|upper }}</p><h2>This video needs another take.</h2><p class="notice error">{{ job.message }}</p><p>Your saved job and its files are kept. You can start a new video from the workspace.</p><a class="button" href="/">New video</a></section>
+  <section class="card"><p class="eyebrow">{{ job.status|upper }}</p><h2>This video needs another take.</h2><p class="notice error">{{ job.message }}</p>
+    {% if can_retry %}
+    <p>Continue from the saved step. Your provider may charge for additional model calls.</p>
+    <div class="actions"><form action="/jobs/{{ job.id }}/retry" method="post"><input type="hidden" name="csrf" value="{{ request.state.csrf }}"><input type="hidden" name="revision" value="{{ revision }}"><button class="button" type="submit">Retry failed step</button></form><a class="button secondary" href="/">New video</a></div>
+    {% else %}
+    <p>Your saved job and its files are kept. You can start a new video from the workspace.</p><a class="button" href="/">New video</a>
+    {% endif %}
+  </section>
 {% else %}
   {% if job.status == 'review' %}<div id="review-workspace" data-url="/jobs/{{ job.id }}" data-revision="{{ revision }}" data-duration="{{ preview_duration }}" data-comments='{{ comments|tojson }}'>{% endif %}
   {% if job.status == 'done' %}

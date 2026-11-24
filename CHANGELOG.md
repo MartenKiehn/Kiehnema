@@ -4,6 +4,13 @@ User-facing changes, newest version first. Each version has a `## MAJOR.MINOR.PA
 heading followed by plain-text `- Change.` bullets. Release notes are taken from
 this file. Versions newer than the installed version are not shown in the app.
 
+## 0.4.0
+
+- Choose more relevant website photos for scenes and keep their subjects in frame across feed and story formats.
+- Give text-heavy scenes more reading time and check the visible copy against the storyboard in both formats.
+- Review both previews silently and hear the synchronized soundtrack in the exported videos.
+- Retry recoverable generation failures from the last saved step.
+
 ## 0.3.0
 
 - See active and disabled accounts alongside pending and expired invitations in Users; renew invitations or revoke them as a Director.

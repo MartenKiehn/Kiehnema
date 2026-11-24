@@ -1,6 +1,9 @@
 <section class="timeline-editor" aria-labelledby="timeline-title">
   <div class="section-heading"><div><p class="eyebrow">CURRENT PREVIEW</p><h3 id="timeline-title">Your scenes</h3></div><span class="help">{{ concept.scenes|length }} scenes · {{ '%g'|format(preview_duration) }} s</span></div>
-  <div class="timeline-transport"><button type="button" class="button secondary small" id="timeline-play" {% if not preview %}disabled{% endif %}>Play both previews</button><output id="timeline-time">0.0 s</output><button type="button" class="button secondary small" id="comment-here">Comment here</button></div>
+  <div class="timeline-transport">
+    <button type="button" class="button secondary small" id="timeline-play" {% if not preview %}disabled{% endif %}>Play both previews</button>
+    <output id="timeline-time">0.0 s</output><button type="button" class="button secondary small" id="comment-here">Comment here</button>
+  </div>
   <label for="timeline-position" class="sr-only">Video timeline position</label>
   <input id="timeline-position" class="timeline-range" type="range" min="0" max="{{ preview_duration }}" step="0.1" value="0">
   <div class="timeline-frames" aria-label="Scene frames">

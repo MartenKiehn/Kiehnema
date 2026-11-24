@@ -190,10 +190,11 @@ async def test_files_pipeline_reaches_human_review_without_website_or_five_facts
     async def board(path):
         assert (path / "brand.json").is_file()
 
-    async def checks(site):
-        from types import SimpleNamespace
+    async def checks(site, *, expected_texts):
+        from app.checks.runtime import CheckReport
         assert (site / "assets" / "brand" / "img").is_dir()
-        return SimpleNamespace(as_dict=lambda: {"ok": True, "issues": [], "texts": []})
+        assert expected_texts == {}
+        return CheckReport()
 
     async def keyframes(state, config):
         return {"keyframes": []}

@@ -28,6 +28,7 @@ from app.crawl.guard import UrlGuard
 from app.changelog import read_entries
 from app.llm import provider
 from app.pipeline import jobs
+from app.pipeline.runtime import can_retry
 from app.pipeline.sources import MAX_TOTAL_BYTES, PDFConfirmationRequired
 from app.pipeline.schemas import SceneChange
 from app.pipeline.design import DesignDraft
@@ -200,7 +201,19 @@ def all_jobs() -> list[dict]:
 
 
 def revision(path: Path) -> str:
-    return hashlib.sha256((path / "status.json").read_bytes() + (path / "concept.json").read_bytes()).hexdigest()
+    concept = path / "concept.json"
+    return hashlib.sha256((path / "status.json").read_bytes() + (concept.read_bytes() if concept.is_file() else b"")).hexdigest()
+
+
+async def retry_available(path: Path) -> bool:
+    if not (path / "_checkpoint.sqlite").is_file():
+        return False
+    try:
+        state = await jobs.job_state(path.name)
+    except Exception as exc:
+        log.warning("Cannot inspect checkpoint for failed job %s (%s)", path.name, type(exc).__name__)
+        return False
+    return can_retry(state["next"], state["interrupts"], state["values"])
 
 
 async def job_context(job_id: str) -> dict:
@@ -210,6 +223,8 @@ async def job_context(job_id: str) -> dict:
     context = {"job": job, "steps": steps, "seen": {h["status"] for h in job.get("history", [])},
                "insights": job_insights(path) if job["poll"] else [],
                "concept": {}, "frames": {}, "facts": {}, "check": {}, "qa": {}, "can_approve": False}
+    if job["status"] == "failed" and await retry_available(path):
+        context.update(can_retry=True, revision=revision(path))
     if job["status"] in {"review", "done"}:
         state = await jobs.job_state(job_id)
         values = state["values"]
@@ -233,17 +248,28 @@ async def run_background(job_id: str, decision: dict | None, capability):
     token = vault.active_job.set(capability)
     path = vault.VaultPath(capability)
     try:
+        write_status(path, "queued", "Queued for rendering" if decision and decision["action"] == "approve"
+                     else "Waiting for the local worker")
         async with app.state.worker_lock:
-            result = await (jobs.run_job(job_id) if decision is None else jobs.resume_job(job_id, decision))
+            if decision is None:
+                result = await jobs.run_job(job_id)
+            elif decision["action"] == "retry":
+                result = await jobs.retry_job(job_id)
+            else:
+                result = await jobs.resume_job(job_id, decision)
             if result.get("error"):
                 write_status(path, "failed", result["error"])
     except asyncio.CancelledError:
         write_status(path, "interrupted", "The app stopped before this job finished. Start a new video; saved files are still available.")
         raise
     except Exception as exc:
-        log.error("Job %s failed (%s); details are stored in the encrypted job", job_id, type(exc).__name__)
-        if read_json(path / 'status.json').get('status') != 'failed':
-            write_status(path, "failed", f"{type(exc).__name__}: {exc}")
+        status = read_json(path / 'status.json').get('status')
+        if isinstance(exc, jobs.ResultReadError) and status in {"review", "done"}:
+            log.warning("Job %s reached %s. %s", job_id, status, exc)
+        else:
+            log.error("Job %s failed (%s); details are stored in the encrypted job", job_id, type(exc).__name__)
+            if status != 'failed':
+                write_status(path, "failed", f"{type(exc).__name__}: {exc}")
     finally:
         app.state.tasks.pop(job_id, None)
         with accounts.database() as con:
@@ -257,8 +283,6 @@ def enqueue(job_id: str, decision: dict | None = None):
     if len(app.state.tasks) >= 20:
         raise HTTPException(429, 'The job queue is full. Try again later.')
     capability = vault.get_job(job_id)
-    write_status(job_path(job_id), "queued", "Queued for rendering" if decision and decision["action"] == "approve"
-                 else "Waiting for the local worker")
     with accounts.database() as con:
         if not con.execute('UPDATE jobs SET active=1 WHERE id=? AND active=0', (job_id,)).rowcount:
             raise HTTPException(409, 'This job already has work in progress.')
@@ -387,6 +411,17 @@ async def reopen(request: Request, job_id: str):
         raise HTTPException(409, "This video is not a completed render. Reload to see its current state.") from exc
     finally:
         app.state.tasks.pop(job_id, None)
+    return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+
+
+@app.post("/jobs/{job_id}/retry")
+async def retry(request: Request, job_id: str):
+    path = job_path(job_id)
+    form = await request.form()
+    if (not await retry_available(path) or job_summary(path)["status"] != "failed"
+            or form.get("revision") != revision(path)):
+        raise HTTPException(409, "This step cannot be retried. Reload the video to see its current state.")
+    enqueue(job_id, {"action": "retry"})
     return RedirectResponse(f"/jobs/{job_id}", status_code=303)
 
 

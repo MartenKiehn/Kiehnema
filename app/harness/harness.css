@@ -12,6 +12,16 @@ body { font-family: var(--font-body, sans-serif); -webkit-font-smoothing: antial
 }
 .mg-scene { visibility: hidden; }
 
+[data-mg-photo] { overflow: hidden; }
+[data-mg-photo] > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: var(--mg-focus, 50% 50%);
+  transform-origin: var(--mg-focus, 50% 50%);
+}
+
 /* word masks created by split() */
 .w  { display: inline-block; overflow: hidden; vertical-align: top; padding: 0 .02em .14em; margin: 0 -.02em -.14em; }
 .wi { display: inline-block; will-change: transform; }

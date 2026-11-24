@@ -22,6 +22,15 @@ whitelisted) and produces a site: `index.html theme.css harness/ composition/ as
 - `#stage` is 1080×1350 (`feed`, 4:5) or 1080×1920 (`story`, 9:16). `ctx.FORMAT`, `ctx.W`, `ctx.H`, `ctx.isStory`.
 - Timing must be identical in both formats; only layout may differ (checked: `format-divergence`).
 
+### Moving photographs
+
+For a scene built around a photograph, use a sized frame such as
+`<figure data-mg-photo style="--mg-focus: 72% 35%"><img src="assets/portrait.jpg" alt=""></figure>`.
+Set `--mg-focus` to the subject's horizontal and vertical position in the source image (default centre).
+The image fills the frame and the camera pushes in by 8% over the registered scene's duration.
+The crop and zoom share this focal point in both formats. Place type and logos outside the frame
+so they stay still. Leave screenshots, diagrams and wordmarks at their intended scale.
+
 ## ctx API
 | Member | Purpose |
 |---|---|
@@ -44,6 +53,9 @@ whitelisted) and produces a site: `index.html theme.css harness/ composition/ as
 4. **Readability:** every visible text carries a unique `data-text-id`. From first appearance to
    leaving, a text needs ≥ `0.5 s + words / 4` (error below 75 %) and must be completely visible
    (opaque, unblurred, all words revealed) for ≥ 0.8 s.
+   The pipeline checks the fully revealed copy against the storyboard in each format. Animated
+   counters must settle on the planned value. After human feedback it checks explicit copy edits
+   and new text boxes so a requested translation can override the original storyboard.
 5. **Layout:** at its mid-hold time a text lies fully inside the frame (error) and ≥ 24 px from the
    edge (warning), in both formats.
 6. **Cues** must use the known types and lie inside the duration.
@@ -55,12 +67,13 @@ whitelisted) and produces a site: `index.html theme.css harness/ composition/ as
 | `groove` | claps + ghost hats join (default: first cut after the drop) |
 | `arp` | arpeggio starts (default: two bars before the drop) |
 | `outro` | drums stop, harmony resolves to `outro_progression` |
-| `stop` {until} | music ducks (dramatic pause) |
+| `stop` {until} | ducks the musical arrangement for a dramatic pause while foley, bells and reverb tails continue |
 | `riser` {length, gain} | noise riser *ending* at t |
 | `impact` {gain} | sub boom + crash |
 | `whoosh` | transition whoosh – added automatically at every scene start except t = 0 and scenes starting on `drop`/`outro`; disable per scene with `scene(…, {whoosh: false})` |
 | `swoosh`, `thud`, `slide`, `tick` {until} | foley-style accents |
 | `chime`, `bell` {note}, `bells` {notes, step} | positive accents (MIDI notes) |
 
+`calm` omits drums. After the `drop`, `medium` uses offbeat bass and `high` adds two short octave pickups per bar.
 Kick drums leave a one-beat gap before every automatic whoosh cut. Choose scene starts on the
 beat grid (60 / bpm) so cuts land on beats.

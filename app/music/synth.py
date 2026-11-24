@@ -281,28 +281,34 @@ class _Synth:
     def build_bass(self):
         if self.drop is None:
             return
-        step = self.beat / 2
-        t = self.drop
-        while t < self.outro - 1e-6:
-            if round((t - self.bar0) / step) % 2 == 1:  # off-beats only -> pumping against the kick
-                b = math.floor((t - self.bar0) / self.bar + 1e-9)
-                f = mtof(self.chord_at(b).bass)
-                i0, i1, lt = self.seg(t, 0.22)
+        high = self.energy == "high"
+        steps = (2, 6, 7, 10, 14, 15) if high else (2, 6, 10, 14)
+        length = min(0.22, self.beat / 4) if high else 0.22
+        gain = 0.2 if self.energy == "calm" else 0.32
+        for b in range(self.drop_bar, self.bars):
+            for step in steps:
+                t = self.bar_start(b) + step * self.beat / 4
+                if t >= self.outro - 1e-6:
+                    return
+                pickup = step % 4 == 3
+                f = mtof(self.chord_at(b).bass + (12 if pickup else 0))
+                i0, i1, lt = self.seg(t, length)
                 k = np.arange(i1 - i0)
                 saw = _saw((f / SR * k) % 1.0, f / SR)
                 lp = _filt_tv("lp", saw, lambda i: 260 + 2200 * math.exp(-(i / SR) / 0.05), 1.1, 32)
                 sub = np.sin(2 * np.pi * (f / 2) / SR * k)
                 env = np.minimum(1, lt / 0.004) * np.exp(-lt / 0.09)
-                gain = 0.32 if self.energy != "calm" else 0.2
-                self.bass[i0:i1] += (lp * 0.8 + sub * 0.55) * env * gain
-            t += step
+                if high:
+                    env *= np.minimum(1, (length - lt) / 0.008)
+                self.bass[i0:i1] += (lp * 0.8 + sub * 0.55) * env * gain * (0.75 if pickup else 1)
 
     def build_drums(self):
         if not self.drums:
             return
         t = self.drop
         while t < self.outro - 1e-6:
-            if not any(abs(t - (c - self.beat)) < 1e-6 for c in self.p.cuts):
+            # Scene times are rounded to milliseconds. Keep the downbeat that lands on the cut.
+            if not any(0.001 < cut - t <= self.beat + 0.001 for cut in self.p.cuts):
                 self.kick_times.append(t)
             t += self.beat
         for tk in self.kick_times:
@@ -345,14 +351,15 @@ class _Synth:
             d[i0:i1] = np.minimum(d[i0:i1], 1 - 0.45 * np.exp(-lt / 0.12))
         return d
 
-    def pad_gain(self) -> np.ndarray:
+    def stop_gain(self) -> np.ndarray:
         g = np.ones(self.n)
         t = np.arange(self.n) / SR
         for a, b in self.stops:
             inside = (t >= a) & (t <= b)
-            g[inside] = 0.25 + 0.75 * np.exp(-(t[inside] - a) / 0.04)
+            g[inside] = np.minimum(g[inside], 0.25 + 0.75 * np.exp(-(t[inside] - a) / 0.04))
             rec = (t > b) & (t <= b + 0.3)
-            g[rec] = 0.25 + 0.75 * (t[rec] - b) / 0.3
+            end_gain = 0.25 + 0.75 * np.exp(-max(0, b - a) / 0.04)
+            g[rec] = np.minimum(g[rec], end_gain + (1 - end_gain) * (t[rec] - b) / 0.3)
         return g
 
     def pluck(self, t, m, gain, pan, decay=0.16):
@@ -394,7 +401,7 @@ class _Synth:
 
     # -- sound design cues
     def cue_tick(self, c: Cue):
-        until = float(c.opts.get("until", c.t + 2))
+        until = min(self.dur, float(c.opts.get("until", c.t + 2)))
         t, k = c.t, 0
         while t < until:
             f = 1750 if k % 2 else 2350
@@ -547,14 +554,16 @@ class _Synth:
         rev_l, rev_r = self.freeverb(self.reverb_send)
 
         d = self.duck()
-        dp = d * self.pad_gain()
+        stop = self.stop_gain()
         common = self.bass * (0.7 + 0.3 * d) + self.kick + self.clap * 0.9
         rev_gain = 1.6 * (0.7 + 0.3 * d)
         arp_gain = 0.75 + 0.25 * d
-        left = (self.pad[0] * dp + common + self.hats[0] + self.hats[1] * 0.6
-                + (self.arp[0] + dly_l) * arp_gain + self.bells[0] + self.fx[0] + rev_l * rev_gain)
-        right = (self.pad[1] * dp + common + self.hats[0] * 0.6 + self.hats[1]
-                 + (self.arp[1] + dly_r) * arp_gain + self.bells[1] + self.fx[1] + rev_r * rev_gain)
+        left = (self.pad[0] * d + common + self.hats[0] + self.hats[1] * 0.6
+                + (self.arp[0] + dly_l) * arp_gain) * stop
+        right = (self.pad[1] * d + common + self.hats[0] * 0.6 + self.hats[1]
+                 + (self.arp[1] + dly_r) * arp_gain) * stop
+        left += self.bells[0] + self.fx[0] + rev_l * rev_gain
+        right += self.bells[1] + self.fx[1] + rev_r * rev_gain
 
         stereo = np.stack([_filt("hp", 28, left), _filt("hp", 28, right)], axis=1)
         drive = 1.05 / max(1e-9, np.abs(stereo).max())
@@ -582,3 +591,9 @@ def write_wav(samples: np.ndarray, path: Path, seed: int = 0xD17E) -> None:
         wav.setsampwidth(2)
         wav.setframerate(SR)
         wav.writeframes(pcm.tobytes())
+
+
+def write_soundtrack(plan: MusicPlan, target: Path) -> None:
+    temporary = target.with_suffix(".tmp")
+    write_wav(synthesize(plan), temporary)
+    temporary.replace(target)

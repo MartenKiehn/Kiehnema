@@ -38,6 +38,8 @@ async def main():
     try:
         if payload["action"] == "run":
             await runtime.run_job(job.id, guard=UrlGuard())
+        elif payload["action"] == "retry":
+            await runtime.retry_job(job.id, guard=UrlGuard())
         elif payload["action"] == "resume":
             await runtime.resume_job(job.id, payload["decision"], guard=UrlGuard())
         elif payload["action"] == "reopen":

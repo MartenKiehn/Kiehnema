@@ -106,6 +106,24 @@ def test_normalize_drops_fragments_and_tracking():
 
 # ---------------------------------------------------------------- fixture site
 
+def test_website_photo_keeps_phone_orientation_after_stripping_metadata():
+    from io import BytesIO
+    from PIL import Image
+    from app.brand.extract import _reencode
+
+    source = Image.new("RGB", (80, 40), "blue")
+    source.paste("red", (0, 0, 40, 40))
+    exif = source.getexif()
+    exif[274] = 6  # phone stored the portrait rotated clockwise
+    raw = BytesIO()
+    source.save(raw, "JPEG", exif=exif)
+    encoded, ext, width, height = _reencode(raw.getvalue(), 40, keep_alpha=False)
+    assert (ext, width, height) == (".jpg", 20, 40)
+    with Image.open(BytesIO(encoded)) as result:
+        assert result.getpixel((10, 5))[0] > 230 and result.getpixel((10, 35))[2] > 230
+        assert not result.getexif()
+
+
 async def test_crawl_and_brand_fixture_site(site, tmp_path):
     snapshots = []
 

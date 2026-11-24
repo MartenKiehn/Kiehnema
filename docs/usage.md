@@ -81,6 +81,8 @@ Each user sees only their own encrypted jobs. Legacy jobs require explicit impor
 plaintext originals are not deleted. Keep the app running while jobs work;
 page reloads and signing out do not interrupt submitted jobs. Jobs run one at a time. Restarting the app preserves finished/review jobs
 and marks unfinished work as interrupted without automatically spending more on model calls.
+If a failed job has a saved checkpoint, **Retry failed step** resumes that job at its pending step.
+Completed stages keep their results. Model work repeated or started after that point can incur charges.
 
 Implementation and test status: `phase4-ui.md`. Browser checks use a temporary local server
 and scripted generation; they do not call Bedrock.
@@ -89,6 +91,9 @@ and scripted generation; they do not call Bedrock.
 uv run pytest tests/test_web.py -m 'not browser' -q  # web routes, no browser or Bedrock
 uv run pytest tests/test_web.py -m browser -q        # full UI smoke in Chromium, no Bedrock
 ```
+
+**Play both previews** plays both formats silently. The exported videos include music. Selecting a scene or scrubbing pauses playback.
+The scene thumbnails favour moments when the most text is fully revealed in each format.
 
 The review timeline seeks both formats to the selected moment. Write a comment, choose its format,
 and **Confirm comment** to save it; markers and the comment list let you edit or delete it later.

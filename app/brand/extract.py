@@ -21,7 +21,7 @@ from urllib.parse import unquote_to_bytes, urlsplit
 import httpx
 import numpy as np
 from defusedxml import ElementTree as SafeET
-from PIL import Image
+from PIL import Image, ImageOps
 from playwright.async_api import async_playwright
 
 from app.crawl.crawler import CrawlResult, _site_key
@@ -381,7 +381,7 @@ def _reencode(body: bytes, max_side: int, *, keep_alpha: bool) -> tuple[bytes, s
     try:
         Image.open(io.BytesIO(body)).verify()
         img = Image.open(io.BytesIO(body))
-        img.load()
+        ImageOps.exif_transpose(img, in_place=True)
     except Exception:
         return None
     img.thumbnail((max_side, max_side))

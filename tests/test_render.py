@@ -69,6 +69,63 @@ async def test_stills_follow_seek(browser, tmp_path: Path):
     assert second.getpixel((400, 200)) == (0xEA, 0x58, 0x37)
 
 
+async def test_brand_font_metrics_are_final_when_composition_builds(browser, tmp_path: Path):
+    import shutil
+    from app.harness.build import build_site
+
+    src = tmp_path / "composition"
+    shutil.copytree(Path(__file__).parents[1] / "examples/they", src)
+    (src / "composition.html").write_text('<span id="title">Vier Wochen zum MVP</span>')
+    (src / "composition.css").write_text('#title { font: 900 88px var(--font-display); }')
+    (src / "composition.js").write_text("""MG.composition(({ $ }) => {
+      window.layoutWidth = $('#title').getBoundingClientRect().width;
+    });""")
+    with serve_directory(build_site(src, tmp_path / "site")) as base:
+        page, _ = await _open_page(browser, base, "index.html", FORMATS["feed"])
+        try:
+            assert await page.evaluate("window.layoutWidth === document.querySelector('#title').getBoundingClientRect().width")
+        finally:
+            await page.context.close()
+
+
+@pytest.mark.parametrize("name", ["feed", "story"])
+async def test_photo_push_in_holds_subject_in_frame(browser, tmp_path: Path, name: str):
+    from PIL import Image
+    from app.harness.build import build_site
+
+    src = tmp_path / "photo"
+    src.mkdir()
+    (src / "manifest.json").write_text('{"duration": 4}')
+    (src / "theme.json").write_text('{"colors": {}}')
+    (src / "composition.html").write_text(
+        '<section id="shot"><figure data-mg-photo><img src="assets/target.svg"></figure></section>')
+    (src / "composition.css").write_text('[data-mg-photo] {width: var(--w); height: var(--h); --mg-focus: 75% 25%}')
+    (src / "composition.js").write_text("MG.composition(({scene}) => scene('shot', 0, 4));")
+    (src / "assets").mkdir()
+    (src / "assets/target.svg").write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900">'
+        '<rect width="1600" height="900"/><circle cx="1200" cy="225" r="40" fill="white"/></svg>')
+    fmt = FORMATS[name]
+    with serve_directory(build_site(src, tmp_path / "site")) as base:
+        page, _ = await _open_page(browser, base, "index.html", fmt)
+        try:
+            boxes = []
+            for t in (0, 3.9, 0):
+                await _seek(page, t)
+                pixels = Image.open(BytesIO(await page.screenshot())).convert("L")
+                box = pixels.point(lambda v: 255 if v > 128 else 0).getbbox()
+                assert box is not None
+                left, top, right, bottom = box
+                assert (left + right) / 2 == pytest.approx(fmt.width * .75, abs=2)
+                assert (top + bottom) / 2 == pytest.approx(fmt.height * .25, abs=2)
+                boxes.append(box)
+            start, end, rewind = boxes
+            assert (end[2] - end[0]) / (start[2] - start[0]) == pytest.approx(1.078, abs=.015)
+            assert rewind == start
+        finally:
+            await page.context.close()
+
+
 @pytest.mark.parametrize("name", ["feed", "story"])
 async def test_fast_capture_matches_screenshot_after_seeks(browser, tmp_path: Path, name: str):
     from PIL import Image

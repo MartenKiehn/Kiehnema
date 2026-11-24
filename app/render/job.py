@@ -12,7 +12,7 @@ from pathlib import Path
 from playwright.async_api import Browser, async_playwright
 
 from app.harness.build import Manifest
-from app.music.synth import MusicPlan, synthesize, write_wav
+from app.music.synth import MusicPlan, write_soundtrack
 from app.render.renderer import FORMATS, ProgressFn, _open_page, render_video
 from app.render.server import serve_directory
 
@@ -37,7 +37,7 @@ async def read_registry(browser: Browser, base_url: str, fmt_name: str = "feed")
 
 
 def music_plan(manifest: Manifest, registry: dict) -> MusicPlan:
-    return MusicPlan.from_registry(manifest.duration, manifest.music, registry["scenes"], registry["cues"])
+    return MusicPlan.from_registry(manifest.duration, manifest.music, registry["scenes"], registry.get("cues", []))
 
 
 async def render_site(
@@ -45,18 +45,20 @@ async def render_site(
     out_dir: Path,
     formats: tuple[str, ...] = ("feed", "story"),
     progress: ProgressFn | None = None,
+    *, reviewed_soundtrack: Path | None = None,
 ) -> RenderResult:
-    manifest = Manifest.model_validate_json((site / "composition" / "manifest.json").read_text())
     out_dir.mkdir(parents=True, exist_ok=True)
     with serve_directory(site) as base:
         async with async_playwright() as pw:
             browser = await pw.chromium.launch(env=browser_environment(), chromium_sandbox=True)
             try:
-                plan = music_plan(manifest, await read_registry(browser, base))
-                music = out_dir / "music.wav"
-                samples = await asyncio.to_thread(synthesize, plan)
-                write_wav(samples, music)
-                result = RenderResult(videos={}, music=music, music_warnings=plan.warnings)
+                music = reviewed_soundtrack or out_dir / "music.wav"
+                result = RenderResult(videos={}, music=music)
+                if reviewed_soundtrack is None:
+                    manifest = Manifest.model_validate_json((site / "composition" / "manifest.json").read_text())
+                    plan = music_plan(manifest, await read_registry(browser, base))
+                    await asyncio.to_thread(write_soundtrack, plan, music)
+                    result.music_warnings = plan.warnings
                 for name in formats:
                     fmt = FORMATS[name]
                     out = out_dir / f"{name}-{fmt.width}x{fmt.height}.mp4"

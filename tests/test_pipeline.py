@@ -12,14 +12,15 @@ import subprocess
 from pathlib import Path
 
 import imageio_ffmpeg
+import numpy as np
 import pytest
 
 from app.config import settings
 from app.crawl.guard import UrlGuard
 from app.pipeline.runtime import job_state, reopen_job, resume_job, start_job
 from app.pipeline.llm import FakeLLM
-from app.pipeline.schemas import CompanyProfile, Concept, QAReport
-from app.pipeline.verify import QuoteIndex, lint_composition, validate_concept
+from app.pipeline.schemas import CompanyProfile, Concept, ConceptCue, QAReport
+from app.pipeline.verify import QuoteIndex, expected_copy, lint_composition, validate_concept
 
 
 async def test_render_progress_combines_formats_and_estimates_remaining_time(tmp_path, monkeypatch):
@@ -32,7 +33,8 @@ async def test_render_progress_combines_formats_and_estimates_remaining_time(tmp
     monkeypatch.setattr(graph, 'monotonic', lambda: next(clock))
     snapshots = []
 
-    async def render(site, out_dir, formats, progress):
+    async def render(site, out_dir, formats, progress, *, reviewed_soundtrack):
+        assert reviewed_soundtrack is None
         snapshots.append(json.loads((tmp_path / 'status.json').read_text()))
         assert formats == ('feed', 'story')
         for fmt, count in [('feed', 0), ('feed', 50), ('feed', 100),
@@ -65,6 +67,27 @@ def _profile(site: str) -> dict:
             {"id": "f9", "kind": "claim", "text": "World leader", "quote": "Acme is the undisputed world leader in robotics", "source_url": site},
         ],
     }
+
+
+async def test_soundtrack_failure_discards_previous_preview_and_reaches_fix(tmp_path, monkeypatch):
+    from app.checks.runtime import CheckReport
+    from app.harness.build import MusicSpec
+    from app.music.synth import MusicPlan
+    from app.pipeline import graph
+
+    (tmp_path / "concept.json").write_text(json.dumps(CONCEPT))
+    previous = tmp_path / "review-music.wav"
+    previous.write_bytes(b'previous mix')
+    monkeypatch.setattr(graph, "_dir", lambda state: tmp_path)
+    monkeypatch.setattr(graph, "build_site", lambda *args: tmp_path)
+    async def checks(site, **kwargs):
+        return CheckReport(music=MusicPlan(1, MusicSpec(progression=["Invalid"]), [], []))
+    monkeypatch.setattr(graph, "check_site", checks)
+    result = await graph.n_check({}, {"configurable": {"llm": FakeLLM({})}})
+    assert not previous.exists()
+    assert result["check"]["errors"] == 1 and graph.after_check(result) == "fix"
+    assert "unsupported chord" in result["problems"]
+    assert "music" not in json.loads((tmp_path / "check.json").read_text())
 
 
 CONCEPT = {
@@ -120,6 +143,8 @@ def data_dir(tmp_path, monkeypatch):
 
 
 async def test_full_pipeline_with_fake_model(site, data_dir, monkeypatch):
+    from app.pipeline import graph, runtime
+
     llm = FakeLLM({
         "distill": [CompanyProfile.model_validate(_profile(site))],
         "concept": [Concept.model_validate(CONCEPT)],
@@ -127,9 +152,20 @@ async def test_full_pipeline_with_fake_model(site, data_dir, monkeypatch):
         "fix": [FIX_LINT, FIX_EDIT],
         "qa": [QAReport(approved=True, summary="Looks good.", issues=[])],
     })
-    job_id, result = await start_job(site, 6, "Short ad for factories", llm=llm)
+    job_id = runtime.create_job(site, 6, "Short ad for factories")
+    async def failed_check(state, config):
+        raise RuntimeError("Renderer unavailable")
+    with monkeypatch.context() as interrupted:
+        interrupted.setattr(graph, "n_check", failed_check)
+        with pytest.raises(RuntimeError, match="Renderer unavailable"):
+            await runtime.run_job(job_id, llm=llm)
+    assert (await job_state(job_id))["next"] == ["check"]
+    result = await runtime.retry_job(job_id, llm=llm)
+    assert sum(step == "compose" for step, _ in llm.calls) == 1
     assert not result.get("error"), result.get("error")
     assert "__interrupt__" in result  # paused for review
+    with pytest.raises(ValueError, match="no failed step"):
+        await runtime.retry_job(job_id, llm=llm)
     job = data_dir / "jobs" / job_id
 
     profile = json.loads((job / "profile.json").read_text())
@@ -137,7 +173,28 @@ async def test_full_pipeline_with_fake_model(site, data_dir, monkeypatch):
     assert result["fix_round"] == 1 and result["check"]["ok"]  # lint violation fixed in one round
     assert "fetch(" not in (job / "composition" / "composition.js").read_text()
     assert result["qa"]["approved"]
+    from base64 import b64decode
+    from io import BytesIO
+    from PIL import Image
+
+    concept_input = next(msgs[1].content for step, msgs in llm.calls if step == "concept")
+    photo_sheet = Image.open(BytesIO(b64decode(concept_input[1]["data"])))
+    assert photo_sheet.size == (256, 192)  # one website photo, excludes all five client logos
+    assert photo_sheet.getpixel((128, 80))[2] > 180
+    measured = json.loads((job / "check.json").read_text())["keyframe_times"]
+    assert all(k["t"] == measured[k["format"]][k["scene"]] for k in result["keyframes"])
     assert {(k["scene"], k["format"]) for k in result["keyframes"]} == {(s, f) for s in ("s-hook", "s-proof", "s-outro") for f in ("feed", "story")}
+    qa_input = next(msgs[1].content for step, msgs in llm.calls if step == "qa")
+    qa_images = [block for block in qa_input if block["type"] == "image"]
+    assert len(qa_images) == len(result["keyframes"])
+    opening = Image.open(BytesIO(b64decode(qa_images[0]["data"]))).convert("L")
+    assert opening.size == (1308, 697)
+    for top, height in [(22, 240), (284, 341)]:
+        # The synthetic hook starts on a dark empty stage, then reveals white type in both crops.
+        def bright_pixels(column):
+            x = 540 + 192 * column
+            return sum(opening.crop((x, top, x + 192, top + height)).histogram()[200:])
+        assert bright_pixels(0) == 0 and bright_pixels(2) > 15
     assert (job / "brand" / "board.png").exists()
 
     # the fix prompt carried the lint problem and shared the cached system prompt with compose
@@ -154,12 +211,22 @@ async def test_full_pipeline_with_fake_model(site, data_dir, monkeypatch):
     concept = json.loads((job / "concept.json").read_text())
     assert concept["scenes"][1]["texts"][0]["text"] == "Fixed prices"
 
-    result = await resume_job(job_id, {"action": "approve"}, llm=llm)
+    assert (job / "review-music.wav").stat().st_size == 6 * 48_000 * 4 + 44
+    with monkeypatch.context() as checked:
+        checked.setattr("app.render.job.write_soundtrack", lambda *args: pytest.fail("Use the reviewed soundtrack"))
+        result = await resume_job(job_id, {"action": "approve"}, llm=llm)
     assert result["status"] == "done"
+    def decoded_audio(path):
+        command = [imageio_ffmpeg.get_ffmpeg_exe(), "-v", "error", "-i", str(path), "-t", "6",
+                   "-map", "0:a:0", "-ac", "1", "-ar", "8000", "-f", "f32le", "pipe:1"]
+        return np.frombuffer(subprocess.run(command, capture_output=True, check=True).stdout, dtype="<f4")
+
+    reviewed = decoded_audio(job / "review-music.wav")
     for name, size in (("feed", "1080x1350"), ("story", "1080x1920")):
         video = job / result["outputs"][name]
         info = subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), "-hide_banner", "-i", str(video)], capture_output=True, text=True).stderr
         assert "Duration: 00:00:06.00" in info and size in info and "Audio: aac" in info
+        assert np.corrcoef(reviewed, decoded_audio(video))[0, 1] > 0.99
     status = json.loads((job / "status.json").read_text())
     assert status["status"] == "done" and status["cost_usd"] > 0
     assert any("characters so far" in h["message"] for h in status["history"])
@@ -196,11 +263,11 @@ def test_concept_validation_catches_unbacked_claims_and_long_text():
     bad["scenes"][0]["texts"][0]["fact_ids"] = []
     bad["scenes"][1]["texts"][0]["text"] = "This headline is much much too long for a scene that lasts less than two seconds"
     bad["scenes"][2]["assets"] = ["clients/client-00.png"]
-    bad["scenes"][2]["cues"].append({"t": 4.5, "type": "drop"})
+    bad["scenes"][2]["cues"].append({"t": 7, "type": "drop"})
     _, errors = validate_concept(Concept.model_validate(bad), profile, 6, {"logo.svg", "clients/client-00.png"}, False)
     joined = "\n".join(errors)
     assert "needs fact_ids" in joined and "words need" in joined and "client logos are disabled" in joined
-    assert "at most one 'drop'" in joined
+    assert "at most one 'drop'" in joined and "outside the video" in joined
 
 
 def test_concept_timing_snaps_to_beats():
@@ -211,10 +278,48 @@ def test_concept_timing_snaps_to_beats():
     assert [(s.start, s.duration) for s in concept.scenes] == [(0, 2.0), (2.0, 2.0), (4.0, 2.0)]
 
 
+@pytest.mark.parametrize("times,dense_index,expected_cuts", [
+    ([(0, 5), (5, 2), (7, 8)], 1, [0, 5, 9.5]),
+    ([(0, 5), (5, 9), (14, 1.6)], 2, [0, 5, 11]),
+])
+def test_concept_allocates_reading_time_on_beats(times, dense_index, expected_cuts):
+    concept = Concept.model_validate(CONCEPT)
+    duration = sum(length for _, length in times)
+    for scene, (start, length) in zip(concept.scenes, times):
+        scene.start, scene.duration = start, length
+        for cue in scene.cues:
+            cue.t = start
+    dense = concept.scenes[dense_index]
+    dense.texts[0].text = "Build and run more reliable robots for small factories across the entire country."
+    for t in (dense.start, dense.start + dense.duration, 0.75):
+        dense.cues.append(ConceptCue(t=t, type="bell"))
+    dense.cues[0].t += dense.duration / 2
+    profile = CompanyProfile.model_validate(_profile("https://example.com/"))
+    concept, errors = validate_concept(concept, profile, duration, {"logo.svg"}, False)
+    assert not errors
+    assert [s.start for s in concept.scenes] == expected_cuts
+    assert dense.duration >= 4.45
+    assert dense.cues[0].t == pytest.approx(dense.start + dense.duration / 2)
+    assert [cue.t for cue in dense.cues[-3:]] == pytest.approx([dense.start, dense.start + dense.duration, 0.75])
+    assert concept.scenes[-1].start + concept.scenes[-1].duration == pytest.approx(duration)
+
+
 def test_quote_index_tolerates_whitespace_and_typography():
     idx = QuoteIndex("Wir   entwickeln KI, die im\nTagesgeschäft wirkt – „klar“ und messbar.")
     assert idx.verified("Wir entwickeln KI, die im Tagesgeschäft wirkt - \"klar\" und messbar.")
     assert not idx.verified("Wir sind Weltmarktführer für KI im Tagesgeschäft")
+
+
+def test_copy_after_review_uses_only_explicit_copy_requests():
+    concept = Concept.model_validate(CONCEPT)
+    assert expected_copy(concept, None)["proof-title"] == "Fixed-price projects"
+    copy = concept.scenes[1].texts[0]
+    copy.text = "Fixed prices"
+    concept.scenes[1].texts.append(copy.model_copy(update={"id": "design-offer", "text": "Start today"}))
+    review = {"text": "Translate the rest into German", "texts": {"proof-title": "Fixed prices"},
+              "design": {"frames": [{"elements": [{"kind": "text", "id": "offer"}]}]}}
+    assert expected_copy(concept, review) == {"proof-title": "Fixed prices", "design-offer": "Start today"}
+    assert expected_copy(concept, {"text": "Translate everything"}) == {}
 
 
 def test_lint_flags_sandbox_violations():

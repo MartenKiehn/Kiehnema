@@ -81,6 +81,10 @@
     const until = opts.visibleUntil ?? start + duration + 0.05;
     tl.set(el, { visibility: 'visible' }, from);
     tl.set(el, { visibility: 'hidden' }, until);
+    const photos = $$('[data-mg-photo] > img', el);
+    if (photos.length) {
+      tl.fromTo(photos, { scale: 1 }, { scale: 1.08, duration, ease: 'none' }, start);
+    }
     scenes.push({ id, start, duration, whoosh: opts.whoosh !== false });
     return { T: start, D: duration, end: start + duration, el, sel: `#${id}` };
   }
@@ -121,14 +125,6 @@
   window.__seek = (t) => { tl.seek(t, false); };
   window.__mg = { scenes, cues, manifest, format: FORMAT };
 
-  // Visible words of an element: text nodes joined by spaces (<br> and nested blocks separate words).
-  const textOf = (el) => {
-    const parts = [];
-    const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-    while (walk.nextNode()) parts.push(walk.currentNode.textContent);
-    return parts.join(' ').replace(/\s+/g, ' ').trim();
-  };
-
   // Readability/layout probe used by the automated checks (app/checks/runtime.py).
   window.__mgProbe = () => {
     const sr = stage.getBoundingClientRect();
@@ -151,13 +147,13 @@
         const b = wi.parentElement.getBoundingClientRect();
         if (a.top >= b.top - 2 && a.bottom <= b.bottom + 2) shown++;
       }
-      // <br> separates words visually but not in textContent, so prefer the word masks.
-      const text = ws.length
-        ? ws.map((w) => w.textContent).join(' ')
-        : textOf(el);
+      const copy = (el.innerText ?? el.textContent).replace(/\s+/g, ' ').trim();
+      const text = copy || (el.matches('img') ? el : el.querySelector('img'))?.alt || '';
       return {
         id: el.dataset.textId,
+        scene: el.closest('.mg-scene')?.id,
         text,
+        textTransform: getComputedStyle(el).textTransform,
         words: ws.length || (text ? text.split(' ').length : 0),
         opacity,
         hidden,
@@ -173,14 +169,20 @@
       if (!build) throw new Error('composition.js did not call MG.composition(fn)');
       if (!(DURATION > 0)) throw new Error('manifest.duration missing');
       $$('.split').forEach(split);
+      // Compositions measure text while building their timeline, so load the actual brand faces first.
+      await Promise.all((theme.fonts || []).map((f) =>
+        document.fonts.load(`${f.style || 'normal'} ${f.weight || 400} 40px "${f.family}"`)));
+      await document.fonts.ready;
       build({ tl, gsap, W, H, FORMAT, isStory: FORMAT === 'story', RENDER, manifest, theme,
         $, $$, scene, words, fadeUp, exitUp, EXIT, stroke, cue, split });
       tl.set({}, {}, DURATION); // fixed total length
-      const families = (theme.fonts || []).map((f) => f.family);
-      await Promise.all(families.map((fam) => document.fonts.load(`40px "${fam}"`)));
       await document.fonts.ready;
-      await Promise.all($$('img').map((img) => img.decode().catch(() => {})));
-      tl.seek(0);
+      await Promise.all($$('img').map((img) => img.decode().catch(() => {
+        const src = img.currentSrc || img.getAttribute('src');
+        if (src && !img.naturalWidth) console.error('asset failed to load: ' + src.slice(0, 250));
+      })));
+      // A freshly paused timeline already reports time zero; force its opening sets to render.
+      tl.render(0, true, true);
       window.__ready = true;
       if (!RENDER) preview();
     } catch (err) {

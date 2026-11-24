@@ -11,6 +11,7 @@ from app.security.workspace import browser_environment
 
 import asyncio
 import base64
+from io import BytesIO
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,6 +19,7 @@ from typing import Awaitable, Callable
 from urllib.parse import urlsplit
 
 import imageio_ffmpeg
+from PIL import Image, ImageDraw
 from playwright.async_api import Browser, CDPSession, Page, Route, async_playwright
 
 log = logging.getLogger(__name__)
@@ -163,13 +165,59 @@ async def render_video(
         await page.context.close()
 
 
+class OpeningSheet:
+    """Small, timestamped samples alongside the first held frame in one QA image."""
+
+    def __init__(self):
+        self.rows: list[Image.Image] = []
+
+    async def capture(self, page: Page, fmt: VideoFormat) -> None:
+        times = (0, 0.5, 1, 2)
+        tile_width, label_height = 192, 22
+        scale = tile_width / fmt.width
+        row = Image.new("RGB", (tile_width * len(times), round(fmt.height * scale) + label_height), "white")
+        draw = ImageDraw.Draw(row)
+        session = await page.context.new_cdp_session(page)
+        try:
+            for column, t in enumerate(times):
+                await _seek(page, t)
+                shot = await session.send("Page.captureScreenshot", {
+                    "format": "jpeg", "quality": 80,
+                    "clip": {"x": 0, "y": 0, "width": fmt.width, "height": fmt.height, "scale": scale},
+                })
+                x = column * tile_width
+                with Image.open(BytesIO(base64.b64decode(shot["data"]))) as tile:
+                    row.paste(tile, (x, label_height))
+                draw.text((x + 4, 2), f"{fmt.name}  {t:g} s", fill="black", font_size=14)
+        finally:
+            await session.detach()
+        self.rows.append(row)
+
+    def save(self, held: Path, label: str, dest: Path) -> None:
+        with Image.open(held) as frame:
+            frame.thumbnail((540, 1080))
+            width = frame.width + self.rows[0].width
+            height = max(frame.height + 22, sum(row.height for row in self.rows))
+            sheet = Image.new("RGB", (width, height), "white")
+            ImageDraw.Draw(sheet).text((4, 2), label, fill="black", font_size=14)
+            sheet.paste(frame, (0, 22))
+            y = 0
+            for row in self.rows:
+                sheet.paste(row, (frame.width, y))
+                y += row.height
+        sheet.save(dest, "JPEG", quality=85)
+
+
 async def render_stills(
-    browser: Browser, base_url: str, page_path: str, fmt: VideoFormat, times: list[float], out_dir: Path
+    browser: Browser, base_url: str, page_path: str, fmt: VideoFormat, times: list[float], out_dir: Path,
+    *, opening: OpeningSheet | None = None,
 ) -> tuple[list[Path], PageDiagnostics]:
     page, diag = await _open_page(browser, base_url, page_path, fmt)
     out_dir.mkdir(parents=True, exist_ok=True)
     paths: list[Path] = []
     try:
+        if opening is not None:
+            await opening.capture(page, fmt)
         for t in times:
             await _seek(page, t)
             path = out_dir / f"{fmt.name}-{t:06.2f}s.png"

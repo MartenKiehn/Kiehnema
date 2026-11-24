@@ -106,6 +106,15 @@ def review_form(client):
             "text:hook-title": "Robots that work.", "action": "approve"}
 
 
+def test_review_preview_is_silent_even_with_export_music(review_job, client):
+    (review_job / "review-music.wav").write_bytes(b"RIFF" + bytes(40))
+    response = client.get(f"/jobs/{JOB}")
+    assert response.status_code == 200
+    assert "<audio" not in response.text
+    assert "Music is added in the final render." in response.text
+    assert client.get(f"/jobs/{JOB}/files/review-music.wav").status_code == 404
+
+
 def test_index_validation_and_static_assets(client):
     response = client.get("/")
     assert "img-src 'self' data: blob:;" in response.headers['Content-Security-Policy']
@@ -476,6 +485,70 @@ def test_review_validation_blocks_bad_or_unchecked_copy(review_job, client, monk
     state = {"values": {"check": {"ok": False}}, "next": ["review"], "interrupts": [{}]}
     monkeypatch.setattr(jobs, "job_state", AsyncMock(return_value=state))
     assert client.post(f"/jobs/{JOB}/review", data=form).status_code == 422
+
+
+@pytest.mark.parametrize("step,approved", [("distill", False), ("render", True)])
+def test_retry_failed_step_uses_checkpoint_and_does_not_count_a_new_request(review_job, client, monkeypatch, step, approved):
+    from app.security import accounts
+
+    write_status(review_job, "failed", "Provider timed out")
+    if not approved:
+        (review_job / "concept.json").unlink()  # Failures may precede the storyboard.
+    (review_job / "_checkpoint.sqlite").write_bytes(b"test checkpoint")
+    values = {"job_id": JOB, "check": {"ok": True}, "review": {"action": "approve"} if approved else {}}
+    jobs.job_state.return_value = {"next": [step], "interrupts": [], "values": values}
+    retry = AsyncMock(return_value={})
+    monkeypatch.setattr(jobs, "retry_job", retry)
+    url = f"/jobs/{JOB}"
+    html = client.get(url).text
+    assert "Retry failed step" in html and "charge for additional model calls" in html
+    form = {"revision": re.search(r'name="revision" value="([a-f0-9]+)"', html)[1]}
+    assert client.post(url + "/retry", data=form, headers={"X-CSRF-Token": "wrong"}).status_code == 403
+    assert client.post(url + "/retry", data={"revision": "old"}).status_code == 409
+    with accounts.database() as db:
+        db.execute("UPDATE jobs SET active=2 WHERE id=?", (JOB,))
+    assert client.post(url + "/retry", data=form).status_code == 409
+    assert json.loads((review_job / "status.json").read_text())["status"] == "failed"
+    retry.assert_not_awaited()
+    with accounts.database() as db:
+        db.execute("UPDATE jobs SET active=0 WHERE id=?", (JOB,))
+    response = client.post(url + "/retry", data=form, follow_redirects=False)
+    assert response.status_code == 303 and response.headers["location"] == url
+    retry.assert_awaited_once_with(JOB)
+    assert client.post(url + "/retry", data=form).status_code == 409
+    assert accounts.video_requests() == []
+
+
+@pytest.mark.parametrize("status,checkpoint,next_node,interrupts", [
+    ("failed", False, "check", []), ("failed", True, None, []),
+    ("failed", True, "review", [{"review": "pending"}]), ("failed", True, "render", []),
+    ("review", True, "check", []), ("interrupted", True, "check", []),
+])
+def test_retry_rejects_unavailable_checkpoints_and_wrong_states(review_job, client, status, checkpoint, next_node, interrupts):
+    write_status(review_job, status, "Test state")
+    if checkpoint:
+        (review_job / "_checkpoint.sqlite").write_bytes(b"test checkpoint")
+    jobs.job_state.return_value = {"next": [next_node] if next_node else [], "interrupts": interrupts,
+                                   "values": {"job_id": JOB, "check": {"ok": True}}}
+    url = f"/jobs/{JOB}"
+    assert "Retry failed step" not in client.get(url).text
+    from app.web.main import revision
+    assert client.post(url + "/retry", data={"revision": revision(review_job), "action": "approve"}).status_code == 409
+    assert json.loads((review_job / "status.json").read_text())["status"] == status
+
+
+def test_retry_rechecks_state_after_loading_checkpoint(review_job, client):
+    from app.web.main import revision
+
+    write_status(review_job, "failed", "Test failure")
+    (review_job / "_checkpoint.sqlite").write_bytes(b"test checkpoint")
+    form = {"revision": revision(review_job)}
+    async def state_changed(job_id):
+        write_status(review_job, "review", "Ready for approval")
+        return {"next": ["check"], "interrupts": [], "values": {"job_id": job_id}}
+    jobs.job_state.side_effect = state_changed
+    assert client.post(f"/jobs/{JOB}/retry", data=form).status_code == 409
+    assert json.loads((review_job / "status.json").read_text())["status"] == "review"
 
 
 def test_reopen_completed_job_and_reject_stale_requests(review_job, client, monkeypatch):

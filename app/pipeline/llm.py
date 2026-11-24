@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import io
 import json
 import time
 from dataclasses import dataclass, field
@@ -11,7 +12,7 @@ from pathlib import Path
 from typing import Any, Callable, Protocol, TypeVar
 
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
-from PIL import Image
+from PIL import Image, ImageDraw
 from pydantic import BaseModel
 
 from app.llm import client
@@ -40,11 +41,43 @@ def image_block(path: Path, max_side: int = 540) -> dict:
         img = Image.new("RGB", source.size, "white")
         img.paste(rgba, mask=rgba.getchannel("A"))
     img.thumbnail((max_side, max_side * 2))
-    import io
+    return _jpeg_block(img)
 
+
+def _jpeg_block(img: Image.Image) -> dict:
     buf = io.BytesIO()
     img.save(buf, "JPEG", quality=85)
     return {"type": "image", "source_type": "base64", "mime_type": "image/jpeg", "data": base64.b64encode(buf.getvalue()).decode()}
+
+
+def website_photo_sheet(brand_dir: Path, assets: list[dict]) -> dict | None:
+    """Show the storyboard model the uncropped, locally extracted website photos."""
+    photos = []
+    root = brand_dir.resolve()
+    for asset in assets:
+        if asset["kind"] != "photo":
+            continue
+        path = (root / asset["file"]).resolve()
+        if not path.is_relative_to(root):
+            continue
+        try:
+            with Image.open(path) as source:
+                source.thumbnail((246, 162))
+                photos.append((asset["file"], source.convert("RGB")))
+        except (OSError, Image.DecompressionBombError):
+            continue
+        if len(photos) == 12:
+            break
+    if not photos:
+        return None
+    columns = min(3, len(photos))
+    sheet = Image.new("RGB", (columns * 256, ((len(photos) + columns - 1) // columns) * 192), "white")
+    draw = ImageDraw.Draw(sheet)
+    for index, (name, photo) in enumerate(photos):
+        x, y = (index % columns) * 256, (index // columns) * 192
+        sheet.paste(photo, (x + (256 - photo.width) // 2, y + (166 - photo.height) // 2))
+        draw.text((x + 5, y + 168), name, fill="black", font_size=16)
+    return _jpeg_block(sheet)
 
 
 def messages(system: str, user: str | list[dict]) -> list[BaseMessage]:

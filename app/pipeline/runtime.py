@@ -100,6 +100,25 @@ async def resume_job(job_id: str, decision: dict, *, llm: LLM | None = None, gua
         return await graph.ainvoke(Command(resume=decision), _config(job_id, llm, guard))
 
 
+def can_retry(next_nodes, interrupts, values: dict) -> bool:
+    if len(next_nodes) != 1 or interrupts or not values.get("job_id"):
+        return False
+    step = next_nodes[0]
+    if step == "render":
+        return values.get("review", {}).get("action") == "approve" and bool(values.get("check", {}).get("ok"))
+    return step in {"crawl", "brand", "distill", "concept", "compose", "check", "fix", "keyframes", "qa", "review"}
+
+
+async def retry_job(job_id: str, *, llm: LLM | None = None, guard: UrlGuard | None = None) -> dict:
+    """Continue at the saved graph node. Passing new input would start the entire job again."""
+    async with _graph() as graph:
+        snapshot = await graph.aget_state({"configurable": {"thread_id": job_id}})
+        if not can_retry(snapshot.next, any(t.interrupts for t in snapshot.tasks), snapshot.values):
+            raise ValueError("This job has no failed step to retry.")
+        model = llm or _model(jobs_dir() / job_id, snapshot.values.get("usage"))
+        return await graph.ainvoke(None, _config(job_id, model, guard))
+
+
 async def job_state(job_id: str) -> dict:
     async with _graph() as graph:
         snapshot = await graph.aget_state({"configurable": {"thread_id": job_id}})

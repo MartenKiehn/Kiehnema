@@ -20,6 +20,10 @@ from app.security.workspace import ram_root
 from app.llm.provider import require as provider_configuration
 
 
+class ResultReadError(RuntimeError):
+    """The worker exited successfully, but its checkpoint result could not be read."""
+
+
 def jobs_dir():
     return vault.VaultRoot()
 
@@ -82,7 +86,10 @@ async def execute(job_id: str, action: str, decision: dict | None = None) -> dic
                     pass
             if process.returncode:
                 raise RuntimeError("The secure worker failed. Check the private job activity.")
-        state = await job_state(job_id)
+        try:
+            state = await job_state(job_id)
+        except Exception as exc:
+            raise ResultReadError(f"Could not read the completed worker's checkpoint ({type(exc).__name__}).") from exc
         return {**state["values"], **({"__interrupt__": state["interrupts"]} if state["interrupts"] else {})}
     finally:
         with database() as con:
@@ -91,6 +98,10 @@ async def execute(job_id: str, action: str, decision: dict | None = None) -> dic
 
 async def run_job(job_id: str) -> dict:
     return await execute(job_id, "run")
+
+
+async def retry_job(job_id: str) -> dict:
+    return await execute(job_id, "retry")
 
 
 async def resume_job(job_id: str, decision: dict) -> dict:

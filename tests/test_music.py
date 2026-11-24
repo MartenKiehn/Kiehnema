@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from app.harness.build import MusicSpec
-from app.music.synth import SR, MusicPlan, parse_chord, synthesize, write_wav
+from app.music.synth import SR, MusicPlan, _Synth, parse_chord, synthesize, write_wav
 
 
 @pytest.mark.parametrize(("name", "bass", "pcs"), [
@@ -62,3 +62,53 @@ def test_calm_energy_has_no_kick():
     medium = synthesize(MusicPlan.from_registry(6, MusicSpec(energy="medium"), SCENES[:3], cues))
     low = lambda x: np.abs(np.fft.rfft(x[int(2.5 * SR):int(3.5 * SR)].mean(1)))[:120].sum()  # < 60 Hz  # noqa: E731
     assert low(medium) > 2 * low(calm)
+
+
+def test_high_energy_bass_adds_pickups_between_offbeats():
+    def bass(energy):
+        plan = MusicPlan.from_registry(2, MusicSpec(bpm=120, energy=energy), [], [{"t": 0, "type": "drop"}])
+        synth = _Synth(plan)
+        synth.build_bass()
+        return synth.bass
+
+    medium, high = bass("medium"), bass("high")
+    assert np.array_equal(high[:int(0.35 * SR)], medium[:int(0.35 * SR)])
+    for t in (0.98, 1.98):
+        assert _energy(medium, t, t + 0.01) == 0
+        assert _energy(high, t, t + 0.01) > 0.01
+
+
+def test_stop_ducks_the_full_groove_and_recovers():
+    cues = [{"t": 0, "type": "drop"}, {"t": 0, "type": "groove"}]
+    playing = synthesize(MusicPlan.from_registry(6, MusicSpec(), [], cues))
+    paused = synthesize(MusicPlan.from_registry(6, MusicSpec(), [], [*cues, {"t": 2, "type": "stop", "until": 3}]))
+    ratio = lambda a, b: _energy(paused, a, b) / _energy(playing, a, b)
+    assert ratio(2.3, 2.9) < 0.45 * ratio(1.3, 1.9)
+    assert ratio(3.5, 4.0) == pytest.approx(ratio(1.3, 1.9), rel=0.03)
+
+
+def test_short_overlapping_stops_release_smoothly():
+    cues = [{"t": 0.2, "type": "stop", "until": 0.21}, {"t": 0.3, "type": "stop", "until": 0.4}]
+    def envelope(markers):
+        return _Synth(MusicPlan.from_registry(1, MusicSpec(), [], markers)).stop_gain()
+
+    expected = np.minimum(envelope(cues[:1]), envelope(cues[1:]))
+    assert np.array_equal(envelope(cues), expected)
+    assert np.max(abs(np.diff(expected))) < 0.001
+
+
+def test_tick_ends_with_the_video(monkeypatch):
+    plan = MusicPlan.from_registry(1, MusicSpec(bpm=120), [], [{"t": 0, "type": "tick", "until": 30}])
+    synth = _Synth(plan)
+    calls = []
+    monkeypatch.setattr(synth, "add_stereo", lambda dst, start, *rest: calls.append(start))
+    synth.sound_design()
+    assert calls == [0, SR // 4, SR // 2, 3 * SR // 4]
+
+
+@pytest.mark.parametrize("cut", [round(2 * 60 / 112, 3), 0.85])
+def test_kick_leaves_space_before_rounded_and_offbeat_cuts(cut):
+    plan = MusicPlan.from_registry(2, MusicSpec(bpm=112), [{"start": cut}], [{"t": 0, "type": "drop"}])
+    synth = _Synth(plan)
+    synth.build_drums()
+    assert synth.kick_times == pytest.approx([0, 2 * 60 / 112, 3 * 60 / 112])

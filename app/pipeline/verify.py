@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import math
 import re
 import unicodedata
 
 from app.checks.runtime import required_reading_time
 from app.music.synth import CUE_TYPES, parse_chord
-from app.pipeline.schemas import CompanyProfile, Concept
+from app.pipeline.schemas import CompanyProfile, Concept, ConceptScene
 
 # ---------------------------------------------------------------- quotes
 
@@ -68,6 +69,41 @@ def verify_profile(profile: CompanyProfile, site_text: str, page_urls: set[str])
 NEEDS_FACT = {"headline", "subline", "quote", "body"}
 
 
+def _minimum_scene_time(scene: ConceptScene) -> float:
+    words = [len(text.text.split()) for text in scene.texts]
+    return max(1.5, sum(words) / 4, required_reading_time(max(words, default=0)) + 0.7)
+
+
+def _fit_cuts(scenes: list[ConceptScene], duration: float, beat: float) -> None:
+    if not scenes:
+        return
+    # The final cut can fall between beats. Reserve its reading time before sharing spare beats.
+    last_start = math.floor((duration - _minimum_scene_time(scenes[-1])) / beat + 1e-9)
+    minimum_beats = [math.ceil(_minimum_scene_time(s) / beat - 1e-9) for s in scenes[:-1]]
+    spare = last_start - sum(minimum_beats)
+    cuts = [0.0]
+    previous_beat = 0
+    planned_end = 0.0
+    for scene, minimum in zip(scenes, minimum_beats):
+        planned_end += scene.duration
+        cut = round(planned_end / beat)
+        if spare >= 0:
+            earliest = previous_beat + minimum
+            cut = max(earliest, min(cut, earliest + spare))
+            spare -= cut - earliest
+        cuts.append(round(cut * beat, 3))
+        previous_beat = cut
+    cuts.append(duration)
+    for scene, start, end in zip(scenes, cuts, cuts[1:]):
+        length = round(end - start, 3)
+        for cue in scene.cues:
+            # A cue outside its own scene is an explicit absolute time (e.g. a lead-in).
+            if scene.duration > 0 and scene.start <= cue.t <= scene.start + scene.duration + 1e-9:
+                position = (cue.t - scene.start) / scene.duration
+                cue.t = round(start + min(position, 1) * length, 3)
+        scene.start, scene.duration = start, length
+
+
 def validate_concept(concept: Concept, profile: CompanyProfile, duration: float, assets: set[str],
                      allow_client_logos: bool) -> tuple[Concept, list[str]]:
     """Normalise timing to the beat grid; return (concept, errors). Errors are fed back to the model."""
@@ -76,15 +112,10 @@ def validate_concept(concept: Concept, profile: CompanyProfile, duration: float,
     scenes = sorted(concept.scenes, key=lambda s: s.start)
     if not 3 <= len(scenes) <= 12:
         errors.append(f"use 3-12 scenes (got {len(scenes)})")
-    # snap cuts to the beat grid and make scenes contiguous, ending exactly at `duration`
-    t = 0.0
-    for i, s in enumerate(scenes):
-        s.start = round(t, 3)
-        end = duration if i == len(scenes) - 1 else round(round((s.start + s.duration) / beat) * beat, 3)
-        s.duration = round(end - s.start, 3)
+    _fit_cuts(scenes, duration, beat)
+    for s in scenes:
         if s.duration < 1.5:
             errors.append(f"scene {s.id}: too short ({s.duration:.2f}s, minimum 1.5s)")
-        t = end
     ids = [s.id for s in scenes]
     if len(set(ids)) != len(ids) or not all(re.fullmatch(r"s-[a-z0-9-]+", i) for i in ids):
         errors.append("scene ids must be unique and look like s-hook, s-proof, ...")
@@ -116,6 +147,8 @@ def validate_concept(concept: Concept, profile: CompanyProfile, duration: float,
         for c in s.cues:
             if c.type not in CUE_TYPES:
                 errors.append(f"scene {s.id}: unknown cue type {c.type!r}")
+            if not 0 <= c.t <= duration:
+                errors.append(f"scene {s.id}: {c.type} cue at {c.t}s is outside the video")
     all_cues = [c for s in scenes for c in s.cues]
     for kind in ("drop", "outro"):
         if len([c for c in all_cues if c.type == kind]) > 1:
@@ -135,6 +168,17 @@ def validate_concept(concept: Concept, profile: CompanyProfile, duration: float,
 
 
 # ---------------------------------------------------------------- generated code lint
+
+def expected_copy(concept: Concept, review: dict | None) -> dict[str, str]:
+    texts = {t.id: t.text for s in concept.scenes for t in s.texts}
+    if not review:
+        return texts
+    # Free-form feedback can request a translation; only explicitly specified copy is binding afterward.
+    edited = set(review.get("texts", {}))
+    for frame in review.get("design", {}).get("frames", []):
+        edited.update("design-" + e["id"] for e in frame["elements"] if e["kind"] == "text")
+    return {key: value for key, value in texts.items() if key in edited}
+
 
 _ALLOWED_URLS = ("http://www.w3.org/2000/svg", "http://www.w3.org/1999/xlink", "http://www.w3.org/1999/xhtml")
 _JS_FORBIDDEN = {

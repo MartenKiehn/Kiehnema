@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from app.security.workspace import browser_environment
 
+import asyncio
 import json
 import logging
 import math
@@ -32,16 +33,17 @@ from app.checks.runtime import check_site
 from app.crawl.crawler import CrawlResult, crawl, site_markdown
 from app.crawl.guard import UrlGuard
 from app.harness.build import Theme, build_site
+from app.music.synth import write_soundtrack
 from app.pipeline import prompts
 from app.pipeline.files import COMPOSITION_FILES, apply_edits, parse_files, theme_for, write_composition
-from app.pipeline.llm import LLM, estimate_cost, image_block, messages
+from app.pipeline.llm import LLM, estimate_cost, image_block, messages, website_photo_sheet
 from app.pipeline.schemas import CompanyProfile, Concept, ConceptText, QAReport, SceneChange
 from app.pipeline.sources import file_brand, file_profile_prompt, read_sources, verify_file_profile
 from app.pipeline.design import DesignDraft
 from app.pipeline.status import write_status
-from app.pipeline.verify import lint_composition, validate_concept, verify_profile
+from app.pipeline.verify import expected_copy, lint_composition, validate_concept, verify_profile
 from app.render.job import render_site
-from app.render.renderer import FORMATS, render_stills
+from app.render.renderer import FORMATS, OpeningSheet, render_stills
 from app.render.server import serve_directory
 
 log = logging.getLogger(__name__)
@@ -241,12 +243,15 @@ async def n_concept(state: JobState, config: RunnableConfig) -> dict:
     user = prompts.concept_user(url=state["url"], duration=state["duration"], description=state.get("description", ""),
                                 profile=profile.model_dump(), brand=brand_summary, assets=assets,
                                 allow_client_logos=allow)
+    sheet = None if state.get("source_mode") == "files" else website_photo_sheet(_dir(state) / "brand", assets)
     errors: list[str] = []
     concept: Concept | None = None
     for attempt in range(MAX_CONCEPT_ATTEMPTS):
         content = user if not errors else (
             f"{user}\n\nYour previous storyboard:\n{concept.model_dump_json()}\n\n"
             "It violates these constraints – return a corrected storyboard:\n- " + "\n- ".join(errors))
+        if sheet:
+            content = [{"type": "text", "text": content}, sheet]
         concept = await _llm(config).structured("concept", Concept, messages(prompts.CONCEPT_SYSTEM, content),
                                                 effort="medium", max_tokens=32_000)
         concept, errors = validate_concept(concept, profile, state["duration"], {a["file"] for a in assets}, allow)
@@ -277,12 +282,19 @@ async def n_compose(state: JobState, config: RunnableConfig) -> dict:
 
 async def n_check(state: JobState, config: RunnableConfig) -> dict:
     _status(state, "check", "Checking contract, determinism, readability and layout")
+    soundtrack = _dir(state) / "review-music.wav"
+    soundtrack.unlink(missing_ok=True)
     lint = state.get("lint", [])
     if lint:
         report = {"ok": False, "issues": [{"severity": "error", "code": "lint", "message": m} for m in lint], "texts": []}
     else:
         site = build_site(_dir(state) / "composition", _dir(state) / "site")
-        rep = await check_site(site)
+        rep = await check_site(site, expected_texts=expected_copy(_concept(state), state.get("review")))
+        if rep.ok and rep.music:
+            try:
+                await asyncio.to_thread(write_soundtrack, rep.music, soundtrack)
+            except (TypeError, ValueError, ArithmeticError) as exc:
+                rep.add("error", "soundtrack", f"Could not synthesize the soundtrack. Check chords and cue options: {exc}")
         report = rep.as_dict()
     (_dir(state) / "check.json").write_text(json.dumps(report, ensure_ascii=False, indent=1))
     errors = [i for i in report["issues"] if i["severity"] == "error"]
@@ -333,8 +345,14 @@ async def n_fix(state: JobState, config: RunnableConfig) -> dict:
     return {"lint": lint, "fix_round": rnd, "fix_instruction": None, **_usage(config)}
 
 
-def _keyframe_times(concept: Concept) -> list[tuple[str, float]]:
-    return [(s.id, round(s.start + min(s.duration - 0.5, max(1.3, 0.62 * s.duration)), 2)) for s in concept.scenes]
+def _keyframe_times(concept: Concept, measured: dict[str, float]) -> list[tuple[str, float]]:
+    times = []
+    for s in concept.scenes:
+        t = measured.get(s.id)
+        if t is None or not s.start <= t < s.start + s.duration:
+            t = round(s.start + min(s.duration - 0.5, max(1.3, 0.62 * s.duration)), 2)
+        times.append((s.id, t))
+    return times
 
 
 async def n_keyframes(state: JobState, config: RunnableConfig) -> dict:
@@ -344,17 +362,24 @@ async def n_keyframes(state: JobState, config: RunnableConfig) -> dict:
     rnd = state.get("fix_round", 0)
     out = _dir(state) / "keyframes" / f"r{rnd}"
     frames: list[dict] = []
-    times = _keyframe_times(concept)
+    opening = None if state.get("qa_done") else OpeningSheet()
+    check = _dir(state) / "check.json"
+    measured = _read_json(check).get("keyframe_times", {}) if check.is_file() else {}
     with serve_directory(site) as base:
         async with async_playwright() as pw:
             browser = await pw.chromium.launch(env=browser_environment(), chromium_sandbox=True)
             try:
                 for fmt in ("feed", "story"):
-                    paths, _ = await render_stills(browser, base, "index.html", FORMATS[fmt], [t for _, t in times], out)
+                    times = _keyframe_times(concept, measured.get(fmt, {}))
+                    paths, _ = await render_stills(browser, base, "index.html", FORMATS[fmt], [t for _, t in times], out,
+                                                   opening=opening)
                     frames += [{"scene": sid, "format": fmt, "t": t, "file": str(p.relative_to(_dir(state)))}
                                for (sid, t), p in zip(times, paths)]
             finally:
                 await browser.close()
+    if opening is not None and frames:
+        first = frames[0]
+        opening.save(_dir(state) / first["file"], f"Held frame: {first['format']}  {first['t']:g} s", out / "opening.jpg")
     return {"keyframes": frames}
 
 
@@ -363,8 +388,15 @@ async def n_qa(state: JobState, config: RunnableConfig) -> dict:
         return {}
     _status(state, "qa", "Art-director review of the keyframes", config)
     concept = _concept(state)
-    frames = [(f"scene {f['scene']} · {f['format']} · t={f['t']}s", image_block(_dir(state) / f["file"]))
-              for f in state["keyframes"]]
+    frames = []
+    for index, frame in enumerate(state["keyframes"]):
+        path = _dir(state) / frame["file"]
+        label = f"scene {frame['scene']} · {frame['format']} · t={frame['t']}s"
+        opening = path.with_name("opening.jpg")
+        if index == 0 and opening.is_file():
+            frames.append((label + " (left); opening samples from both formats (right)", image_block(opening, max_side=1400)))
+        else:
+            frames.append((label, image_block(path)))
     report = await _llm(config).structured("qa", QAReport, messages(prompts.QA_SYSTEM, prompts.qa_user(frames, concept.model_dump())),
                                            effort="medium", max_tokens=16_000)
     (_dir(state) / "qa.json").write_text(report.model_dump_json(indent=1))
@@ -499,7 +531,9 @@ async def n_render(state: JobState, config: RunnableConfig) -> dict:
         _status(state, "render", message, render_progress={"percent": percent, "eta_seconds": eta,
                                                           "format": fmt if fraction < 1 else None})
 
-    result = await render_site(site, _dir(state) / "renders", formats=formats, progress=progress)
+    soundtrack = _dir(state) / "review-music.wav"
+    result = await render_site(site, _dir(state) / "renders", formats=formats, progress=progress,
+                               reviewed_soundtrack=soundtrack if soundtrack.is_file() else None)
     outputs = {k: str(v.relative_to(_dir(state))) for k, v in result.videos.items()}
     _status(state, "done", "Videos ready", config, outputs=outputs,
             render_progress={"percent": 100, "eta_seconds": 0})
